@@ -1,0 +1,472 @@
+/* ============================================================================
+   FRAPPE / ERPNEXT INSPIRED DESIGN SYSTEM
+   ============================================================================ */
+:root, [data-theme="light"] {
+    --bg-main: #f4f5f6;
+    --bg-sidebar: #f8f9fa;
+    --bg-surface: #ffffff;
+    --text-primary: #171717;
+    --text-muted: #6b7280;
+    --brand-accent: #2490ef; 
+    --brand-success: #10b981;
+    --brand-danger: #ef4444;
+    --border-subtle: #d1d8dd;
+    --border-light: #e2e8f0;
+    --combobox-hover: #f1f5f9;
+    --radius-md: 8px;
+    --radius-sm: 4px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+[data-theme="dark"] {
+    --bg-main: #17171c;
+    --bg-sidebar: #1f212a;
+    --bg-surface: #262932;
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    --brand-accent: #3b82f6; 
+    --brand-success: #22c55e;
+    --brand-danger: #ef4444;
+    --border-subtle: #334155;
+    --border-light: #475569;
+    --combobox-hover: #334155;
+    --radius-md: 8px;
+    --radius-sm: 4px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    margin: 0; padding: 0;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Frappe Layout Core */
+.frappe-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.frappe-sidebar {
+    width: 260px;
+    background-color: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sidebar-menu {
+    padding: 15px 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.menu-group {
+    margin-bottom: 20px;
+}
+
+.menu-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin: 0 0 8px 10px;
+    display: block;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    margin-bottom: 2px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.menu-item:hover {
+    background-color: var(--border-light);
+}
+
+.menu-item.active {
+    background-color: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+    color: var(--brand-accent);
+}
+
+.sidebar-badge {
+    background: var(--brand-danger);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 12px;
+}
+
+/* Main Area */
+.frappe-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.frappe-navbar {
+    height: 60px;
+    background-color: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    flex-shrink: 0;
+}
+
+.navbar-breadcrumb {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.frappe-content {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+/* Frappe Cards */
+.frappe-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+    max-width: 1400px;
+}
+
+.system-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.system-header h2, .system-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.btn-primary { background: var(--brand-accent); color: white; }
+.btn-success { background: var(--brand-success); color: white; }
+.btn-secondary { background: var(--bg-main); border-color: var(--border-subtle); color: var(--text-primary); }
+.btn-text-danger { background: none; border: none; color: var(--brand-danger); font-size: 13px; cursor: pointer; font-weight: 600;}
+
+/* Inputs */
+.form-input, .form-select-native {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-size: 13px;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+
+.form-input:focus, .form-select-native:focus {
+    outline: none;
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 3px rgba(36,144,239,0.15);
+}
+
+.form-group { margin-bottom: 15px; }
+.input-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.form-grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.grid-span-2 { grid-column: span 2; }
+.grid-span-3 { grid-column: span 3; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+td { padding: 10px; border-bottom: 1px solid var(--border-light); }
+
+/* Modals Overlay Base Styling */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(2px); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+.modal-box { background: var(--bg-surface); padding: 24px; border-radius: var(--radius-md); max-width: 400px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); color: var(--text-primary);}
+.modal-box h3 { margin: 0 0 8px 0; font-size: 15px; color: var(--brand-danger); }
+.modal-box p { margin: 0 0 20px 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Auth Layout */
+.auth-fallback-viewport { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg-main); }
+.login-card-wrapper {background: linear-gradient( 180deg, var(--bg-surface), rgba(38, 41, 50, 0.85) ); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 34px; width: 100%; max-width: 380px; box-shadow: 0 25px 80px rgba(0,0,0,0.45); backdrop-filter: blur(10px); }
+
+@media print {
+    .frappe-sidebar, .frappe-navbar, button, .modal-overlay { display: none !important; }
+    .frappe-main, .frappe-content { padding: 0 !important; margin: 0 !important; }
+    #print-window-target { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+    .frappe-content > div:not(#print-window-target) { display: none !important; }
+    
+    @page { size: A4 portrait; margin: 15mm; }
+    .print-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .print-table th, .print-table td { border: 1px solid #000000 !important; padding: 6px; }
+    .print-header-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #000; padding: 10px; margin-bottom: 10px; }
+    .text-right { text-align: right; }
+}
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.login-btn {
+     margin-top: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+
+.login-shell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+}
+
+/* Top branding block */
+.login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.login-logo {
+    height: 52px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.25));
+}
+
+.login-brand-text h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.4px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.login-brand-text p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.login-footnote {
+    margin-top: 14px;
+    font-size: 11px;
+    text-align: center;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+
+.dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 9999;
+}
+
+.dropdown-item {
+    padding: 10px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-light);
+    transition: background 0.15s ease;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item:hover {
+    background: var(--combobox-hover);
+    color: var(--brand-accent);
+}
+
+.toast-container{
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.toast-message{
+    background: var(--bg-surface);
+    border-left: 4px solid var(--brand-accent);
+    color: var(--text-primary);
+    padding: 16px 20px;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    width: 320px;
+    font-size: 13px;
+    line-height: 1.5;
+    pointer-events: auto;
+    animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 0.5s ease-out 4.5s forwards;
+}
+
+.toast-message.toast-success{border-left-color: var(--brand-success);}
+.toast-message.toast-warning{border-left-color: var(--brand-danger);}
+
+@keyframes slideInRight {
+    from{transform: translateX(100%); opacity: 0;}
+    to{transform: translateX(0); opacity: 1;}
+}
+
+@keyframes fadeOut {
+    from{opacity: 1;}
+    to{opacity: 0; visibility: hidden;}
+}
+/* =========================================================
+   COST BREAKDOWN VISIBILITY FIX (APPEND ONLY)
+   ========================================================= */
+
+details {
+    margin-top: 10px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    background: var(--bg-surface);
+}
+
+summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--brand-accent);
+    padding: 4px 0;
+    outline: none;
+}
+
+/* remove ugly default marker spacing */
+summary::-webkit-details-marker {
+    color: var(--brand-accent);
+}
+
+/* grid inside breakdown */
+details div {
+    color: var(--text-primary);
+}
+
+/* LEFT labels (Span column) */
+details span {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* RIGHT values (Strong column) */
+details strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* highlight total */
+details strong:last-child {
+    color: var(--brand-success);
+    font-size: 14px;
+}
+
+/* improve row spacing */
+details div > span,
+details div > strong {
+    padding: 2px 0;
+}
+
+.modal-box h3,
+.modal-box p,
+.modal-box strong,
+.modal-box span {
+    color: var(--text-primary);
+}
+
+.modal-box .muted,
+.modal-box small {
+    color: var(--text-muted);
+}
+
+.modal-box .muted,
+.modal-box small {
+    color: var(--text-muted);
+}
+
+.modal-box button {
+    margin-top: 10px;
+}
+
+.modal-box {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
