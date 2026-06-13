@@ -19,16 +19,16 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
 
         source_zone = "W1"
         partner_zones = EDBR.get_partner_zones(partner_id)
-        print("list of zones: ", partner_zones)
+
         destination_zone = classify_city_zone(destination_city,partner_zones)
-        print(destination_zone)
+
         debug["destination_city"] = destination_city
         debug["destination_zone"] = destination_zone
         debug["partner_zone_options"] = partner_zones
 
         if not source_zone or not destination_zone:
             raise ValueError(f"Zone not resolved for city: {destination_city}")
-        print("PARTNER ZONES=", partner_zones)
+
         # Step 2: Rate Extraction
         rate = EDBR.get_zone_rate(partner_id, source_zone, destination_zone)
         if not rate:
@@ -55,8 +55,10 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         fov_charge = (float(shipment["invoice_value"]) * float(partner["fov_percentage"]) / 100)
         oda_charge = float(EDBR.get_oda_charge(partner_id, shipment.get("delivery_distance", 0), chargeable_weight) or 0)
 
-        subtotal = (basic_freight + fuel_charge + fov_charge + oda_charge + 
-                    float(partner["documentation_charge"]) + float(partner["hawala_charges"]))
+        hamali_cost = float(shipment.get("hamali_cost", 0))
+        hamali_detail = shipment.get("hamali_detail", "")
+
+        subtotal = (basic_freight + fuel_charge + fov_charge + oda_charge + float(partner["documentation_charge"]) + hamali_cost)
 
         total = subtotal * (1 + float(partner["gst_percentage"]) / 100)
 
@@ -72,6 +74,8 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
             "fuel_charge": round(fuel_charge, 2),
             "fov_charge": round(fov_charge, 2),
             "oda_charge": round(oda_charge, 2),
+            "hamali_detail": hamali_detail,
+            "hamali_cost": round(hamali_cost, 2),
             "subtotal": round(subtotal, 2),
             "dispatch_cost_gst": round(total, 2)
         }

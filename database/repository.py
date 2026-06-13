@@ -221,6 +221,27 @@ class PostgresRepository:
                 updated = cur.fetchone()
                 updated['created_at'] = updated['created_at'].isoformat()
                 return updated
+    
+    def create_dispatch_record(self, record: dict, operator_email: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO dispatch_records (
+                        partner_name, source_zone, destination_zone, chargeable_weight, 
+                        basic_freight, fuel_charge, fov_charge, oda_charge, 
+                        hamali_detail, hamali_cost, subtotal, dispatch_cost_gst,
+                        operator_email
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    record.get("partner_name"), record.get("source_zone"), record.get("destination_zone"),
+                    record.get("chargeable_weight"), record.get("basic_freight"), record.get("fuel_charge"),
+                    record.get("fov_charge"), record.get("oda_charge"), 
+                    record.get("hamali_detail", ""), record.get("hamali_cost", 0),
+                    record.get("subtotal"), record.get("dispatch_cost_gst"), operator_email
+                ))
+                conn.commit()
+                return cur.fetchone()
+            
     # --- TASK MANAGER SUBSYSTEM end---
     # --- LOGISTICS PARTNET start---
     def get_logistics_partners(self):

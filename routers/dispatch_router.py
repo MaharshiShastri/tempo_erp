@@ -70,38 +70,20 @@ def save_full_partner(payload: FullPartnerProfile, user: dict = Depends(verify_b
 @router.put("/partners/{partner_id}",
     dependencies=[Depends(check_department("Sales"))]
 )
-def patch_partner(
-    partner_id: int,
-    payload: dict,
-    user: dict = Depends(verify_bearer_token)
-):
+def patch_partner(partner_id: int, payload: dict, user: dict = Depends(verify_bearer_token)):
     try:
-        return EDBR.update_full_partner_profile(
-            partner_id,
-            payload
-        )
+        return EDBR.update_full_partner_profile(partner_id, payload)
     except Exception as e:
         logging.error(traceback.format_exc())
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to patch partner: {str(e)}"
-        )
-@router.get(
-    "/partners/{partner_id}/profile",
-    dependencies=[Depends(check_department("Transport"))]
-)
-def get_partner_profile(
-    partner_id: int,
-    user: dict = Depends(verify_bearer_token)
-):
+        raise HTTPException(status_code=400, detail=f"Failed to patch partner: {str(e)}")
+
+@router.get("/partners/{partner_id}/profile", dependencies=[Depends(check_department("Transport"))])
+def get_partner_profile(partner_id: int, user: dict = Depends(verify_bearer_token)):
     try:
         profile = EDBR.get_full_partner_profile(partner_id)
 
         if not profile:
-            raise HTTPException(
-                status_code=404,
-                detail="Partner not found"
-            )
+            raise HTTPException(status_code=404, detail="Partner not found")
 
         return profile
 
@@ -109,7 +91,4 @@ def get_partner_profile(
         raise
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch partner profile: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch partner profile: {str(e)}")

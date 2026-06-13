@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import API from "../api/api";
 export default function DispatchPlannerView({ state }) {
     const [dim, setDim] = useState({
-        width: 0, height: 0, depth: 0, weight: 0, invoice_value: 0, source_state: "Mumbai", destination_city: "", delivery_distance: 0, diesel_price: 98, cft_charge: 0, min_weight: 0});
+        width: 0, height: 0, depth: 0, weight: 0, invoice_value: 0, source_state: "Mumbai", destination_city: "", delivery_distance: 0, diesel_price: 98, cft_charge: 0, min_weight: 0, hamali_detail: "", hamali_cost: 0});
 
     const [newPartner, setNewPartner] = useState({
         name: "Walk-In Transporter",
@@ -11,9 +11,12 @@ export default function DispatchPlannerView({ state }) {
         documentation_charge: 0,
         delivery_destination_charge: 0,
         freight_invoice_brokerage_percentage: 0,
-        hawala_charges: 0
+        hawala_charges: 0,
+        hamali_detail: "",
+        hamali_cost: 0
     });
 
+    const [showHamali, setShowHamali] = useState(false);
     const [includeNew, setIncludeNew] = useState(false);
     const [resultsData, setResultsData] = useState(null);
     const [selectedTransport, setSelectedTransport] = useState(null);
@@ -129,7 +132,32 @@ export default function DispatchPlannerView({ state }) {
                         value={dim.diesel_price}
                         onChange={(e) => setDim({ ...dim, diesel_price: +e.target.value })}
                     />
+                </div>
 
+                <div style={{ marginTop: "15px" }}>
+                    <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ fontSize: "12px", background: showHamali ? "#eee" : "transparent" }}
+                        onClick={() => setShowHamali(!showHamali)}
+                    >
+                        {showHamali ? "− Hide Hamali Charges" : "+ Add Hamali Charges(Confirm from Sachin Sir)"}
+                    </button>
+
+                    {showHamali && (
+                        <div style={{ marginTop: "10px", padding: "15px", background: "var(--bg-surface)", border: "1px dashed var(--brand-accent)", borderRadius: "var(--radius-sm)" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                                <div>
+                                    <label className="input-label" style={{ fontSize: "11px" }}>Hamali Detail</label>
+                                    <input className="form-input" placeholder="e.g., Loading/Unloading" value={dim.hamali_detail} onChange={(e) => setDim({ ...dim, hamali_detail: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="input-label" style={{ fontSize: "11px" }}>Cost Amount (₹)</label>
+                                    <input className="form-input" type="number" value={dim.hamali_cost} onChange={(e) => setDim({ ...dim, hamali_cost: +e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* WALK-IN TOGGLE */}
@@ -185,11 +213,21 @@ export default function DispatchPlannerView({ state }) {
                             placeholder="Brokerage %"
                             onChange={(e) => setNewPartner({ ...newPartner, freight_invoice_brokerage_percentage: +e.target.value })}
                         />
-                        <label className="input-label">Hawala</label>
-                        <input className="form-input"
-                            placeholder="Hawala (optional)"
-                            onChange={(e) => setNewPartner({ ...newPartner, hawala_charges: +e.target.value })}
-                        />
+                        <div style={{ marginTop: "20px", padding: "15px", background: "var(--bg-surface)", border: "1px dashed var(--brand-accent)", borderRadius: "var(--radius-sm)" }}>
+                            <label className="input-label" style={{ color: "var(--brand-accent)", fontWeight: "bold", marginBottom: "10px", display: "block" }}>
+                                Hamali Charges (Ask from Sachin Sir)
+                            </label>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                                <div>
+                                    <label className="input-label" style={{ fontSize: "11px" }}>Hamali Detail</label>
+                                    <input className="form-input" placeholder="e.g., Loading/Unloading" value={dim.hamali_detail} onChange={(e) => setDim({ ...dim, hamali_detail: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="input-label" style={{ fontSize: "11px" }}>Cost Amount (₹)</label>
+                                    <input className="form-input" type="number" value={dim.hamali_cost} onChange={(e) => setDim({ ...dim, hamali_cost: +e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -271,6 +309,12 @@ export default function DispatchPlannerView({ state }) {
 
                                             <span>ODA Charge</span>
                                             <strong>₹{opt.oda_charge}</strong>
+                                            
+                                            {opt.hamali_cost > 0 && (<>
+                                                <span style={{color: "var(--brand-accent)"}}>{opt.hamali_detail || "Hamali Charges"}</span>
+                                                <strong style={{color: "var(--brand-accent)"}}>₹{opt.hamali_cost}</strong>
+                                                </>
+                                            )}
                                             
                                             <span>Charges before Taxes</span>
                                             <strong>₹{opt.subtotal}</strong>
