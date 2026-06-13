@@ -101,6 +101,20 @@ const API = {
     return r.json();
   },
 
+  saveDispatchRecord: async (payload, token) => {
+    const res = await fetch("/api/v1/dispatch/records/save", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error("Failed to save dispatch record");
+    return res.json();
+  },
+  
   async saveTask(payload, token) {
     const r = await fetch("/api/v1/tasks/create", {
       method: "POST",
