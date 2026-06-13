@@ -6,13 +6,11 @@ from schemas.logistics_schema import FullPartnerProfile
 import logging
 import os
 
-USER = os.getenv("role", "")
-PASSWORD = os.getenv("db_password", "")
-# Replace with your actual Postgres credentials
-DB_DSN = f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp"
+DB_DSN = os.getenv("DATABASE_URL", "")
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
+logger.info(f"DB URI: {DB_DSN}")
 # We keep companies and items mock arrays temporarily as requested until Phase 2
 MOCK_COMPANIES = [
     {"id": "C001", "name": "Tata Power", "address": "Bombay House, Fort, Mumbai"},
