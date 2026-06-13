@@ -6,7 +6,10 @@ from schemas.logistics_schema import FullPartnerProfile
 import logging
 import os
 
-DB_DSN = os.getenv("DATABASE_URL", "")
+USER = os.getenv("role", "")
+PASSWORD = os.getenv("db_password", "")
+
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
