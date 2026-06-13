@@ -59,7 +59,7 @@ def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
         if evaluation_session.get("failed_providers", 0) > 0:
             logging.info(f"Dispatch evaluated with {evaluation_session['failed_providers']} dropped partners.")
 
-@router.post("/partners/save", dependencies=[Depends(check_department("Sales"))])
+@router.post("/partners/save", dependencies=[Depends(check_department("Transport"))])
 def save_full_partner(payload: FullPartnerProfile, user: dict = Depends(verify_bearer_token)):
     try:
         # Use the compound profile method instead of the flat one
@@ -68,7 +68,7 @@ def save_full_partner(payload: FullPartnerProfile, user: dict = Depends(verify_b
         raise HTTPException(status_code=400, detail=f"Failed to configure partner: {str(e)}")
     
 @router.put("/partners/{partner_id}",
-    dependencies=[Depends(check_department("Sales"))]
+    dependencies=[Depends(check_department("Transport"))]
 )
 def patch_partner(partner_id: int, payload: dict, user: dict = Depends(verify_bearer_token)):
     try:
@@ -92,3 +92,13 @@ def get_partner_profile(partner_id: int, user: dict = Depends(verify_bearer_toke
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch partner profile: {str(e)}")
+    
+@router.post("/records/save", dependencies=[Depends(check_department("Sales"))])
+def save_dispatch_record(payload: dict, user: dict = Depends(verify_bearer_token)):
+    try:
+        # Save the finalized record
+        result = EDBR.create_dispatch_record(payload, user["email"])
+        return {"status": "success", "record_id": result["id"]}
+    except Exception as e:
+        logging.error(f"Failed to save dispatch record: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not save dispatch record to history.")

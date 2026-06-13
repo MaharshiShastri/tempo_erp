@@ -245,6 +245,23 @@ class PostgresRepository:
             
     # --- TASK MANAGER SUBSYSTEM end---
     # --- LOGISTICS PARTNET start---
+    """CREATE TABLE dispatch_records (
+    id SERIAL PRIMARY KEY,
+    partner_name VARCHAR(255),
+    source_zone VARCHAR(10),
+    destination_zone VARCHAR(10),
+    chargeable_weight NUMERIC(10,2),
+    basic_freight NUMERIC(10,2),
+    fuel_charge NUMERIC(10,2),
+    fov_charge NUMERIC(10,2),
+    oda_charge NUMERIC(10,2),
+    hamali_detail VARCHAR(255),
+    hamali_cost NUMERIC(10,2),
+    subtotal NUMERIC(10,2),
+    dispatch_cost_gst NUMERIC(10,2),
+    operator_email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);"""
     def get_logistics_partners(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
