@@ -98,7 +98,14 @@ def save_dispatch_record(payload: dict, user: dict = Depends(verify_bearer_token
     try:
         # Save the finalized record
         result = EDBR.create_dispatch_record(payload, user["email"])
-        return {"status": "success", "record_id": result["id"]}
+        
+        # Return a user-friendly message directly from the backend
+        return {
+            "status": "success", 
+            "message": f"Dispatch evaluated and record #{result['id']} securely logged to history.", 
+            "record_id": result["id"]
+        }
     except Exception as e:
         logging.error(f"Failed to save dispatch record: {str(e)}")
-        raise HTTPException(status_code=500, detail="Could not save dispatch record to history.")
+        # Pass the exact repository error to the frontend
+        raise HTTPException(status_code=500, detail=f"Database Engine Error: {str(e)}")

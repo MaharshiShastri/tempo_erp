@@ -111,7 +111,12 @@ const API = {
         body: JSON.stringify(payload)
     });
 
-    if (!res.ok) throw new Error("Failed to save dispatch record");
+    if (!res.ok) {
+        // Parse the error payload to get the exact backend exception message
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to save dispatch record.");
+    }
+    
     return res.json();
   },
   

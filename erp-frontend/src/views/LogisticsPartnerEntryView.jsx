@@ -8,11 +8,12 @@ export default function LogisticsPartnerEntryView({ state }) {
     
     // We store the baseline data stringified so we can easily check if the user has made changes
     const [originalPayloadString, setOriginalPayloadString] = useState("{}");
+    const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
 
     // --- 2. Form State ---
     const defaultPartner = {
         name: "", cft_factor: 10.0, minimum_weight: 0.0, minimum_freight_value: 0.0,
-        documentation_charge: 0.0, fov_percentage: 0.0, hawala_charges: 0.0, gst_percentage: 18.0
+        documentation_charge: 0.0, fov_percentage: 0.0, gst_percentage: 18.0
     };
 
     const [partner, setPartner] = useState(defaultPartner);
@@ -35,7 +36,7 @@ export default function LogisticsPartnerEntryView({ state }) {
             const data = await API.getPartners(state.user.access_token);
             setAvailablePartners(data || []);
         } catch (err) {
-            console.error("Failed to fetch partner list", err);
+            setModalAlert({ isOpen: true, title: "Fetch Error", message: "Failed to load partners list.", isError: true });
         }
     };
 
@@ -66,7 +67,6 @@ export default function LogisticsPartnerEntryView({ state }) {
             minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
             documentation_charge: parseFloat(partner.documentation_charge) || 0,
             fov_percentage: parseFloat(partner.fov_percentage) || 0,
-            hawala_charges: parseFloat(partner.hawala_charges) || 0,
             gst_percentage: parseFloat(partner.gst_percentage) || 0,
             
             zones: zones.filter(z => z.zone_code).map(z => ({
@@ -75,8 +75,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 states: (z.states_raw || "").split(",").map(s => s.trim()).filter(Boolean)
             })),
             
-            rates: rates.filter(r => r.source_zone && r.destination_zone).map(r => ({
-                source_zone: r.source_zone.trim(),
+            rates: rates.filter(r => r.destination_zone).map(r => ({
                 destination_zone: r.destination_zone.trim(),
                 rate_per_kg: parseFloat(r.rate_per_kg) || 0
             })),
@@ -113,7 +112,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 name: profile.name || "", cft_factor: profile.cft_factor ?? 10,
                 minimum_weight: profile.minimum_weight ?? 0, minimum_freight_value: profile.minimum_freight_value ?? 0,
                 documentation_charge: profile.documentation_charge ?? 0, fov_percentage: profile.fov_percentage ?? 0,
-                hawala_charges: profile.hawala_charges ?? 0, gst_percentage: profile.gst_percentage ?? 18
+                gst_percentage: profile.gst_percentage ?? 18
             });
 
             // 2. Populate Standard Tables
@@ -155,29 +154,35 @@ export default function LogisticsPartnerEntryView({ state }) {
     };
 
     // --- 6. Event Handlers ---
+    // --- 6. Event Handlers ---
     const handleSave = async (e) => {
         e.preventDefault();
         const payload = buildCurrentPayload();
 
         try {
+            let backendResponse;
+            
             if (selectedPartnerId) {
-                await API.updateDispatchPartner(selectedPartnerId, payload, state.user.access_token);
-                state.setAlertMessage("Transporter profile updated successfully.");
+                backendResponse = await API.updateDispatchPartner(selectedPartnerId, payload, state.user.access_token);
             } else {
-                await API.saveDispatchPartner(payload, state.user.access_token);
-                state.setAlertMessage("New Transporter profile created successfully.");
-                setSelectedPartnerId(""); // reset UI
+                backendResponse = await API.saveDispatchPartner(payload, state.user.access_token);
+                setSelectedPartnerId(""); // reset UI on successful creation
             }
+            
+            // Extract the dynamic data returned straight from the repository
+            const actionStatus = backendResponse.status || "processed";
+            const partnerName = backendResponse.partner_name || payload.name;
+
+            // Trigger the global user-defined alert
+            setModalAlert({ isOpen: true, title: "Database Synced", message: `🚚 Logistics Partner "${partnerName}" was successfully ${actionStatus}.`, isError: false });
             
             // Sync baseline so the Update button disappears again
             setOriginalPayloadString(JSON.stringify(payload));
-            state.setAlertMessage("Partner configuration updated successfully.");
-            state.setIsAlertOpen(true);
             loadPartnersList(); 
             
         } catch (err) {
-            state.setAlertMessage("Database sync failed: " + err.message);
-            state.setIsAlertOpen(true);
+            // Display backend failure messages in the same custom alert modal
+            setModalAlert({ isOpen: true, title: "Sync Failure", message: err.message, isError: true });
         }
     };
 
@@ -220,7 +225,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     <div className="form-group"><label className="input-label">Min Freight Value (₹)</label><input required type="number" className="form-input" value={partner.minimum_freight_value} onChange={e => setPartner({ ...partner, minimum_freight_value: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Docs/GC Charge</label><input required type="number" className="form-input" value={partner.documentation_charge} onChange={e => setPartner({ ...partner, documentation_charge: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">FOV Risk (%)</label><input required type="number" step="0.01" className="form-input" value={partner.fov_percentage} onChange={e => setPartner({ ...partner, fov_percentage: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">Hawala Charge</label><input required type="number" className="form-input" value={partner.hawala_charges} onChange={e => setPartner({ ...partner, hawala_charges: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">GST Rate (%)</label><input required type="number" className="form-input" value={partner.gst_percentage} onChange={e => setPartner({ ...partner, gst_percentage: e.target.value })} /></div>
                 </div>
 
@@ -246,14 +250,13 @@ export default function LogisticsPartnerEntryView({ state }) {
                 {/* 3. RATES */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
                     <h4 style={{ color: "var(--brand-accent)" }}>Commercial Freight Rates</h4>
-                    <button type="button" className="btn btn-secondary" onClick={() => addRow(setRates, { source_zone: "", destination_zone: "", rate_per_kg: "" })}>+ Add Rate</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => addRow(setRates, {destination_zone: "", rate_per_kg: "" })}>+ Add Rate</button>
                 </div>
                 <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead><tr style={{ textAlign: "left" }}><th>From Zone</th><th>To Zone</th><th>Rate Per Kg (₹)</th><th></th></tr></thead>
+                    <thead><tr style={{ textAlign: "left" }}><th>To Zone</th><th>Rate Per Kg (₹)</th><th></th></tr></thead>
                     <tbody>
                         {rates.map((r, i) => (
                             <tr key={i}>
-                                <td><input className="form-input" style={{ textTransform: "uppercase" }} value={r.source_zone} onChange={e => handleTableChange(rates, setRates, i, "source_zone", e.target.value)} /></td>
                                 <td><input className="form-input" style={{ textTransform: "uppercase" }} value={r.destination_zone} onChange={e => handleTableChange(rates, setRates, i, "destination_zone", e.target.value)} /></td>
                                 <td><input className="form-input" type="number" step="0.01" value={r.rate_per_kg} onChange={e => handleTableChange(rates, setRates, i, "rate_per_kg", e.target.value)} /></td>
                                 <td><button type="button" className="btn-text-danger" onClick={() => removeRow(rates, setRates, i)}>✕</button></td>
@@ -344,6 +347,17 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </div>
                 )}
             </form>
+            {modalAlert.isOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-box" style={{ borderTop: `4px solid ${modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
+                        <h3 style={{ color: modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)" }}>
+                            {modalAlert.title}
+                        </h3>
+                        <p style={{ margin: "15px 0" }}>{modalAlert.message}</p>
+                        <button className="btn btn-secondary" onClick={() => setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -5,14 +5,9 @@ API_KEY = os.getenv("GROQ_API_KEY", "")
 
 print(API_KEY)
 
-client = Groq(
-    api_key=API_KEY
-)
+client = Groq(api_key=API_KEY)
 
-def classify_city_zone(
-    city: str,
-    zones: list
-):
+def classify_city_zone(city: str, zones: list):
 
     zone_text = "\n".join([
         f"{z['zone_code']} = {z['zone_name']}"
@@ -47,10 +42,4 @@ Available Zones:
         ]
     )
 
-    return (
-        response
-        .choices[0]
-        .message
-        .content
-        .strip()
-    )
+    return (response.choices[0].message.content.strip())

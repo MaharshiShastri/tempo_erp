@@ -228,13 +228,13 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO dispatch_records (
-                        partner_name, source_zone, destination_zone, chargeable_weight, 
+                        partner_name, destination_zone, chargeable_weight, 
                         basic_freight, fuel_charge, fov_charge, oda_charge, 
                         hamali_detail, hamali_cost, subtotal, dispatch_cost_gst,
                         operator_email
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                 """, (
-                    record.get("partner_name"), record.get("source_zone"), record.get("destination_zone"),
+                    record.get("partner_name"), record.get("destination_zone"),
                     record.get("chargeable_weight"), record.get("basic_freight"), record.get("fuel_charge"),
                     record.get("fov_charge"), record.get("oda_charge"), 
                     record.get("hamali_detail", ""), record.get("hamali_cost", 0),
@@ -245,23 +245,6 @@ class PostgresRepository:
             
     # --- TASK MANAGER SUBSYSTEM end---
     # --- LOGISTICS PARTNET start---
-    """CREATE TABLE dispatch_records (
-    id SERIAL PRIMARY KEY,
-    partner_name VARCHAR(255),
-    source_zone VARCHAR(10),
-    destination_zone VARCHAR(10),
-    chargeable_weight NUMERIC(10,2),
-    basic_freight NUMERIC(10,2),
-    fuel_charge NUMERIC(10,2),
-    fov_charge NUMERIC(10,2),
-    oda_charge NUMERIC(10,2),
-    hamali_detail VARCHAR(255),
-    hamali_cost NUMERIC(10,2),
-    subtotal NUMERIC(10,2),
-    dispatch_cost_gst NUMERIC(10,2),
-    operator_email VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);"""
     def get_logistics_partners(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
@@ -277,10 +260,10 @@ class PostgresRepository:
                     cur.execute("""
                         UPDATE logistics_partners 
                         SET name=%s, cft_factor=%s, minimum_weight=%s, minimum_freight_value=%s, 
-                            documentation_charge=%s, fov_percentage=%s, hawala_charges=%s, gst_percentage=%s
+                            documentation_charge=%s, fov_percentage=%s, gst_percentage=%s
                         WHERE id=%s
                     """, (p['name'], p['cft_factor'], p['minimum_weight'], p['minimum_freight_value'], 
-                            p['documentation_charge'], p['fov_percentage'], p['hawala_charges'], p['gst_percentage'], partner_id))
+                            p['documentation_charge'], p['fov_percentage'], p['gst_percentage'], partner_id))
 
                     # 2. THE WIPE - Delete all existing child matrices for this partner
                     cur.execute("DELETE FROM logistics_zones WHERE partner_id=%s", (partner_id,))
@@ -293,8 +276,8 @@ class PostgresRepository:
                         cur.execute("INSERT INTO logistics_zones (partner_id, zone_code, zone_name, states) VALUES (%s, %s, %s, %s)",
                                     (partner_id, z['zone_code'], z['zone_name'], z['states']))
                     for r in p['rates']:
-                        cur.execute("INSERT INTO logistics_zone_rates (partner_id, source_zone, destination_zone, rate_per_kg) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, r['source_zone'], r['destination_zone'], r['rate_per_kg']))
+                        cur.execute("INSERT INTO logistics_zone_rates (partner_id, destination_zone, rate_per_kg) VALUES (%s, %s, %s)",
+                                    (partner_id, r['destination_zone'], r['rate_per_kg']))
                     for f in p['fuel_matrix']:
                         cur.execute("INSERT INTO logistics_fuel_matrix (partner_id, fuel_price_from, fuel_price_to, surcharge_percentage) VALUES (%s, %s, %s, %s)",
                                     (partner_id, f['fuel_price_from'], f['fuel_price_to'], f['surcharge_percentage']))
@@ -304,7 +287,7 @@ class PostgresRepository:
 
                     # 4. Commit the transaction ONLY if all inserts succeed
                     conn.commit()
-                    return {"partner_id": partner_id, "status": "updated"}
+                    return {"partner_id": partner_id, "status": "updated", "partner_name": p['name']}
                     
                 except Exception as e:
                     # If ANY query fails, revert the database to its exact state before the update began
@@ -318,10 +301,10 @@ class PostgresRepository:
                     # 1. Create Partner
                     cur.execute("""
                         INSERT INTO logistics_partners (name, cft_factor, minimum_weight, minimum_freight_value, 
-                                                        documentation_charge, fov_percentage, hawala_charges, gst_percentage)
+                                                        documentation_charge, fov_percentage, gst_percentage)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                     """, (p.name, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
-                          p.documentation_charge, p.fov_percentage, p.hawala_charges, p.gst_percentage))
+                          p.documentation_charge, p.fov_percentage, p.gst_percentage))
                     
                     partner_id = cur.fetchone()['id']
 
@@ -332,8 +315,8 @@ class PostgresRepository:
 
                     # 3. Insert Rates
                     for r in p.rates:
-                        cur.execute("INSERT INTO logistics_zone_rates (partner_id, source_zone, destination_zone, rate_per_kg) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, r.source_zone, r.destination_zone, r.rate_per_kg))
+                        cur.execute("INSERT INTO logistics_zone_rates (partner_id, destination_zone, rate_per_kg) VALUES (%s, %s, %s)",
+                                    (partner_id, r.destination_zone, r.rate_per_kg))
 
                     # 4. Insert Fuel
                     for f in p.fuel_matrix:
@@ -346,7 +329,7 @@ class PostgresRepository:
                                     (partner_id, o.km_from, o.km_to, o.weight_from, o.weight_to, o.oda_charge))
 
                     conn.commit()
-                    return {"partner_id": partner_id, "status": "success"}
+                    return {"partner_id": partner_id, "status": "created", "partner_name": p['name']}
                 
                 except Exception as e:
                     conn.rollback()
@@ -367,7 +350,7 @@ class PostgresRepository:
 
                 return (row["zone_code"] if row else None)
         
-    def get_zone_rate( self,  partner_id, source_zone,destination_zone):
+    def get_zone_rate( self,  partner_id,destination_zone):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
 
@@ -375,10 +358,9 @@ class PostgresRepository:
                     SELECT rate_per_kg
                     FROM logistics_zone_rates
                     WHERE partner_id=%s
-                    AND source_zone=%s
                     AND destination_zone=%s
                     LIMIT 1
-                """, (partner_id, source_zone, destination_zone ))
+                """, (partner_id, destination_zone ))
 
                 row = cur.fetchone()
 
@@ -393,12 +375,12 @@ class PostgresRepository:
                     FROM logistics_fuel_matrix
                     WHERE partner_id=%s
                     AND fuel_price_from <= %s
-                    AND fuel_price_to > %s
+                    AND fuel_price_to >= %s
                     LIMIT 1
                 """, (partner_id, diesel_price, diesel_price ))
 
                 row = cur.fetchone()
-
+                print("Row found: ", row)
                 return ( row["surcharge_percentage"] if row else 0 )
         
     def get_oda_charge(self, partner_id, kms, weight):
@@ -438,7 +420,7 @@ class PostgresRepository:
                 zones = cur.fetchall()
 
                 # 3. Fetch Matrices
-                cur.execute("SELECT id, source_zone, destination_zone, rate_per_kg FROM logistics_zone_rates WHERE partner_id=%s", (partner_id,))
+                cur.execute("SELECT id, destination_zone, rate_per_kg FROM logistics_zone_rates WHERE partner_id=%s", (partner_id,))
                 rates = cur.fetchall()
 
                 cur.execute("SELECT id, fuel_price_from, fuel_price_to, surcharge_percentage FROM logistics_fuel_matrix WHERE partner_id=%s", (partner_id,))
@@ -453,7 +435,6 @@ class PostgresRepository:
                 partner['minimum_freight_value'] = float(partner.get('minimum_freight_value') or 0.0)
                 partner['documentation_charge'] = float(partner.get('documentation_charge') or 0.0)
                 partner['fov_percentage'] = float(partner.get('fov_percentage') or 0.0)
-                partner['hawala_charges'] = float(partner.get('hawala_charges') or 0.0)
                 partner['gst_percentage'] = float(partner.get('gst_percentage') or 18.0)
 
                 for r in rates: r['rate_per_kg'] = float(r['rate_per_kg'])

@@ -26,7 +26,8 @@ def save_oda(partner_id: int, payload: dict, user: dict = Depends(verify_bearer_
 
 @router.patch("/partners/{partner_id}")
 def patch_partner(partner_id: int, payload: dict, user=Depends(verify_bearer_token)):
-    return EDBR.patch_full_partner_profile(partner_id, payload, user["email"])
+    partner_id, status = EDBR.update_full_partner_profile(partner_id, payload, user["email"])
+    return {"partner_id": partner_id, "status": status}
 
 @router.delete("/partners/{partner_id}")
 def delete_partner(partner_id: int, user=Depends(verify_bearer_token)):

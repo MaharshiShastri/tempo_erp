@@ -8,7 +8,6 @@ class LogisticsPartnerCreate(BaseModel):
     documentation_charge: float = 0.0
     delivery_destination_charge: float = 0.0
     freight_invoice_brokerage_percentage: float = 0.0
-    hawala_charges: float = 0.0
 
 class ZoneDef(BaseModel):
     zone_code: str
@@ -16,7 +15,6 @@ class ZoneDef(BaseModel):
     states: List[str]
 
 class ZoneRate(BaseModel):
-    source_zone: str
     destination_zone: str
     rate_per_kg: float
 
@@ -39,7 +37,6 @@ class FullPartnerProfile(BaseModel):
     minimum_freight_value: float = 0.0
     documentation_charge: float = 0.0
     fov_percentage: float = 0.0
-    hawala_charges: float = 0.0
     gst_percentage: float = 18.0
     
     # Nested data arrays

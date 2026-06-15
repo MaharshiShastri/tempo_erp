@@ -26,13 +26,13 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         debug["destination_zone"] = destination_zone
         debug["partner_zone_options"] = partner_zones
 
-        if not source_zone or not destination_zone:
+        if not destination_zone:
             raise ValueError(f"Zone not resolved for city: {destination_city}")
 
         # Step 2: Rate Extraction
-        rate = EDBR.get_zone_rate(partner_id, source_zone, destination_zone)
+        rate = EDBR.get_zone_rate(partner_id, destination_zone)
         if not rate:
-            raise ValueError(f"No freight matrix found for {source_zone} -> {destination_zone}")
+            raise ValueError(f"No freight matrix found for {destination_zone}")
 
         # Step 3: Volumetric Mathematics
         width = float(shipment["width"])
@@ -51,10 +51,11 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         # Step 5: Surcharges and ODA
         fuel_percentage = float(EDBR.get_fuel_surcharge(partner_id, shipment.get("diesel_price", 90.0)) or 0)
         fuel_charge = (basic_freight * fuel_percentage / 100)
+        print("fuel percentage: ", fuel_percentage, " and fuel charge is: ", fuel_charge)
 
         fov_charge = (float(shipment["invoice_value"]) * float(partner["fov_percentage"]) / 100)
         oda_charge = float(EDBR.get_oda_charge(partner_id, shipment.get("delivery_distance", 0), chargeable_weight) or 0)
-
+        print("ODA charge: ", oda_charge)
         hamali_cost = float(shipment.get("hamali_cost", 0))
         hamali_detail = shipment.get("hamali_detail", "")
 
@@ -67,11 +68,11 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         calculation_state["data"] = {
             "partner_id": partner_id,
             "partner_name": partner["name"],
-            "source_zone": source_zone,
             "destination_zone": destination_zone,
             "chargeable_weight": round(chargeable_weight, 2),
             "basic_freight": round(basic_freight, 2),
             "fuel_charge": round(fuel_charge, 2),
+            "documentation_charge": round(partner["documentation_charge"], 2),
             "fov_charge": round(fov_charge, 2),
             "oda_charge": round(oda_charge, 2),
             "hamali_detail": hamali_detail,
