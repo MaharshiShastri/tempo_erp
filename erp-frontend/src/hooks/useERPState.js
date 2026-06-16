@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import API from "../api/api";
 
+const API_HOST = window.location.hostname;
+
 export default function useERPState() {
     const [user, setUser] = useState(() => {
-        const cache = localStorage.getItem('invoice_session');
+        const cache = localStorage.getItem('tempo_erp_user');
         return cache ? JSON.parse(cache) : null;
     });
 
@@ -96,7 +98,9 @@ export default function useERPState() {
                     case 'b': setActiveTab('bills-list'); break;
                     case 't': setActiveTab('tasks-workspace'); break;
                     case 'd': setActiveTab('dispatch-planner'); break;
-                    case 'p': setActiveTabe('accountability-hub'); break;
+                    case 'p': setActiveTab('accountability-hub'); break;
+                    case 'l': setActiveTab('partner-new'); break;
+                    case 'm': setActiveTab('admin-users'); break;
                     case 'n': // Contextual New Record
                         if (activeTab.includes('company')) setActiveTab('company-new');
                         else if (activeTab.includes('order')) triggerNewOrderInitialization();
@@ -141,7 +145,7 @@ export default function useERPState() {
 
     const refreshDataHub = async () => {
         try {
-            const [ord, bl, comp, itm, tsk, usersData, dispatchData] = await Promise.all([
+            const [ord, bl, comp, tsk, usersData, dispatchData] = await Promise.all([
                 API.fetchOrders(sessionToken),
                 API.fetchBills(sessionToken),
                 API.fetchCompaniesMaster(sessionToken),
@@ -149,7 +153,7 @@ export default function useERPState() {
                 API.getPartners(sessionToken).then(r => r.data),
                 fetch('/api/v1/auth/users', {headers: {'Authorization': `Bearer ${sessionToken}`}}).then(r => r.json())
             ]);
-            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setItemsMaster(itm); setTasks(tsk); setSystemUsers(usersData); setDispatch(dispatchData);
+            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setTasks(tsk); setSystemUsers(usersData); setDispatch(dispatchData);
         } catch (e) {
             setErrorMessage('Network transmission failure across Postgres nodes.');
         }
@@ -223,12 +227,12 @@ export default function useERPState() {
         try {
             setErrorMessage('');
             const data = await API.login(loginEmail, loginPassword);
-            localStorage.setItem('invoice_session', JSON.stringify(data));
+            localStorage.setItem('tempo_erp_user', JSON.stringify(data));
             setUser(data);
         } catch (err) { setErrorMessage('Access denied. Invalid signature parameters.'); }
     };
 
-    const handleLogout = () => { localStorage.removeItem('invoice_session'); setUser(null); };
+    const handleLogout = () => { localStorage.removeItem('tempo_erp_user'); setUser(null); };
     const appendOrderItemRow = () => setOrderItems([...orderItems, { ...defaultOrderItem }]);
     const popOrderItemRow = (idx) => setOrderItems(orderItems.filter((_, i) => i !== idx));
     const updateOrderItemField = (idx, field, val) => {
@@ -325,7 +329,7 @@ export default function useERPState() {
     useEffect(()=>{
         if (!sessionToken) return;
 
-        const ws = new WebSocket(`ws://192.163.0.168:8000/api/v1/ws/floor?token=${sessionToken}`);
+        const ws = new WebSocket(`ws://${API_HOST}:8000/api/v1/ws/floor?token=${sessionToken}`);
 
         ws.onmessage = (event) => {
             try{

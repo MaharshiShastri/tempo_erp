@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import { FiMenu, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import useERPState from "./hooks/useERPState";
 
 import LoginView from "./views/LoginView";
@@ -23,13 +23,30 @@ import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 
 function App() {
-  const state = useERPState();
+    const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
-
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('erp-theme', theme);
     }, [theme]);
+    
+    useEffect(() => {
+        const savedSession = localStorage.getItem("tempo_erp_user");
+        if (savedSession) {
+        try {
+            state.setUser(JSON.parse(savedSession));
+        } catch (e) {
+            console.error("Corrupted session data");
+            localStorage.removeItem("tempo_erp_user");
+        }
+        }
+    }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem("tempo_erp_user");
+        state.setUser(null);
+    };
 
     console.log("USER:", state.user);
     if (!state.user) return (<LoginView state={state} />);
@@ -45,34 +62,45 @@ function App() {
             {state.printType === 'order' && <PrintOrderTemplate orderData={state.activePrintJob} />}
 
             {/* FRAPPE SIDEBAR */}
-            <aside className="frappe-sidebar">
+            <aside className="frappe-sidebar" className={`frappe-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
                 <div className="sidebar-header">
-                    <h2>Tempo ERP</h2>
+                    {!sidebarCollapsed && <h2>Tempo ERP</h2>}
+                    <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+                    {sidebarCollapsed ? <FiChevronRight /> : <FiChevronLeft />}
+    </button>
                 </div>
+                
                 <div className="sidebar-menu">
                     <div className="menu-group">
                         <span className="menu-title">Sales Module</span>
                         <a href="#companies" className={`menu-item ${state.activeTab === 'companies-list' || state.activeTab === 'company-new' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('companies-list')}}>
-                            👥 Clients Directory
+                            <span>👥</span>
+                            {!sidebarCollapsed && (<span>Clients Directory</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+C</span>
                         </a>
                         <a href="#orders" className={`menu-item ${state.activeTab === 'orders-list' || state.activeTab === 'order-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('orders-list')}}>
-                            📦 Orders Blueprints
+                            <span>📦</span> 
+                            {!sidebarCollapsed &&(<span>Orders Blueprints</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+O</span>
                         </a>
                         <a href="#billing" className={`menu-item ${state.activeTab === 'bills-list' || state.activeTab === 'bill-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('bills-list')}}>
-                            🧾 Billing Ledgers
+                            <span>🧾</span> 
+                            {!sidebarCollapsed &&(<span>Billing Ledgers</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+B</span>
                         </a>
                         <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
-                            🚚 Dispatch Planner
+                            <span>🚚</span> 
+                            {!sidebarCollapsed &&(<span>Dispatch Planner</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+D</span>
                         </a>
                         <a href="#partner-new" className={`menu-item ${state.activeTab === 'partner-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('partner-new')}}>
-                            🤝 Logistics Master
+                            <span>🤝</span>
+                            {!sidebarCollapsed && (<span>Logistics Master</span>)}
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
                         </a>
                         <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
-                            📦 Product Master
+                            <span>📦</span> 
+                            {!sidebarCollapsed && (<span>Product Master</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
                         </a>
                     </div>
@@ -80,12 +108,14 @@ function App() {
                     <div className="menu-group">
                         <span className="menu-title">Shop Floor</span>
                         <a href="#tasks" className={`menu-item ${state.activeTab === 'tasks-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('tasks-workspace')}}>
-                            ⚙️ Task Management 
+                            <span>⚙️</span> 
+                            {!sidebarCollapsed && (<span>Task Management </span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+T</span>
                             {pendingTasksCount > 0 && <span className="sidebar-badge">{pendingTasksCount}</span>}
                         </a>
                         <a href="#activity-tree" className={`menu-item ${state.activeTab === 'accountability-hub' ? 'active': ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('accountability-hub')}}>
-                            🛠️ Production Pulse
+                            <span>🛠️</span> 
+                            {!sidebarCollapsed && (<span>Production Pulse</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+P</span>
                         </a>
                     </div>
@@ -93,7 +123,11 @@ function App() {
                     {isSuperUser && (
                         <div className="menu-group">
                             <span className="menu-title">Administration</span>
-                            <a href="#admin" className={`menu-item ${state.activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => state.setActiveTab('admin-users')}>🛡️ Team Management</a>
+                            <a href="#admin" className={`menu-item ${state.activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => state.setActiveTab('admin-users')}>
+                                <span>🛡️</span> 
+                                {!sidebarCollapsed && (<span>Team Management</span>)}
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+M</span>
+                            </a>
                         </div>
                     )}
                 </div>
@@ -111,7 +145,7 @@ function App() {
                         </button>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                             <span style={{ fontSize: '13px', fontWeight: '500' }}>{state.user.name}</span>
-                            <button className="btn-text-danger" onClick={state.handleLogout}>Logout</button>
+                            <button className="btn-text-danger" onClick={handleLogout}>Logout</button>
                         </div>
                     </div>
                 </header>

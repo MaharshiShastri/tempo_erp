@@ -34,13 +34,16 @@ export default function LoginView({ state }) {
 
     const data = await res.json();
 
-    state.setUser({
+    const userData = {
       email: data.email,
       name: data.name,
       role: data.role,
       access_token: data.access_token
-    });
+    };
 
+    localStorage.setItem("tempo_erp_user", JSON.stringify(userData));
+    state.setUser(userData);
+    
     } catch (err) {
       setModalAlert({ isOpen: true, title: "Authentication Failed", message: err.message });
       console.error(err);
@@ -51,7 +54,7 @@ export default function LoginView({ state }) {
 
   return (
     <div className="auth-fallback-viewport">
-        <div className="login-brand">
+      <div className="login-brand">
         <img
           src="https://tempoinstruments.com/wp-content/uploads/2024/08/tempo-instruments-logo.png"
           alt="Tempo Instruments"
@@ -61,7 +64,8 @@ export default function LoginView({ state }) {
           <h1>Tempo ERP</h1>
           <p>Precision Manufacturing Control System</p>
         </div>
-        
+      </div>
+
       <div className="login-card-wrapper">  
         <form onSubmit={handleLogin} className="login-form">
           <h2>Tempo ERP</h2>
@@ -73,39 +77,46 @@ export default function LoginView({ state }) {
           <div className="form-group">
             <label className="input-label">Enter Password:</label>
             <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  placeholder="password" 
-                  className="form-input"
-                  style={{ width: "100%", paddingRight: "60px" }}
-                />
-                
-                {/* 3. Password Toggle Button */}
-                <button 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                      position: "absolute", right: "10px", background: "none", border: "none", 
-                      fontSize: "12px", color: "var(--brand-accent)", cursor: "pointer"
-                  }}
-                >
-                    {showPassword ? <FiEyeOff size={20}/> : <FiEye size={20}/>}
-                </button>
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                placeholder="password" 
+                className="form-input"
+                style={{ width: "100%", paddingRight: "60px" }}
+              />
+                  
+              {/* 3. Password Toggle Button */}
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute", right: "10px", background: "none", border: "none", 
+                  fontSize: "12px", color: "var(--brand-accent)", cursor: "pointer"
+                }}
+              >
+                {showPassword ? <FiEyeOff size={20}/> : <FiEye size={20}/>}
+              </button>
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? "Authenticating..." : "Login"}
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "25px" }}>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={loading}
+              style={{ padding: "10px 40px", minWidth: "160px", fontSize: "16px", borderRadius: "var(--radius-sm)" }}
+            >
+            {loading ? "Authenticating..." : "Login"}
+            </button>
+          </div>
+            
           <div className="login-footnote">
             Secure ERP Access • Authorized Personnel Only
           </div>
-        </form>
+          </form>
       </div>
-    </div>
-    {modalAlert.isOpen && (
+      {modalAlert.isOpen && (
         <div className="modal-overlay">
             <div className="modal-box" style={{ borderTop: "4px solid var(--brand-danger)" }}>
                 <h3 style={{ color: "var(--brand-danger)" }}>{modalAlert.title}</h3>
