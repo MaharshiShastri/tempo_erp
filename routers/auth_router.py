@@ -4,6 +4,7 @@ from database.repository import EDBR
 from security import verify_bearer_token, SECRET_KEY
 import jwt
 import logging
+from datetime import datetime, timedelta, timezone
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,20 +12,29 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Authentication Layer"])
 
 @router.post("/login")
 def login_session_gate(payload: LoginInput):
+    if not payload.email.strip() or not payload.password.strip():
+        raise HTTPException(status_code=400, detail="Incomplete credentials")
     try:
-        print(f"Email Id: {payload.email} and password: {payload.password}")
-        logger.info(f"Email Id: {payload.email} and password: {payload.password}")
+        logger.info(f"Login Attempt for email: {payload.email}")
         user = EDBR.get_user(payload.email, payload.password)
-        print(f"Found users")
-        logger.info(f"Found users")
-        jwt_payload = {"email": user['email'], "role": user['role'], "department": user.get('department', 'General')}
+
+        if not user:
+            raise ValueError("No user matched these credentials.")
+        
+        logger.info(f"User validated successfully.")
+
+        jwt_payload = {"email": user['email'], "role": user['role'], "department": user.get('department', 'General'), "exp": datetime.now(timezone.utc) + timedelta(hours=9.5)}
         token = jwt.encode(jwt_payload, SECRET_KEY, algorithm="HS256")
+
         if user:
             return{
                 "email": user["email"], "name": user["name"], "role": user["role"], "department": user.get("department", "General"),
                 "access_token": token
             }
-        
+    
+    except ValueError as ve:
+        logger.warning(f"Login failed: {str(ve)}")
+        raise HTTPException(status_code=401, detail="Invalid corporate credentials")
     except Exception as e:  
         print("User lookup failed")  
         logger.warning("User lookup failed")
