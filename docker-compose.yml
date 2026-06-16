@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 services:
   web:
     build: .
@@ -14,3 +15,17 @@ services:
 # THIS MUST BE FLUSH LEFT (NO SPACES AT THE START)
 volumes:
   postgres_data:
+=======
+services:
+  web:
+    build: .
+    image: tempo-erp-app:v1.1.0
+    command: uvicorn server:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://postgres:TempoInstruments@host.docker.internal:5432/tempo_erp
+>>>>>>> 3a82e01 (REmoved certain environment variable)
