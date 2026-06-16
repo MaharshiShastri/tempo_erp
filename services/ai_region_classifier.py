@@ -8,7 +8,10 @@ print(API_KEY)
 client = Groq(api_key=API_KEY)
 
 def classify_city_zone(city: str, zones: list):
-
+    if API_KEY:
+        print("API KEY found")
+    else:
+        print("NO API KEY")
     zone_text = "\n".join([
         f"{z['zone_code']} = {z['zone_name']}"
         for z in zones
