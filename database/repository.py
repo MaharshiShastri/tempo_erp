@@ -19,7 +19,23 @@ MOCK_COMPANIES = [
     {"id": "C001", "name": "Tata Power", "address": "Bombay House, Fort, Mumbai"},
     {"id": "C002", "name": "Reliance Industries", "address": "Maker Chambers IV, Nariman Point, Mumbai"}
 ]
-
+"""
+CREATE TABLE crm_leads (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL,
+    designation VARCHAR(100),
+    company_name VARCHAR(255),
+    contact_email VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(50),
+    city_state VARCHAR(255) NOT NULL,
+    product_query TEXT, 
+    gdpr_consent BOOLEAN DEFAULT FALSE,
+    assigned_region VARCHAR(100),
+    assigned_to VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'New',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
 class PostgresRepository:
     def _get_connection(self):
         return psycopg2.connect(DB_DSN, cursor_factory=RealDictCursor)

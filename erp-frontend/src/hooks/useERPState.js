@@ -133,6 +133,7 @@ export default function useERPState() {
                     case 'p': setActiveTab('accountability-hub'); break;
                     case 'l': setActiveTab('partner-new'); break;
                     case 'm': setActiveTab('admin-users'); break;
+                    case 'w': setActiveTab('crm-workspace'); break;
                     case 'n': // Contextual New Record
                         if (activeTab.includes('company')) setActiveTab('company-new');
                         else if (activeTab.includes('order')) triggerNewOrderInitialization();
@@ -360,7 +361,31 @@ export default function useERPState() {
     //Web socket, later make websocket into dedicated api file
     useEffect(()=>{
         if (!sessionToken) return;
+        
+        const eventSource = new EventSource(`/api/v1/crm/stream?token=${sessionToken}`);
+        eventSource.onmessage = (event) => {
+            try{
+                const data = JSON.parse(event.data);
 
+                if (data.type === 'CRM_LEAD'){
+                    setAlertMessage(`🚨 INBOUND INQUIRY: ${data.message} Please check the CRM workspace.`);
+                    setIsAlertOpen(true);
+                } else {
+                    addToast(data.message, data.type || 'info');
+                }
+            } catch(e) {
+                console.error('Failed to parse SSE payload.');
+            }
+        };
+
+        eventSource.onerror = (error) => {
+            console.log("SSE Connection droppped. Attempting to reconnect...", error);
+        };
+        return () => {
+            if (eventSource.readyState !== 2){
+                eventSource.close();
+            }
+        };
         const ws = new WebSocket(`ws://${API_HOST}:8000/api/v1/ws/floor?token=${sessionToken}`);
 
         ws.onmessage = (event) => {

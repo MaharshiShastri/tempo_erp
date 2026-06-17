@@ -275,6 +275,24 @@ const API = {
     return await r.json();
   },
   
+  async fetchLeads(token) {
+    const r = await fetch("/api/v1/crm/leads", {
+      headers: this.headers(token),
+    });
+    if (!r.ok) throw new Error("Failed to download CRM pipeline.");
+    return r.json();
+  },
+
+  async updateLeadStatus(leadId, status, token) {
+    const r = await fetch(`/api/v1/crm/leads/${leadId}/status`, {
+      method: "PATCH",
+      headers: this.headers(token),
+      body: JSON.stringify({ status }),
+    });
+    if (!r.ok) throw new Error("Failed to update lead status.");
+    return r.json();
+  },
+  
 };
 
 export default API;

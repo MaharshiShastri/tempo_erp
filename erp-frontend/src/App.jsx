@@ -14,6 +14,7 @@ import AdminUserRegistryView from "./views/AdminUserRegistryView";
 import DispatchPlannerView  from "./views/DispatchPlannerView";
 import SharedAlertModal from "./components/shared/SharedAlertModal";
 import {ToastContainer} from "./components/Shared";
+import CRM_WorkspaceView from "./views/CRM_WorkspaceView";
 import LogisticsPartnerEntryView from "./views/LogisticsPartnerEntryView";
 import ItemMasterView from './views/ItemMasterView';
 import ItemMasterCreateView from "./views/ItemMasterCreateView";
@@ -103,6 +104,11 @@ function App() {
                             {!sidebarCollapsed && (<span>Product Master</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
                         </a>
+                        <a href="#crm" className={`menu-item ${state.activeTab === 'crm-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('crm-workspace')}}>
+                            <span>🎯</span> 
+                            {!sidebarCollapsed &&(<span>CRM Pipeline</span>)}
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+W</span>
+                        </a>
                     </div>
                     
                     <div className="menu-group">
@@ -165,6 +171,7 @@ function App() {
                     {isFactory && state.activeTab === "item-create" && <ItemMasterCreateView state={state}/>}
                     {isFactory && state.activeTab === "accountability-hub" && <ActivityDashboardView state={state}/>}
                     {isTransporter && state.activeTab === 'partner-new' && <LogisticsPartnerEntryView state={state} />}
+                    {isSales && state.activeTab === 'crm-workspace' && <CRM_WorkspaceView state={state} />}
                 </div>
             </div>
 
