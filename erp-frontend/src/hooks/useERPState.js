@@ -56,6 +56,38 @@ export default function useERPState() {
         }
     }, []);
 
+    useEffect(() => {
+        if (!user?.access_token) return;
+
+        try {
+            const payload = JSON.parse(
+                atob(user.access_token.split('.')[1])
+            );
+
+            const expiresAt = payload.exp * 1000;
+            const remaining = expiresAt - Date.now();
+
+            if (remaining <= 0) {
+                localStorage.removeItem("tempo_erp_user");
+                setUser(null);
+                return;
+            }
+
+            const timer = setTimeout(() => {
+                localStorage.removeItem("tempo_erp_user");
+                setUser(null);
+
+                alert("Your session has expired. Please login again.");
+            }, remaining);
+
+            return () => clearTimeout(timer);
+
+        } catch {
+            localStorage.removeItem("tempo_erp_user");
+            setUser(null);
+        }
+    }, [user]);
+
     const dispatchSystemNotification = (title, message) => {
         setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
         setIsAlertOpen(true);
