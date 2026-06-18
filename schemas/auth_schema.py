@@ -21,3 +21,12 @@ class UserProfileResponse(BaseModel):
     name: str
     role: str
     access_token: str
+
+class UserUpdateInput(BaseModel):
+    name: str
+    password: Optional[str] = None
+    role: str
+    dob: Optional[date] = None
+    phone_personal: Optional[str] = ""
+    phone_business: Optional[str] = ""
+    regions: List[str] = []

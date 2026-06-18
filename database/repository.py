@@ -70,6 +70,34 @@ class PostgresRepository:
                 ))
                 conn.commit()
                 return cur.fetchone()
+            
+    def update_user(self, email: str, user_data: dict):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # If a new password is provided, update it. Otherwise, leave the hash alone.
+                if user_data.get('password'):
+                    cur.execute("""
+                        UPDATE users 
+                        SET name=%s, password_hash=%s, role=%s, dob=%s, phone_personal=%s, phone_business=%s, regions=%s
+                        WHERE email=%s RETURNING email, name, role
+                    """, (user_data['name'], user_data['password'], user_data['role'], user_data.get('dob'), 
+                          user_data.get('phone_personal'), user_data.get('phone_business'), user_data.get('regions', []), email))
+                else:
+                    cur.execute("""
+                        UPDATE users 
+                        SET name=%s, role=%s, dob=%s, phone_personal=%s, phone_business=%s, regions=%s
+                        WHERE email=%s RETURNING email, name, role
+                    """, (user_data['name'], user_data['role'], user_data.get('dob'), 
+                          user_data.get('phone_personal'), user_data.get('phone_business'), user_data.get('regions', []), email))
+                conn.commit()
+                return cur.fetchone()
+
+    def delete_user(self, email: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM users WHERE email=%s RETURNING email", (email,))
+                conn.commit()
+                return cur.fetchone()
     # --- AUTH & RBAC end---
     # --- GLOBAL ORDERS ENGINE start---
     def get_all_orders(self):
@@ -701,4 +729,58 @@ class PostgresRepository:
 
                 return dashboard_tree
     # --- CONTEXTUAL ACCOUNTABILITY HUB (ACTIVITY LOGS) end---
+    # --- CRM SUBSYSTEM start ---
+    def get_crm_leads(self, user_profile: dict):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Admins see everything, Sales Reps only see leads assigned to their email
+                if user_profile['role'] in ['Admin', 'Chief Full Stack Developer']:
+                    cur.execute("SELECT * FROM crm_leads ORDER BY created_at DESC")
+                else:
+                    cur.execute("SELECT * FROM crm_leads WHERE assigned_to = %s ORDER BY created_at DESC", (user_profile['email'],))
+                
+                leads = cur.fetchall()
+                for l in leads:
+                    l['created_at'] = l['created_at'].isoformat() if l['created_at'] else None
+                return leads
+
+    def update_crm_lead_status(self, lead_id: int, status: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE crm_leads SET status = %s WHERE id = %s RETURNING id", (status, lead_id))
+                conn.commit()
+                return cur.fetchone()
+
+    def create_crm_lead(self, lead_data: dict):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO crm_leads (
+                        full_name, designation, company_name, contact_email,
+                        phone_number, city_state, product_query, gdpr_consent,
+                        assigned_region, assigned_to
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    lead_data['full_name'], lead_data.get('designation'), lead_data.get('company_name'),
+                    lead_data['contact_email'], lead_data.get('phone_number'), lead_data['city_state'],
+                    lead_data.get('product_query'), lead_data.get('gdpr_consent', False),
+                    lead_data.get('assigned_region'), lead_data.get('assigned_to')
+                ))
+                conn.commit()
+                return cur.fetchone()['id']
+
+    def get_sales_regions(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # UNNEST flattens the arrays into individual rows, DISTINCT removes duplicates
+                cur.execute("""
+                    SELECT DISTINCT unnest(regions) AS region_name 
+                    FROM users 
+                    WHERE regions IS NOT NULL AND array_length(regions, 1) > 0
+                """)
+                rows = cur.fetchall()
+                
+                # Format into the dictionary structure expected by classify_city_zone
+                return [{"zone_code": r["region_name"], "zone_name": r["region_name"]} for r in rows]
+    # --- CRM SUBSYSTEM end ---
 EDBR = PostgresRepository()

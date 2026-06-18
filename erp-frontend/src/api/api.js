@@ -293,6 +293,34 @@ const API = {
     return r.json();
   },
   
+  async fetchUsers(token) {
+    const r = await fetch("/api/v1/auth/users", { headers: this.headers(token) });
+    if (!r.ok) throw new Error("Failed to fetch users directory.");
+    return r.json();
+  },
+
+  async updateUser(email, payload, token) {
+    const r = await fetch(`/api/v1/auth/users/${email}`, {
+        method: "PUT",
+        headers: this.headers(token),
+        body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error("Failed to update user profile.");
+    return r.json();
+  },
+
+  async deleteUser(email, token) {
+    const r = await fetch(`/api/v1/auth/users/${email}`, {
+        method: "DELETE",
+        headers: this.headers(token)
+    });
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "Failed to delete user.");
+    }
+    return r.json();
+  },
+  
 };
 
 export default API;
