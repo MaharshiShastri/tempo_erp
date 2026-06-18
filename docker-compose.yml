@@ -7,8 +7,5 @@ services:
       - .:/app
     ports:
       - "8000:8000"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://postgres:TempoInstruments@host.docker.internal:5432/tempo_erp
     env_file:
       - .env
