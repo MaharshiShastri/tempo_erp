@@ -14,6 +14,7 @@ from routers.dispatch_router import router as dispatch_router
 from routers.item_routers import router as item_router
 from routers.dashboard_router import router as dashboard_router
 from routers.crm_router import router as crm_router
+from routers.wms_router import router as wms_router
 
 app = FastAPI(title="Tempo Instruments ERP - Decoupled Enterprise Solution")
 
@@ -34,6 +35,8 @@ app.include_router(dispatch_router)
 app.include_router(item_router)
 app.include_router(dashboard_router)
 app.include_router(crm_router)
+app.include_router(wms_router)
+
 BASE_DIR = Path(__file__).resolve().parent
 print(BASE_DIR)
 

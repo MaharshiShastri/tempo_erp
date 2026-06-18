@@ -35,6 +35,23 @@ CREATE TABLE crm_leads (
     status VARCHAR(50) DEFAULT 'New',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE grn_headers (
+    id SERIAL PRIMARY KEY,
+    grn_number VARCHAR(100) UNIQUE NOT NULL,
+    vendor_name VARCHAR(255),
+    receipt_date DATE DEFAULT CURRENT_DATE,
+    operator_email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE grn_items (
+    id SERIAL PRIMARY KEY,
+    grn_id INT REFERENCES grn_headers(id) ON DELETE CASCADE,
+    item_code VARCHAR(100),
+    quantity NUMERIC(10,2),
+    rate NUMERIC(10,2),
+    amount NUMERIC(10,2) GENERATED ALWAYS AS (quantity * rate) STORED
+);
 """
 class PostgresRepository:
     def _get_connection(self):
@@ -783,4 +800,91 @@ class PostgresRepository:
                 # Format into the dictionary structure expected by classify_city_zone
                 return [{"zone_code": r["region_name"], "zone_name": r["region_name"]} for r in rows]
     # --- CRM SUBSYSTEM end ---
+    # --- GRN SUBSYSTEM start ---
+    def create_grn(self, grn_data: dict, operator_email: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    INSERT INTO grn_headers
+                    (
+                        grn_number,
+                        vendor_name,
+                        operator_email
+                    )
+                    VALUES (%s,%s,%s)
+                    RETURNING id, grn_number
+                """, (
+                    grn_data["grn_number"],
+                    grn_data["vendor_name"],
+                    operator_email
+                ))
+
+                header = cur.fetchone()
+                grn_id = header["id"]
+
+                for item in grn_data["items"]:
+
+                    cur.execute("""
+                        INSERT INTO grn_items
+                        (
+                            grn_id,
+                            item_code,
+                            quantity,
+                            rate
+                        )
+                        VALUES (%s,%s,%s,%s)
+                    """, (
+                        grn_id,
+                        item["item_code"],
+                        item["quantity"],
+                        item["rate"]
+                    ))
+
+                conn.commit()
+
+                return {
+                    "grn_id": grn_id,
+                    "grn_number": header["grn_number"]
+                }
+    def get_grn_by_id(self, grn_id: int):
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    SELECT *
+                    FROM grn_headers
+                    WHERE id=%s
+                """, (grn_id,))
+
+                header = cur.fetchone()
+
+                if not header:
+                    return None
+
+                cur.execute("""
+                    SELECT *
+                    FROM grn_items
+                    WHERE grn_id=%s
+                    ORDER BY id
+                """, (grn_id,))
+
+                items = cur.fetchall()
+
+                for item in items:
+                    item["quantity"] = float(item["quantity"])
+                    item["rate"] = float(item["rate"])
+                    item["amount"] = float(item["amount"])
+
+                subtotal = sum(i["amount"] for i in items)
+
+                return {
+                    "id": header["id"],
+                    "grn_number": header["grn_number"],
+                    "vendor_name": header["vendor_name"],
+                    "invoice_date": str(header["receipt_date"]),
+                    "items": items,
+                    "subtotal": subtotal
+                }
 EDBR = PostgresRepository()

@@ -321,6 +321,59 @@ const API = {
     return r.json();
   },
   
+  async scanVendorBill(file, token) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const r = await fetch("/api/v1/wms/grn/scan-bill", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }, // Fetch handles multipart boundaries automatically
+        body: formData
+    });
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "Failed to scan bill.");
+    }
+    return r.json();
+  },
+  
+  async exportGRNPreview(payload, token) {
+
+    const r = await fetch(
+          "/api/v1/wms/grn/export-preview",
+          {
+              method: "POST",
+              headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json"
+              },
+              body: JSON.stringify(payload)
+          }
+      );
+
+      if (!r.ok)
+          throw new Error("Export failed");
+
+      return r.blob();
+  },
+  async saveGRN(payload, token) {
+
+      const r = await fetch(
+          "/api/v1/wms/grn/save",
+          {
+              method: "POST",
+              headers: this.headers(token),
+              body: JSON.stringify(payload)
+          }
+      );
+
+      if (!r.ok) {
+          const err = await r.json();
+          throw new Error(err.detail || "Failed to save GRN");
+      }
+
+      return r.json();
+  },
 };
 
 export default API;

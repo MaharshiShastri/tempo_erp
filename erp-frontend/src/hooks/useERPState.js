@@ -134,6 +134,7 @@ export default function useERPState() {
                     case 'l': setActiveTab('partner-new'); break;
                     case 'm': setActiveTab('admin-users'); break;
                     case 'w': setActiveTab('crm-workspace'); break;
+                    case 'g': setActiveTab('grn-workspace'); break;
                     case 'n': // Contextual New Record
                         if (activeTab.includes('company')) setActiveTab('company-new');
                         else if (activeTab.includes('order')) triggerNewOrderInitialization();

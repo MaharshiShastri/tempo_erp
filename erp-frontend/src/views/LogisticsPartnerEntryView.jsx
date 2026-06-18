@@ -1,16 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import API from "../api/api";
 
 export default function LogisticsPartnerEntryView({ state }) {
-    // --- 1. Top Level State ---
     const [availablePartners, setAvailablePartners] = useState([]);
     const [selectedPartnerId, setSelectedPartnerId] = useState("");
-    
-    // We store the baseline data stringified so we can easily check if the user has made changes
     const [originalPayloadString, setOriginalPayloadString] = useState("{}");
     const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
+    const [isExtracting, setIsExtracting] = useState(false);
+    
+    const fileInputRef = useRef(null);
 
-    // --- 2. Form State ---
     const defaultPartner = {
         name: "", cft_factor: 10.0, minimum_weight: 0.0, minimum_freight_value: 0.0,
         documentation_charge: 0.0, fov_percentage: 0.0, gst_percentage: 18.0
@@ -20,16 +19,11 @@ export default function LogisticsPartnerEntryView({ state }) {
     const [zones, setZones] = useState([]);
     const [rates, setRates] = useState([]);
     const [fuelMatrix, setFuelMatrix] = useState([]);
-    
-    // ODA 2D Matrix State
-    const [odaDistances, setOdaDistances] = useState([]); // Y-Axis (Rows)
-    const [odaWeights, setOdaWeights] = useState([]);     // X-Axis (Columns)
-    const [odaCharges, setOdaCharges] = useState({});     // { 'distId_weightId': chargeValue }
+    const [odaDistances, setOdaDistances] = useState([]); 
+    const [odaWeights, setOdaWeights] = useState([]);     
+    const [odaCharges, setOdaCharges] = useState({});     
 
-    // --- 3. Initialization ---
-    useEffect(() => {
-        loadPartnersList();
-    }, []);
+    useEffect(() => { loadPartnersList(); }, []);
 
     const loadPartnersList = async () => {
         try {
@@ -40,20 +34,15 @@ export default function LogisticsPartnerEntryView({ state }) {
         }
     };
 
-    // --- 4. Centralized Payload Builder (Serialization) ---
-    // This function compiles the messy UI state into the exact JSON your backend expects.
     const buildCurrentPayload = () => {
         const compiledOdaMatrix = [];
-        
         odaDistances.forEach(dist => {
             odaWeights.forEach(wt => {
                 const chargeVal = odaCharges[`${dist.id}_${wt.id}`];
                 if (chargeVal !== undefined && chargeVal !== "" && chargeVal !== null) {
                     compiledOdaMatrix.push({
-                        km_from: parseFloat(dist.from) || 0,
-                        km_to: parseFloat(dist.to) || 0,
-                        weight_from: parseFloat(wt.from) || 0,
-                        weight_to: parseFloat(wt.to) || 0,
+                        km_from: parseFloat(dist.from) || 0, km_to: parseFloat(dist.to) || 0,
+                        weight_from: parseFloat(wt.from) || 0, weight_to: parseFloat(wt.to) || 0,
                         oda_charge: parseFloat(chargeVal) || 0
                     });
                 }
@@ -61,162 +50,148 @@ export default function LogisticsPartnerEntryView({ state }) {
         });
 
         return {
-            name: partner.name || "",
-            cft_factor: parseFloat(partner.cft_factor) || 0,
-            minimum_weight: parseFloat(partner.minimum_weight) || 0,
-            minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
-            documentation_charge: parseFloat(partner.documentation_charge) || 0,
-            fov_percentage: parseFloat(partner.fov_percentage) || 0,
+            name: partner.name || "", cft_factor: parseFloat(partner.cft_factor) || 0,
+            minimum_weight: parseFloat(partner.minimum_weight) || 0, minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
+            documentation_charge: parseFloat(partner.documentation_charge) || 0, fov_percentage: parseFloat(partner.fov_percentage) || 0,
             gst_percentage: parseFloat(partner.gst_percentage) || 0,
-            
-            zones: zones.filter(z => z.zone_code).map(z => ({
-                zone_code: z.zone_code.trim(),
-                zone_name: (z.zone_name || "").trim(),
-                states: (z.states_raw || "").split(",").map(s => s.trim()).filter(Boolean)
-            })),
-            
-            rates: rates.filter(r => r.destination_zone).map(r => ({
-                destination_zone: r.destination_zone.trim(),
-                rate_per_kg: parseFloat(r.rate_per_kg) || 0
-            })),
-            
-            fuel_matrix: fuelMatrix.filter(f => f.fuel_price_from !== "" && f.fuel_price_to !== "").map(f => ({
-                fuel_price_from: parseFloat(f.fuel_price_from) || 0,
-                fuel_price_to: parseFloat(f.fuel_price_to) || 0,
-                surcharge_percentage: parseFloat(f.surcharge_percentage) || 0
-            })),
-            
+            zones: zones.filter(z => z.zone_code).map(z => ({ zone_code: z.zone_code.trim(), zone_name: (z.zone_name || "").trim(), states: (z.states_raw || "").split(",").map(s => s.trim()).filter(Boolean) })),
+            rates: rates.filter(r => r.destination_zone).map(r => ({ destination_zone: r.destination_zone.trim(), rate_per_kg: parseFloat(r.rate_per_kg) || 0 })),
+            fuel_matrix: fuelMatrix.filter(f => f.fuel_price_from !== "" && f.fuel_price_to !== "").map(f => ({ fuel_price_from: parseFloat(f.fuel_price_from) || 0, fuel_price_to: parseFloat(f.fuel_price_to) || 0, surcharge_percentage: parseFloat(f.surcharge_percentage) || 0 })),
             oda_matrix: compiledOdaMatrix
         };
     };
 
-    // --- 5. Selection & Loading (Deserialization) ---
+    // Shared function to populate UI state (used by Database Fetch AND AI Extraction)
+    const populateState = (profile) => {
+        setPartner({
+            name: profile.name || "", cft_factor: profile.cft_factor ?? 10,
+            minimum_weight: profile.minimum_weight ?? 0, minimum_freight_value: profile.minimum_freight_value ?? 0,
+            documentation_charge: profile.documentation_charge ?? 0, fov_percentage: profile.fov_percentage ?? 0,
+            gst_percentage: profile.gst_percentage ?? 18
+        });
+
+        setZones(profile.zones?.map(z => ({ ...z, states_raw: z.states_raw || (z.states ? z.states.join(', ') : "") })) || []);
+        setRates(profile.rates || []);
+        setFuelMatrix(profile.fuel_matrix || []);
+
+        const loadedOda = profile.oda_matrix || [];
+        const dMap = new Map(); const wMap = new Map(); const newCharges = {};
+
+        loadedOda.forEach((o, idx) => {
+            const dKey = `${o.km_from}-${o.km_to}`; const wKey = `${o.weight_from}-${o.weight_to}`;
+            if (!dMap.has(dKey)) dMap.set(dKey, { id: `d_${idx}`, from: o.km_from, to: o.km_to });
+            if (!wMap.has(wKey)) wMap.set(wKey, { id: `w_${idx}`, from: o.weight_from, to: o.weight_to });
+            newCharges[`${dMap.get(dKey).id}_${wMap.get(wKey).id}`] = o.oda_charge;
+        });
+
+        setOdaDistances(Array.from(dMap.values())); setOdaWeights(Array.from(wMap.values())); setOdaCharges(newCharges);
+
+        setTimeout(() => setOriginalPayloadString(JSON.stringify(buildCurrentPayload())), 100);
+    };
+
     const handlePartnerSelection = async (e) => {
         const id = e.target.value;
         setSelectedPartnerId(id);
-
-        if (!id) {
-            // Reset to clean slate
-            setPartner(defaultPartner);
-            setZones([]); setRates([]); setFuelMatrix([]);
-            setOdaDistances([]); setOdaWeights([]); setOdaCharges({});
-            setOriginalPayloadString(JSON.stringify(defaultPartner)); 
-            return;
-        }
+        if (!id) { populateState(defaultPartner); return; }
 
         try {
             const profile = await API.getPartnerProfile(id, state.user.access_token);
-            
-            // 1. Populate Core
-            setPartner({
-                name: profile.name || "", cft_factor: profile.cft_factor ?? 10,
-                minimum_weight: profile.minimum_weight ?? 0, minimum_freight_value: profile.minimum_freight_value ?? 0,
-                documentation_charge: profile.documentation_charge ?? 0, fov_percentage: profile.fov_percentage ?? 0,
-                gst_percentage: profile.gst_percentage ?? 18
-            });
-
-            // 2. Populate Standard Tables
-            setZones(profile.zones?.map(z => ({ ...z, states_raw: z.states_raw || "" })) || []);
-            setRates(profile.rates || []);
-            setFuelMatrix(profile.fuel_matrix || []);
-
-            // 3. Populate ODA 2D Matrix
-            const loadedOda = profile.oda_matrix || [];
-            const dMap = new Map();
-            const wMap = new Map();
-            const newCharges = {};
-
-            loadedOda.forEach((o, idx) => {
-                const dKey = `${o.km_from}-${o.km_to}`;
-                const wKey = `${o.weight_from}-${o.weight_to}`;
-
-                if (!dMap.has(dKey)) dMap.set(dKey, { id: `d_${idx}`, from: o.km_from, to: o.km_to });
-                if (!wMap.has(wKey)) wMap.set(wKey, { id: `w_${idx}`, from: o.weight_from, to: o.weight_to });
-
-                const rowId = dMap.get(dKey).id;
-                const colId = wMap.get(wKey).id;
-                newCharges[`${rowId}_${colId}`] = o.oda_charge;
-            });
-
-            setOdaDistances(Array.from(dMap.values()));
-            setOdaWeights(Array.from(wMap.values()));
-            setOdaCharges(newCharges);
-
-            // Wait a micro-tick so states settle, then lock in the baseline for change detection
-            setTimeout(() => {
-                setOriginalPayloadString(JSON.stringify(buildCurrentPayload()));
-            }, 0);
-
+            populateState(profile);
         } catch (err) {
-            state.setAlertMessage("Failed to load partner profile.");
-            state.setIsAlertOpen(true);
+            setModalAlert({ isOpen: true, title: "Fetch Error", message: "Failed to load partner profile.", isError: true });
         }
     };
 
-    // --- 6. Event Handlers ---
-    // --- 6. Event Handlers ---
+    // --- NEW: AI File Upload Handler ---
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        setIsExtracting(true);
+        setModalAlert({ isOpen: true, title: "🤖 AI Document Analysis", message: "Extracting contract parameters... This will take a moment.", isError: false });
+
+        try {
+            const response = await fetch("/api/v1/dispatch/partners/extract-from-file", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${state.user.access_token}` }, // Do NOT set Content-Type, fetch sets multipart boundaries automatically
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || "Extraction failed");
+            }
+
+            const result = await response.json();
+            
+            // Populate the UI with AI data
+            setSelectedPartnerId(""); // Ensure we are in "Create" mode
+            populateState(result.data);
+            
+            setModalAlert({ isOpen: true, title: "Extraction Complete", message: "Please review the auto-filled data below before saving to the database.", isError: false });
+        } catch (err) {
+            setModalAlert({ isOpen: true, title: "AI Extraction Failed", message: err.message, isError: true });
+        } finally {
+            setIsExtracting(false);
+            if(fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        }
+    };
+
     const handleSave = async (e) => {
         e.preventDefault();
         const payload = buildCurrentPayload();
-
         try {
             let backendResponse;
+            if (selectedPartnerId) { backendResponse = await API.updateDispatchPartner(selectedPartnerId, payload, state.user.access_token); } 
+            else { backendResponse = await API.saveDispatchPartner(payload, state.user.access_token); setSelectedPartnerId(""); }
             
-            if (selectedPartnerId) {
-                backendResponse = await API.updateDispatchPartner(selectedPartnerId, payload, state.user.access_token);
-            } else {
-                backendResponse = await API.saveDispatchPartner(payload, state.user.access_token);
-                setSelectedPartnerId(""); // reset UI on successful creation
-            }
-            
-            // Extract the dynamic data returned straight from the repository
             const actionStatus = backendResponse.status || "processed";
             const partnerName = backendResponse.partner_name || payload.name;
-
-            // Trigger the global user-defined alert
             setModalAlert({ isOpen: true, title: "Database Synced", message: `🚚 Logistics Partner "${partnerName}" was successfully ${actionStatus}.`, isError: false });
-            
-            // Sync baseline so the Update button disappears again
             setOriginalPayloadString(JSON.stringify(payload));
             loadPartnersList(); 
-            
         } catch (err) {
-            // Display backend failure messages in the same custom alert modal
             setModalAlert({ isOpen: true, title: "Sync Failure", message: err.message, isError: true });
         }
     };
 
-    // Standard Helpers
     const addRow = (setter, defaultObj) => setter(prev => [...prev, defaultObj]);
     const removeRow = (list, setter, idx) => setter(list.filter((_, i) => i !== idx));
-    const handleTableChange = (list, setter, idx, field, val) => {
-        const updated = [...list];
-        updated[idx][field] = val;
-        setter(updated);
-    };
-
-    // ODA Helpers
+    const handleTableChange = (list, setter, idx, field, val) => { const updated = [...list]; updated[idx][field] = val; setter(updated); };
     const addOdaRow = () => setOdaDistances([...odaDistances, { id: `d_${Date.now()}`, from: "", to: "" }]);
     const addOdaCol = () => setOdaWeights([...odaWeights, { id: `w_${Date.now()}`, from: "", to: "" }]);
     const updateOdaAxis = (setter, list, id, field, val) => setter(list.map(item => item.id === id ? { ...item, [field]: val } : item));
     const updateOdaCharge = (dId, wId, val) => setOdaCharges(prev => ({ ...prev, [`${dId}_${wId}`]: val }));
+    const removeOdaRow = (id) => setOdaDistances(prev => prev.filter(r => r.id !== id));
+    const removeOdaCol = (id) => setOdaWeights(prev => prev.filter(c => c.id !== id));
 
-    // Change Detection
     const hasChanges = JSON.stringify(buildCurrentPayload()) !== originalPayloadString;
 
-    // --- 7. UI Render ---
     return (
         <div className="frappe-card" style={{ maxWidth: 1200, margin: "0 auto", padding: 25 }}>
             <div className="system-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3>🚚 Master Logistics Onboarding Dashboard</h3>
-                <select className="form-select-native" value={selectedPartnerId} onChange={handlePartnerSelection}>
-                    <option value="">➕ Create New Transporter</option>
-                    {availablePartners.map(p => <option key={p.id} value={p.id}>✏️ {p.name}</option>)}
-                </select>
+                <h3>🚚 Master Logistics Onboarding</h3>
+                
+                <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+                    {/* NEW AI BUTTON */}
+                    <div>
+                        <input type="file" accept=".pdf" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
+                        <button type="button" className="btn btn-secondary" style={{ background: "var(--brand-accent)", color: "#fff", border: "none" }} onClick={() => fileInputRef.current.click()} disabled={isExtracting}>
+                            {isExtracting ? "⏳ Extracting..." : "🤖 Auto-Fill via Contract PDF"}
+                        </button>
+                    </div>
+
+                    <select className="form-select-native" value={selectedPartnerId} onChange={handlePartnerSelection}>
+                        <option value="">➕ Create Manually</option>
+                        {availablePartners.map(p => <option key={p.id} value={p.id}>✏️ {p.name}</option>)}
+                    </select>
+                </div>
             </div>
 
             <form onSubmit={handleSave}>
-                {/* 1. CORE PARAMS */}
                 <h4 style={{ color: "var(--brand-accent)", marginTop: "20px" }}>Core Contract Parameters</h4>
                 <div className="form-grid-layout" style={{ gap: "15px" }}>
                     <div className="form-group"><label className="input-label">Transporter Name</label><input required className="form-input" value={partner.name} onChange={e => setPartner({ ...partner, name: e.target.value })} /></div>
@@ -228,7 +203,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     <div className="form-group"><label className="input-label">GST Rate (%)</label><input required type="number" className="form-input" value={partner.gst_percentage} onChange={e => setPartner({ ...partner, gst_percentage: e.target.value })} /></div>
                 </div>
 
-                {/* 2. ZONES */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
                     <h4 style={{ color: "var(--brand-accent)" }}>Zone Definitions</h4>
                     <button type="button" className="btn btn-secondary" onClick={() => addRow(setZones, { zone_code: "", zone_name: "", states_raw: "" })}>+ Add Zone</button>
@@ -247,7 +221,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </tbody>
                 </table>
 
-                {/* 3. RATES */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
                     <h4 style={{ color: "var(--brand-accent)" }}>Commercial Freight Rates</h4>
                     <button type="button" className="btn btn-secondary" onClick={() => addRow(setRates, {destination_zone: "", rate_per_kg: "" })}>+ Add Rate</button>
@@ -265,7 +238,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </tbody>
                 </table>
 
-                {/* 4. FUEL */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
                     <h4 style={{ color: "var(--brand-accent)" }}>Fuel Escalation (FSC)</h4>
                     <button type="button" className="btn btn-secondary" onClick={() => addRow(setFuelMatrix, { fuel_price_from: "", fuel_price_to: "", surcharge_percentage: "" })}>+ Add Fuel Slab</button>
@@ -284,7 +256,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </tbody>
                 </table>
 
-                {/* 5. ODA 2D MATRIX */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px", marginBottom: "15px" }}>
                     <h4 style={{ color: "var(--brand-accent)" }}>ODA Delivery Matrix</h4>
                     <div>
@@ -328,7 +299,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                                         const cellKey = `${dist.id}_${wt.id}`;
                                         return (
                                             <td key={cellKey} style={{ padding: "10px", borderBottom: "1px solid var(--border-light)", borderRight: "1px solid var(--border-light)" }}>
-                                                <input className="form-input" type="number" placeholder="₹ Value" style={{ width: "100%", boxSizing: "border-box", textAlign: "center" }} value={odaCharges[cellKey] ?? ""} onChange={e => updateOdaCharge(dist.id, wt.id, e.target.value)} />
+                                                <input className="form-input" type="number" placeholder="₹" style={{ width: "100%", boxSizing: "border-box", textAlign: "center" }} value={odaCharges[cellKey] ?? ""} onChange={e => updateOdaCharge(dist.id, wt.id, e.target.value)} />
                                             </td>
                                         );
                                     })}
@@ -338,7 +309,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </table>
                 </div>
 
-                {/* SAVE CONTROLS (Only visible if state differs from original) */}
                 {hasChanges && (
                     <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
                         <button type="submit" className="btn btn-success" style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold" }}>
@@ -347,6 +317,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </div>
                 )}
             </form>
+
             {modalAlert.isOpen && (
                 <div className="modal-overlay">
                     <div className="modal-box" style={{ borderTop: `4px solid ${modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
@@ -354,7 +325,9 @@ export default function LogisticsPartnerEntryView({ state }) {
                             {modalAlert.title}
                         </h3>
                         <p style={{ margin: "15px 0" }}>{modalAlert.message}</p>
-                        <button className="btn btn-secondary" onClick={() => setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
+                        <button className="btn btn-secondary" onClick={() => setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>
+                            {isExtracting ? "Dismiss" : "Acknowledge"}
+                        </button>
                     </div>
                 </div>
             )}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database.repository import EDBR
 from security import verify_bearer_token
 from services.dispatch_calculator import execute_dispatch_algorithm
@@ -6,6 +6,10 @@ from .dependencies import check_department
 import logging
 from schemas.logistics_schema import FullPartnerProfile, LogisticsPartnerCreate
 import traceback
+import shutil
+import PyPDF2
+from pathlib import Path
+from services.ai_contract_parser import extract_logistics_profile_from_text
 
 router = APIRouter(prefix="/api/v1/dispatch", tags=["Dispatch Logistics Engine"])
 
@@ -109,3 +113,41 @@ def save_dispatch_record(payload: dict, user: dict = Depends(verify_bearer_token
         logging.error(f"Failed to save dispatch record: {str(e)}")
         # Pass the exact repository error to the frontend
         raise HTTPException(status_code=500, detail=f"Database Engine Error: {str(e)}")
+    
+UPLOAD_DIR = Path("local_contract_uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@router.post("/partners/extract-from-file", dependencies=[Depends(check_department("Transport"))])
+async def extract_partner_from_file(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are currently supported for auto-extraction.")
+
+    # 1. Store the file locally
+    file_location = UPLOAD_DIR / file.filename
+    with open(file_location, "wb+") as file_object:
+        shutil.copyfileobj(file.file, file_object)
+
+    try:
+        # 2. Extract text from PDF
+        extracted_text = ""
+        with open(file_location, "rb") as pdf_file:
+            reader = PyPDF2.PdfReader(pdf_file)
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    extracted_text += text + "\n"
+        
+        if len(extracted_text.strip()) < 50:
+             raise ValueError("Could not read text from PDF. Ensure it is a text-based PDF, not a scanned image.")
+
+        # 3. Process via Groq AI
+        ai_parsed_json = extract_logistics_profile_from_text(extracted_text)
+        
+        return {
+            "status": "success",
+            "message": "Contract parsed successfully.",
+            "data": ai_parsed_json
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Parsing Failed: {str(e)}")

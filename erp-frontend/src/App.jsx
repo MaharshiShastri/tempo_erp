@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiMenu, FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage } from "react-icons/fi";
 import useERPState from "./hooks/useERPState";
 
 import LoginView from "./views/LoginView";
@@ -19,6 +19,7 @@ import LogisticsPartnerEntryView from "./views/LogisticsPartnerEntryView";
 import ItemMasterView from './views/ItemMasterView';
 import ItemMasterCreateView from "./views/ItemMasterCreateView";
 import ItemMasterDetailView from "./views/ItemMasterDetailView";
+import GRN_WorkspaceView from "./views/GRN_WorkspaceView";
 import ActivityDashboardView from "./views/ActivityDashboardView";
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
@@ -101,7 +102,7 @@ function App() {
                         </a>
                         <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
                             <span>📦</span> 
-                            {!sidebarCollapsed && (<span>Product Master</span>)}
+                            {!sidebarCollapsed && (<span>Item Master</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
                         </a>
                         <a href="#crm" className={`menu-item ${state.activeTab === 'crm-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('crm-workspace')}}>
@@ -123,6 +124,14 @@ function App() {
                             <span>🛠️</span> 
                             {!sidebarCollapsed && (<span>Production Pulse</span>)}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+P</span>
+                        </a>
+                        
+                        <a href="#grn" className={`menu-item ${state.activeTab === 'grn-workspace' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('grn-workspace'); }}>
+                            <span><FiPackage /></span>
+                            {!sidebarCollapsed && <span>GRN Workspace</span>}
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>
+                                Alt+G
+                            </span>
                         </a>
                     </div>
 
@@ -172,6 +181,7 @@ function App() {
                     {isFactory && state.activeTab === "accountability-hub" && <ActivityDashboardView state={state}/>}
                     {isTransporter && state.activeTab === 'partner-new' && <LogisticsPartnerEntryView state={state} />}
                     {isSales && state.activeTab === 'crm-workspace' && <CRM_WorkspaceView state={state} />}
+                    {isFactory && state.activeTab === 'grn-workspace' && (<GRN_WorkspaceView state={state} />)}
                 </div>
             </div>
 
