@@ -887,4 +887,48 @@ class PostgresRepository:
                     "items": items,
                     "subtotal": subtotal
                 }
+    #Testing
+    def seed_test_items(self, items_list: list):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # We use ON CONFLICT DO NOTHING so you can safely run the CSV upload 
+                # multiple times without throwing duplicate key errors.
+                cur.executemany("""
+                    INSERT INTO test_items_master (item_code, item_specification)
+                    VALUES (%s, %s)
+                    ON CONFLICT (item_code) DO NOTHING
+                """, [(item['item_code'], item['item_specification']) for item in items_list])
+                conn.commit()
+    
+    def get_test_items(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    SELECT
+                        item_code,
+                        item_specification
+                    FROM test_items_master
+                """)
+
+                return cur.fetchall()
+    
+    def get_test_item_by_code(self, item_code: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    SELECT
+                        item_code,
+                        item_specification
+                    FROM test_items_master
+                    WHERE item_code=%s
+                """, (item_code,))
+                row = cur.fetchone()
+                
+                if not row:
+                    return None
+                
+                return dict(row)
+            
 EDBR = PostgresRepository()

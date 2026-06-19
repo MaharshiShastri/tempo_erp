@@ -374,6 +374,39 @@ const API = {
 
       return r.json();
   },
+  async uploadItemMasterCSV(file, token) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const r = await fetch("/api/v1/wms/items/seed-test-csv", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }, // Do NOT set Content-Type
+        body: formData
+    });
+    
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "Failed to upload CSV.");
+    }
+    return r.json();
+  },
+  async getTestItem(itemCode, token) {
+
+      const r = await fetch(
+          `/api/v1/wms/test-item/${encodeURIComponent(itemCode)}`,
+          {
+              headers: {
+                  Authorization: `Bearer ${token}`
+              }
+          }
+      );
+
+      if (!r.ok) {
+          throw new Error("Lookup failed");
+      }
+
+      return r.json();
+  },
 };
 
 export default API;

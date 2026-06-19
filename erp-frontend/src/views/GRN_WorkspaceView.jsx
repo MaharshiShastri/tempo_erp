@@ -24,14 +24,38 @@ export default function GRN_WorkspaceView({ state }) {
         try {
             const result = await API.scanVendorBill(file, state.user.access_token);
             
-            const editableItems = result.data.items.map(aiItem => {
-                const isKnownCode = state.itemsMaster.some(m => m.item_code === aiItem.item_code);
-                return {
-                    ...aiItem,
-                    isMatched: isKnownCode,
-                    amount: Number(((parseFloat(aiItem.quantity) || 0) * (parseFloat(aiItem.rate) || 0)).toFixed(2))
-                };
-            });
+            const editableItems = await Promise.all(
+    result.data.items.map(async (aiItem) => {
+
+        let matchedSpec = "";
+
+        try {
+            if (aiItem.item_code) {
+
+                const lookup = await API.getTestItem(aiItem.item_code, state.user.access_token);
+
+                if (lookup) {
+                    matchedSpec = lookup.item_specification || "";
+                }
+            }
+        } catch(error) {
+            alert("An error occurred: " + error.message);
+        }
+
+        return {
+            ...aiItem,
+            test_specification: matchedSpec,
+            isMatched: !!matchedSpec,
+            amount:
+                Number(
+                    (
+                        (parseFloat(aiItem.quantity) || 0) *
+                        (parseFloat(aiItem.rate) || 0)
+                    ).toFixed(2)
+                )
+        };
+    })
+);
 
             const totals = calculateTotals(editableItems);
 
@@ -79,7 +103,7 @@ export default function GRN_WorkspaceView({ state }) {
         setScannedData({ ...scannedData, [field]: value });
     };
 
-    const updateItem = (index, field, value) => {
+    const updateItem = async (index, field, value) => {
         const newItems = [...scannedData.items];
         newItems[index][field] = value;
         
@@ -88,7 +112,26 @@ export default function GRN_WorkspaceView({ state }) {
         }
 
         if (field === 'item_code') {
-            newItems[index].isMatched = state.itemsMaster.some(m => m.item_code === value);
+            try {
+                const lookup = API.getTestItem(value, state.user.access_token);
+
+                if (lookup) {
+
+                    newItems[index].isMatched = true;
+
+                    newItems[index].test_specification = lookup.item_specification || "";
+
+                } else {
+
+                    newItems[index].isMatched = false;
+                    newItems[index].test_specification = "";
+                }
+
+            } catch {
+
+                newItems[index].isMatched = false;
+                newItems[index].test_specification = "";
+            }
         }
 
         const totals = calculateTotals(newItems);
@@ -277,6 +320,7 @@ export default function GRN_WorkspaceView({ state }) {
                                                 placeholder="Search Code..."
                                             />
                                             {!item.isMatched && <div style={{ fontSize: "10px", color: "var(--brand-danger)", marginTop: "4px", fontWeight: "bold" }}>⚠️ Unmapped Code</div>}
+                                            {item.test_specification && (<div style={{ marginTop: "4px", fontSize: "11px", color: "#666"}}> {item.test_specification} </div> )}
                                         </td>
                                         <td style={{ padding: "12px" }}>
                                             <input className="form-input" value={item.description} onChange={(e) => updateItem(idx, "description", e.target.value)} />

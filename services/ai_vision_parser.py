@@ -1,11 +1,16 @@
 import os
 import json
 from groq import Groq
+from database.repository import EDBR
 
-# Uses your existing Groq API Key
 client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
 
+
+# ==============================
+# CORE: VISION EXTRACTION
+# ==============================
 def extract_grn_from_image(base64_image: str) -> dict:
+
     prompt = """
     You are a data-extraction AI for a precision manufacturing ERP.
     Read the provided vendor invoice and convert it into a STRICT JSON format for a Goods Receipt Note (GRN).
@@ -39,33 +44,80 @@ def extract_grn_from_image(base64_image: str) -> dict:
 }
     """
 
-    try:
-        response = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct", # Groq's high-speed vision model
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ],
-                }
-            ],
-            temperature=0.1,
-            max_tokens=1024,
-            response_format={"type": "json_object"}
-        )
+    response = client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ],
+            }
+        ],
+        temperature=0.1,
+        max_tokens=1024,
+        response_format={"type": "json_object"}
+    )
 
-        raw_content = response.choices[0].message.content.strip()
-        print(raw_content)
-        # Clean up markdown formatting if the AI wraps it in ```json
-        if raw_content.startswith("```"):
-            raw_content = raw_content.strip("`")
+    raw = response.choices[0].message.content.strip()
 
-            if raw_content.startswith("json"):
-                raw_content = raw_content[4:]
+    # clean possible markdown noise
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.startswith("json"):
+            raw = raw[4:].strip()
 
-            raw_content = raw_content.strip()
-        return json.loads(raw_content)
-    except Exception as e:
-        raise ValueError(f"Vision API failure: {str(e)}")
+    return json.loads(raw)
+
+
+# ==============================
+# ERP ENRICHMENT LAYER
+# ==============================
+def enrich_items_from_master(items: list) -> list:
+
+    enriched = []
+
+    for item in items:
+
+        item_code = (item.get("item_code") or "").strip()
+
+        item["item_description"] = ""
+        item["matched_from_master"] = False
+
+        if not item_code:
+            enriched.append(item)
+            continue
+
+        try:
+            master = EDBR.get_test_item_by_code(item_code)
+
+        except Exception:
+            master = None
+
+        if master:
+            item["item_description"] = master.get("item_specification", "")
+            item["matched_from_master"] = True
+
+        enriched.append(item)
+
+    return enriched
+
+
+# ==============================
+# MAIN ENTRY (USED BY ROUTE)
+# ==============================
+def process_grn_image(base64_image: str) -> dict:
+
+    data = extract_grn_from_image(base64_image)
+
+    items = data.get("items", [])
+
+    data["items"] = enrich_items_from_master(items)
+
+    return data

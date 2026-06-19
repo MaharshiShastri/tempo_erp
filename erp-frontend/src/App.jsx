@@ -21,6 +21,7 @@ import ItemMasterCreateView from "./views/ItemMasterCreateView";
 import ItemMasterDetailView from "./views/ItemMasterDetailView";
 import GRN_WorkspaceView from "./views/GRN_WorkspaceView";
 import ActivityDashboardView from "./views/ActivityDashboardView";
+import ItemMasterUploadView from "./views/ItemMasterUploadView";
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 
@@ -133,6 +134,11 @@ function App() {
                                 Alt+G
                             </span>
                         </a>
+
+                        <a href="#items-upload" className={`menu-item ${state.activeTab === 'items-upload' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-upload')}}>
+                            <span>📥</span> 
+                            {!sidebarCollapsed && (<span>Bulk Import Items</span>)}
+                        </a>
                     </div>
 
                     {isSuperUser && (
@@ -182,6 +188,7 @@ function App() {
                     {isTransporter && state.activeTab === 'partner-new' && <LogisticsPartnerEntryView state={state} />}
                     {isSales && state.activeTab === 'crm-workspace' && <CRM_WorkspaceView state={state} />}
                     {isFactory && state.activeTab === 'grn-workspace' && (<GRN_WorkspaceView state={state} />)}
+                    {isFactory && state.activeTab === 'items-upload' && <ItemMasterUploadView state={state} />}
                 </div>
             </div>
 
