@@ -151,3 +151,4 @@ async def extract_partner_from_file(file: UploadFile = File(...), user: dict = D
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Parsing Failed: {str(e)}")
+    
