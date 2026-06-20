@@ -7,7 +7,7 @@ export default function LogisticsPartnerEntryView({ state }) {
     const [originalPayloadString, setOriginalPayloadString] = useState("{}");
     const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
     const [isExtracting, setIsExtracting] = useState(false);
-    
+    const [isDeleting, setIsDeleting] = useState(false);
     const fileInputRef = useRef(null);
 
     const defaultPartner = {
@@ -87,6 +87,50 @@ export default function LogisticsPartnerEntryView({ state }) {
         setOdaDistances(Array.from(dMap.values())); setOdaWeights(Array.from(wMap.values())); setOdaCharges(newCharges);
 
         setTimeout(() => setOriginalPayloadString(JSON.stringify(buildCurrentPayload())), 100);
+    };
+
+    const handleDelete = async () => {
+        if (!selectedPartnerId) return;
+        
+        const confirmDelete = window.confirm(
+            "⚠️ Are you sure you want to completely delete this logistics partner?\n\nThis will permanently wipe all their core parameters, zones, rates, fuel matrices, and ODA matrices. This action cannot be undone."
+        );
+        
+        if (!confirmDelete) return;
+
+        setIsDeleting(true);
+        try {
+            // We use a direct fetch here matching the style of your AI File Upload handler
+            const response = await fetch(`/api/v1/logistics/config/partners/${selectedPartnerId}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${state.user.access_token}` }
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || "Deletion failed on the server.");
+            }
+
+            const result = await response.json();
+            
+            // Show success message
+            setModalAlert({ 
+                isOpen: true, 
+                title: "Partner Deleted", 
+                message: `🗑️ ${result.partner_name || "Logistics Partner"} was successfully removed from the system.`, 
+                isError: false 
+            });
+            
+            // Reset UI back to a blank "Create" slate
+            setSelectedPartnerId("");
+            populateState(defaultPartner);
+            loadPartnersList(); 
+            
+        } catch (err) {
+            setModalAlert({ isOpen: true, title: "Deletion Failed", message: err.message, isError: true });
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handlePartnerSelection = async (e) => {
@@ -309,13 +353,31 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </table>
                 </div>
 
-                {hasChanges && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
-                        <button type="submit" className="btn btn-success" style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold" }}>
-                            {selectedPartnerId ? "Update Changed Matrices" : "Save New Transporter Master"}
-                        </button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-light)", paddingTop: "20px", marginTop: "20px" }}>
+                    <div>
+                        {/* Only show Delete if an existing partner is selected */}
+                        {selectedPartnerId && (
+                            <button 
+                                type="button" 
+                                className="btn" 
+                                style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold", background: "var(--brand-danger, #dc3545)", color: "#fff", border: "none" }} 
+                                onClick={handleDelete} 
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? "⏳ Deleting..." : "🗑️ Delete Transporter"}
+                            </button>
+                        )}
                     </div>
-                )}
+                    
+                    <div>
+                        {/* Only show Save/Update if the user actually changed something */}
+                        {hasChanges && (
+                            <button type="submit" className="btn btn-success" style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold" }}>
+                                {selectedPartnerId ? "Update Changed Matrices" : "Save New Transporter Master"}
+                            </button>
+                        )}
+                    </div>
+                </div>
             </form>
 
             {modalAlert.isOpen && (

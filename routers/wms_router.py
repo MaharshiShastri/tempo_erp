@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 import base64
-from services.ai_vision_parser import extract_grn_from_image
+from services.ai_vision_parser import extract_grn_from_image, calculate_grn_totals, process_grn_image
 from security import verify_bearer_token
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
@@ -9,9 +9,65 @@ from io import BytesIO
 from database.repository import EDBR
 from openpyxl.styles import (Font, PatternFill, Border, Side, Alignment)
 import csv
-from difflib import SequenceMatcher
+import datetime
 
 router = APIRouter(prefix="/api/v1/wms", tags=["Warehouse & Inventory"])
+
+def normalize_item(item: dict) -> dict:
+    qty = float(item.get("quantity") or 0)
+    rate = float(item.get("rate") or 0)
+    disc_pct = float(item.get("discount_percent") or 0)
+
+    gross = qty * rate
+    discount_amount = gross * disc_pct / 100
+    net = gross - discount_amount
+
+    return {
+        "item_code": (item.get("item_code") or "").strip(),
+
+        # Vendor bill values
+        "item_name": item.get("item_name", ""),
+        "description": item.get("description", ""),
+
+        # ERP matched description
+        "item_description": item.get("item_description", ""),
+
+        "quantity": qty,
+        "rate": rate,
+        "discount_percent": disc_pct,
+
+        "gross_amount": round(gross, 2),
+        "discount_amount": round(discount_amount, 2),
+        "net_amount": round(net, 2)
+    }
+
+def hydrate_items_with_master(items: list) -> list:
+
+    hydrated = []
+
+    for item in items:
+
+        code = (item.get("item_code") or "").strip()
+
+        item["item_description"] = ""
+
+        if not code:
+            hydrated.append(item)
+            continue
+
+        master = None
+
+        try:
+            master = EDBR.get_test_item_by_code(code)
+        except Exception:
+            master = None
+
+        if master:
+            item["item_description"] = master.get("item_specification") or ""
+
+        hydrated.append(item)
+
+    return hydrated
 
 @router.post("/grn/scan-bill")
 async def scan_vendor_bill(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
@@ -25,7 +81,7 @@ async def scan_vendor_bill(file: UploadFile = File(...), user: dict = Depends(ve
         base64_encoded = base64.b64encode(file_bytes).decode('utf-8')
         
         # Pass to Groq Vision
-        ai_extracted_data = extract_grn_from_image(base64_encoded)
+        ai_extracted_data = process_grn_image(base64_encoded)
         subtotal = 0
 
         for item in ai_extracted_data["items"]:
@@ -64,185 +120,118 @@ async def save_grn(payload: dict, user: dict = Depends(verify_bearer_token)):
     }
 
 @router.get("/grn/export/{grn_id}")
+async def scan_vendor_bill(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
+
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Upload image only")
+
+    file_bytes = await file.read()
+    base64_encoded = base64.b64encode(file_bytes).decode("utf-8")
+
+    data = extract_grn_from_image(base64_encoded)
+
+    items = [normalize_item(i) for i in data.get("items", [])]
+
+    subtotal = sum(i["net_amount"] for i in items)
+
+    cgst = round(subtotal * 0.09, 2)
+    sgst = round(subtotal * 0.09, 2)
+
+    data["items"] = items
+    data["subtotal"] = round(subtotal, 2)
+    data["taxes"] = {"cgst": cgst, "sgst": sgst}
+    data["grand_total"] = round(subtotal + cgst + sgst, 2)
+
+    return {
+        "status": "success",
+        "message": "Bill scanned successfully",
+        "data": data
+    }
+
+
+# ==============================
+# SAVE GRN
+# ==============================
+@router.post("/grn/save")
+async def save_grn(payload: dict, user: dict = Depends(verify_bearer_token)):
+    result = EDBR.create_grn(payload, user["email"])
+    return {"success": True, **result}
+
+
+# ==============================
+# EXPORT GRN
+# ==============================
+@router.get("/grn/export/{grn_id}")
 async def export_grn_excel(grn_id: int, user: dict = Depends(verify_bearer_token)):
 
     grn = EDBR.get_grn_by_id(grn_id)
 
     if not grn:
         raise HTTPException(status_code=404, detail="GRN not found")
-    
+
     wb = Workbook()
     ws = wb.active
     ws.title = "GRN"
 
-    # ================= BORDER STYLE =================
-    thin_border = Border(
+    thin = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
         top=Side(style="thin"),
-        bottom=Side(style="thin")
+        bottom=Side(style="thin"),
     )
 
     center = Alignment(horizontal="center", vertical="center")
-    left = Alignment(horizontal="left", vertical="center")
 
-    # ================= HEADER =================
+    headers = ["Sr", "Code", "Desc", "Qty", "Rate", "Gross", "Disc%", "Disc Amt", "Net"]
 
-    ws.merge_cells("A1:C1")
-    ws["A1"] = "Tempo Instruments Pvt. Ltd."
-    ws["A1"].font = Font(size=16, bold=True)
-    ws["A1"].alignment = center
+    for i, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.font = Font(bold=True)
+        c.border = thin
+        c.alignment = center
 
-    ws["E2"] = "Date:"
-    ws["F2"] = grn.get("invoice_date", "")
-    ws["E2"].alignment = center
-    ws["F2"].alignment = center
-
-    # ================= FIXED HEADER FIELDS =================
-
-    # Vendor
-    ws["A3"] = "Name of Party:"
-    ws["B3"] = grn.get("vendor_name", "")
-
-    # Goods Rec No
-    ws["E1"] = "Goods Rec. No:"
-    ws["F1"] = grn.get("grn_number", "")
-
-    # Invoice No & Date
-    ws["D4"] = "Cash Memo/Invoice No. & Date:"
-    ws.merge_cells("E4:F4")
-    ws["E4"] = grn.get("invoice_number", "")
-
-    # Challan No & Date
-    ws["D5"] = "Challan No. & Date:"
-    ws.merge_cells("E5:F5")
-    ws["E5"] = grn.get("challan_number", "")
-
-    # ================= TABLE HEADER =================
-
-    start_row = 7
-
-    headers = [
-        "Sr. No.",
-        "Code No.",
-        "Description of Goods",
-        "Qty",
-        "Rate Per",
-        "Amount"
-    ]
-
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=start_row, column=col)
-        cell.value = h
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="4472C4")
-        cell.alignment = center
-        cell.border = thin_border
-
-    # ================= ITEMS =================
-
-    row = start_row + 1
+    row = 2
     subtotal = 0
 
-    for idx, item in enumerate(grn["items"], start=1):
+    for idx, item in enumerate(grn["items"], 1):
 
-        qty = float(item.get("quantity", 0) or 0)
-        rate = float(item.get("rate", 0) or 0)
-        amount = qty * rate
-        subtotal += amount
+        qty = float(item.get("quantity", 0))
+        rate = float(item.get("rate", 0))
+        disc = float(item.get("discount_percent", 0))
 
-        vendor_desc = item.get("description", "")
-        internal_spec = item.get("test_specification", "")
+        gross = qty * rate
+        disc_amt = gross * disc / 100
+        net = item.get("net_amount", gross - disc_amt)
 
-        # ---------------- MAIN ROW ----------------
-        ws.cell(row=row, column=1).value = idx
-        ws.cell(row=row, column=2).value = item.get("item_code", "")
-        ws.cell(row=row, column=3).value = vendor_desc
-        ws.cell(row=row, column=4).value = qty
-        ws.cell(row=row, column=5).value = rate
-        ws.cell(row=row, column=6).value = amount
+        subtotal += net
 
-        for col in range(1, 7):
-            ws.cell(row=row, column=col).border = thin_border
-
-        # ---------------- SUB ROW (DETAIL SPEC) ----------------
-        if internal_spec:
-
-            row += 1
-
-            ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=6)
-
-            cell = ws.cell(row=row, column=3)
-            cell.value = f"Spec: {internal_spec}"
-
-            cell.font = Font(size=9, italic=True, color="666666")
-            cell.alignment = Alignment(wrap_text=True)
-
-            for col in range(1, 7):
-                ws.cell(row=row, column=col).border = thin_border
+        ws.cell(row=row, column=1, value=idx)
+        ws.cell(row=row, column=2, value=item.get("item_code", ""))
+        ws.cell(row=row, column=3, value=item.get("description", ""))
+        ws.cell(row=row, column=4, value=qty)
+        ws.cell(row=row, column=5, value=rate)
+        ws.cell(row=row, column=6, value=gross)
+        ws.cell(row=row, column=7, value=disc)
+        ws.cell(row=row, column=8, value=disc_amt)
+        ws.cell(row=row, column=9, value=net)
 
         row += 1
-
-    # ================= TAXES =================
 
     cgst = round(subtotal * 0.09, 2)
     sgst = round(subtotal * 0.09, 2)
-    grand_total = subtotal + cgst + sgst
 
     row += 2
+    ws.cell(row=row, column=8, value="Subtotal")
+    ws.cell(row=row, column=9, value=subtotal)
 
-    totals = [
-        ("CGST 9%", cgst),
-        ("SGST 9%", sgst),
-        ("Grand Total", grand_total),
-    ]
+    ws.cell(row=row + 1, column=8, value="CGST")
+    ws.cell(row=row + 1, column=9, value=cgst)
 
-    for label, value in totals:
-        ws.cell(row=row, column=5).value = label
-        ws.cell(row=row, column=6).value = value
+    ws.cell(row=row + 2, column=8, value="SGST")
+    ws.cell(row=row + 2, column=9, value=sgst)
 
-        ws.cell(row=row, column=5).font = Font(bold=True)
-        ws.cell(row=row, column=6).font = Font(bold=True)
-
-        ws.cell(row=row, column=5).border = thin_border
-        ws.cell(row=row, column=6).border = thin_border
-
-        row += 1
-
-    # ================= FOOTER BLOCK (AS YOU REQUESTED) =================
-
-    row += 2  # spacing after items + taxes
-
-    # Delivery Taken By (merged 3 cols)
-    ws.merge_cells(start_row=row, start_column=1, end_row=row+1, end_column=3)
-    cell1 = ws.cell(row=row, column=1)
-    cell1.value = "Delivery Taken By:"
-    cell1.alignment = center
-    cell1.border = thin_border
-
-    # Store Keeper (merged 3 cols)
-    ws.merge_cells(start_row=row, start_column=4, end_row=row+1, end_column=6)
-    cell2 = ws.cell(row=row, column=4)
-    cell2.value = "Store Keeper (Signature of Keeper)"
-    cell2.alignment = center
-    cell2.border = thin_border
-
-    # apply borders to full merged area
-    for r in range(row, row + 2):
-        for c in range(1, 7):
-            ws.cell(row=r, column=c).border = thin_border
-    # ================= COLUMN WIDTHS =================
-
-    ws.column_dimensions["A"].width = 10
-    ws.column_dimensions["B"].width = 15
-    ws.column_dimensions["C"].width = 45
-    ws.column_dimensions["D"].width = 10
-    ws.column_dimensions["E"].width = 15
-    ws.column_dimensions["F"].width = 18
-
-    ws.freeze_panes = "A8"
-
-    # ================= EXPORT =================
+    ws.cell(row=row + 3, column=8, value="Grand Total")
+    ws.cell(row=row + 3, column=9, value=subtotal + cgst + sgst)
 
     stream = BytesIO()
     wb.save(stream)
@@ -251,200 +240,98 @@ async def export_grn_excel(grn_id: int, user: dict = Depends(verify_bearer_token
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename={grn['grn_number']}.xlsx"
-        }
+        headers={"Content-Disposition": f"attachment; filename={grn['grn_number']}.xlsx"}
     )
 
 @router.post("/grn/export-preview")
-async def export_preview_excel(payload: dict, user: dict = Depends(verify_bearer_token)):
-
-    grn = payload
+async def export_grn_preview(payload: dict, user: dict = Depends(verify_bearer_token)):
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "GRN"
+    ws.title = "GRN PREVIEW"
 
-    # ================= BORDER STYLE =================
-    thin_border = Border(
+    thin = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
         top=Side(style="thin"),
-        bottom=Side(style="thin")
+        bottom=Side(style="thin"),
     )
 
     center = Alignment(horizontal="center", vertical="center")
-    left = Alignment(horizontal="left", vertical="center")
 
-    # ================= HEADER =================
-
-    ws.merge_cells("A1:C1")
+    ws.merge_cells("A1:D1")
     ws["A1"] = "Tempo Instruments Pvt. Ltd."
     ws["A1"].font = Font(size=16, bold=True)
     ws["A1"].alignment = center
 
+    ws["E1"] = "GRN No:"
+    ws["F1"] = payload.get("grn_number", "")
+
     ws["E2"] = "Date:"
-    ws["F2"] = grn.get("invoice_date", "")
-    ws["E2"].alignment = center
-    ws["F2"].alignment = center
+    ws["F2"] = payload.get("invoice_date", "")
 
-    # ================= FIXED HEADER FIELDS =================
+    ws["A3"] = "Vendor:"
+    ws.merge_cells("B3:F3")
+    ws["B3"] = payload.get("vendor_name", "")
 
-    # Vendor
-    ws["A3"] = "Name of Party:"
-    ws["B3"] = grn.get("vendor_name", "")
+    start_row = 6
 
-    # Goods Rec No
-    ws["E1"] = "Goods Rec. No:"
-    ws["F1"] = grn.get("grn_number", "")
+    headers = ["Sr", "Code", "Description", "Qty", "Rate", "Gross", "Disc %", "Disc Amt", "Net"]
 
-    # Invoice No & Date
-    ws["D4"] = "Cash Memo/Invoice No. & Date:"
-    ws.merge_cells("E4:F4")
-    ws["E4"] = grn.get("invoice_number", "")
+    for i, h in enumerate(headers, 1):
+        c = ws.cell(row=start_row, column=i, value=h)
+        c.font = Font(bold=True)
+        c.border = thin
+        c.alignment = center
 
-    # Challan No & Date
-    ws["D5"] = "Challan No. & Date:"
-    ws.merge_cells("E5:F5")
-    ws["E5"] = grn.get("challan_number", "")
-
-    # ================= TABLE HEADER =================
-
-    start_row = 7
-
-    headers = [
-        "Sr. No.",
-        "Code No.",
-        "Description of Goods",
-        "Qty",
-        "Rate Per",
-        "Amount"
-    ]
-
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=start_row, column=col)
-        cell.value = h
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="4472C4")
-        cell.alignment = center
-        cell.border = thin_border
-
-    # ================= ITEMS =================
+    items = [normalize_item(i) for i in payload.get("items", [])]
 
     row = start_row + 1
-    subtotal = 0
 
-    for idx, item in enumerate(grn["items"], start=1):
-
-        qty = float(item.get("quantity", 0) or 0)
-        rate = float(item.get("rate", 0) or 0)
-        amount = qty * rate
-        subtotal += amount
-
-        vendor_desc = item.get("description", "")
-        internal_spec = item.get("test_specification", "")
-
-        # ---------------- MAIN ROW ----------------
-        ws.cell(row=row, column=1).value = idx
-        ws.cell(row=row, column=2).value = item.get("item_code", "")
-        ws.cell(row=row, column=3).value = vendor_desc
-        ws.cell(row=row, column=4).value = qty
-        ws.cell(row=row, column=5).value = rate
-        ws.cell(row=row, column=6).value = amount
-
-        for col in range(1, 7):
-            ws.cell(row=row, column=col).border = thin_border
-
-        # ---------------- SUB ROW (DETAIL SPEC) ----------------
-        if internal_spec:
-
-            row += 1
-
-            ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=6)
-
-            cell = ws.cell(row=row, column=3)
-            cell.value = f"Spec: {internal_spec}"
-
-            cell.font = Font(size=9, italic=True, color="666666")
-            cell.alignment = Alignment(wrap_text=True)
-
-            for col in range(1, 7):
-                ws.cell(row=row, column=col).border = thin_border
-
+    
+    for idx, item in enumerate(items, 1):
+        ws.cell(row=row, column=1, value=idx)
+        ws.cell(row=row, column=2, value=item["item_code"])
+        display_text = item.get("item_name", "")
+        if item.get("item_description"):
+            display_text += f"\n{item['item_description']}"
+        cell = ws.cell(row=row, column=3, value=display_text)
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.cell(row=row, column=4, value=item["quantity"])
+        ws.cell(row=row, column=5, value=item["rate"])
+        ws.cell(row=row, column=6, value=item["gross_amount"])
+        ws.cell(row=row, column=7, value=item["discount_percent"])
+        ws.cell(row=row, column=8, value=item["discount_amount"])
+        ws.cell(row=row, column=9, value=item["net_amount"])
         row += 1
 
-    # ================= TAXES =================
-
-    cgst = round(subtotal * 0.09, 2)
-    sgst = round(subtotal * 0.09, 2)
-    grand_total = subtotal + cgst + sgst
+    shipping = float(payload.get("shipping", 0))
+    totals = calculate_grn_totals(items, shipping)
 
     row += 2
 
-    totals = [
-        ("CGST 9%", cgst),
-        ("SGST 9%", sgst),
-        ("Grand Total", grand_total),
-    ]
+    ws.cell(row=row, column=8, value="Subtotal")
+    ws.cell(row=row, column=9, value=totals["subtotal"])
 
-    for label, value in totals:
-        ws.cell(row=row, column=5).value = label
-        ws.cell(row=row, column=6).value = value
+    ws.cell(row=row+1, column=8, value="CGST")
+    ws.cell(row=row+1, column=9, value=totals["taxes"]["cgst"])
 
-        ws.cell(row=row, column=5).font = Font(bold=True)
-        ws.cell(row=row, column=6).font = Font(bold=True)
+    ws.cell(row=row+2, column=8, value="SGST")
+    ws.cell(row=row+2, column=9, value=totals["taxes"]["sgst"])
 
-        ws.cell(row=row, column=5).border = thin_border
-        ws.cell(row=row, column=6).border = thin_border
+    ws.cell(row=row+3, column=8, value="Grand Total")
+    ws.cell(row=row+3, column=9, value=totals["grand_total"])
 
-        row += 1
-
-    # ================= FOOTER BLOCK (AS YOU REQUESTED) =================
-
-    row += 2  # spacing after items + taxes
-
-    # Delivery Taken By (merged 3 cols)
-    ws.merge_cells(start_row=row, start_column=1, end_row=row+1, end_column=3)
-    cell1 = ws.cell(row=row, column=1)
-    cell1.value = "Delivery Taken By:"
-    cell1.alignment = center
-    cell1.border = thin_border
-
-    # Store Keeper (merged 3 cols)
-    ws.merge_cells(start_row=row, start_column=4, end_row=row+1, end_column=6)
-    cell2 = ws.cell(row=row, column=4)
-    cell2.value = "Store Keeper (Signature of Keeper)"
-    cell2.alignment = center
-    cell2.border = thin_border
-
-    # apply borders to full merged area
-    for r in range(row, row + 2):
-        for c in range(1, 7):
-            ws.cell(row=r, column=c).border = thin_border
-    # ================= COLUMN WIDTHS =================
-
-    ws.column_dimensions["A"].width = 10
-    ws.column_dimensions["B"].width = 15
-    ws.column_dimensions["C"].width = 45
-    ws.column_dimensions["D"].width = 10
-    ws.column_dimensions["E"].width = 15
-    ws.column_dimensions["F"].width = 18
-
-    ws.freeze_panes = "A8"
-
-    # ================= EXPORT =================
-
-    stream = BytesIO()
+    stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
 
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f"attachment; filename={grn['grn_number']}.xlsx"
-        }
+        headers={"Content-Disposition": "attachment; filename=GRN_PREVIEW.xlsx"}
     )
+
 @router.post("/items/seed-test-csv")
 async def seed_test_items_from_csv(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
     # 1. Validate file type

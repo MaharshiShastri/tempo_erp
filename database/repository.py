@@ -317,14 +317,14 @@ class PostgresRepository:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 try:
-                    # 1. Update the parent partner record
+                    # 1. Update the parent partner record (Changed bracket notation to dot notation)
                     cur.execute("""
                         UPDATE logistics_partners 
                         SET name=%s, cft_factor=%s, minimum_weight=%s, minimum_freight_value=%s, 
                             documentation_charge=%s, fov_percentage=%s, gst_percentage=%s
                         WHERE id=%s
-                    """, (p['name'], p['cft_factor'], p['minimum_weight'], p['minimum_freight_value'], 
-                            p['documentation_charge'], p['fov_percentage'], p['gst_percentage'], partner_id))
+                    """, (p.name, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
+                            p.documentation_charge, p.fov_percentage, p.gst_percentage, partner_id))
 
                     # 2. THE WIPE - Delete all existing child matrices for this partner
                     cur.execute("DELETE FROM logistics_zones WHERE partner_id=%s", (partner_id,))
@@ -332,29 +332,64 @@ class PostgresRepository:
                     cur.execute("DELETE FROM logistics_fuel_matrix WHERE partner_id=%s", (partner_id,))
                     cur.execute("DELETE FROM logistics_oda_matrix WHERE partner_id=%s", (partner_id,))
 
-                    # 3. THE REPLACE - Re-insert the fresh matrices from the UI
-                    for z in p['zones']:
+                    # 3. THE REPLACE - Re-insert the fresh matrices from the UI (Changed p['key'] to p.key)
+                    for z in p.zones:
                         cur.execute("INSERT INTO logistics_zones (partner_id, zone_code, zone_name, states) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, z['zone_code'], z['zone_name'], z['states']))
-                    for r in p['rates']:
+                                    (partner_id, z.zone_code, z.zone_name, z.states))
+                    for r in p.rates:
                         cur.execute("INSERT INTO logistics_zone_rates (partner_id, destination_zone, rate_per_kg) VALUES (%s, %s, %s)",
-                                    (partner_id, r['destination_zone'], r['rate_per_kg']))
-                    for f in p['fuel_matrix']:
+                                    (partner_id, r.destination_zone, r.rate_per_kg))
+                    for f in p.fuel_matrix:
                         cur.execute("INSERT INTO logistics_fuel_matrix (partner_id, fuel_price_from, fuel_price_to, surcharge_percentage) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, f['fuel_price_from'], f['fuel_price_to'], f['surcharge_percentage']))
-                    for o in p['oda_matrix']:
+                                    (partner_id, f.fuel_price_from, f.fuel_price_to, f.surcharge_percentage))
+                    for o in p.oda_matrix:
                         cur.execute("INSERT INTO logistics_oda_matrix (partner_id, km_from, km_to, weight_from, weight_to, oda_charge) VALUES (%s, %s, %s, %s, %s, %s)",
-                                    (partner_id, o['km_from'], o['km_to'], o['weight_from'], o['weight_to'], o['oda_charge']))
+                                    (partner_id, o.km_from, o.km_to, o.weight_from, o.weight_to, o.oda_charge))
 
                     # 4. Commit the transaction ONLY if all inserts succeed
                     conn.commit()
-                    return {"partner_id": partner_id, "status": "updated", "partner_name": p['name']}
+                    
+                    # Also fixed the return statement here
+                    return {"partner_id": partner_id, "status": "updated", "partner_name": p.name}
                     
                 except Exception as e:
                     # If ANY query fails, revert the database to its exact state before the update began
                     conn.rollback()
                     raise e
-            
+    
+    def delete_partner(self, partner_id: int, operator_email: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                try:
+                    # 1. Fetch the partner name before deletion (for the UI response/logs)
+                    cur.execute("SELECT name FROM logistics_partners WHERE id=%s", (partner_id,))
+                    partner = cur.fetchone()
+                    
+                    if not partner:
+                        return {"partner_id": partner_id, "status": "not_found"}
+                        
+                    partner_name = partner['name']
+
+                    # 2. THE CASCADE WIPE - Delete all child matrices first
+                    cur.execute("DELETE FROM logistics_zones WHERE partner_id=%s", (partner_id,))
+                    cur.execute("DELETE FROM logistics_zone_rates WHERE partner_id=%s", (partner_id,))
+                    cur.execute("DELETE FROM logistics_fuel_matrix WHERE partner_id=%s", (partner_id,))
+                    cur.execute("DELETE FROM logistics_oda_matrix WHERE partner_id=%s", (partner_id,))
+
+                    # 3. Delete the parent record
+                    cur.execute("DELETE FROM logistics_partners WHERE id=%s", (partner_id,))
+
+                    # 4. Commit the transaction ONLY if all deletions succeed
+                    conn.commit()
+                    
+                    return {"partner_id": partner_id, "status": "deleted", "partner_name": partner_name}
+                    
+                except Exception as e:
+                    # If any query fails, rollback to prevent partial deletions
+                    conn.rollback()
+                    raise e
+                
+                
     def create_full_partner_profile(self, p: FullPartnerProfile):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
@@ -925,7 +960,7 @@ class PostgresRepository:
                     WHERE item_code=%s
                 """, (item_code,))
                 row = cur.fetchone()
-                
+                print(row)
                 if not row:
                     return None
                 
