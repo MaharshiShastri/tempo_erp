@@ -105,10 +105,10 @@ export default function GRN_WorkspaceView({ state }) {
             discount_total += discAmt;
             subtotal += net;
         });
-
+        subtotal = items_net_total + Number(currentShipping);
         const cgst = subtotal * 0.09;
         const sgst = subtotal * 0.09;
-        const grand_total = subtotal + cgst + sgst + Number(currentShipping);
+        const grand_total = subtotal + cgst + sgst;
 
         return { gross_total, discount_total, subtotal, cgst, sgst, grand_total };
     };
@@ -414,6 +414,17 @@ export default function GRN_WorkspaceView({ state }) {
                                 <strong style={{ color: "var(--brand-danger)" }}>₹{(scannedData.discount_total || 0).toFixed(2)}</strong>
                             </div>
 
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-light)", paddingBottom: "12px" }}>
+                                <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>Freight/Shipping (+):</span>
+                                <input 
+                                    type="number" 
+                                    className="form-input" 
+                                    style={{ width: "100px", padding: "4px 8px", textAlign: "right" }}
+                                    value={scannedData.shipping} 
+                                    onChange={(e) => updateFinancials("shipping", e.target.value)}
+                                />
+                            </div>
+                            
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderTop: "1px dashed var(--border-light)", paddingTop: "8px" }}>
                                 <span style={{ color: "var(--text-primary)", fontSize: "13px", fontWeight: "600" }}>Subtotal (Taxable):</span>
                                 <strong style={{ fontSize: "14px" }}>₹{(scannedData.subtotal || 0).toFixed(2)}</strong>
@@ -427,17 +438,6 @@ export default function GRN_WorkspaceView({ state }) {
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                                 <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>CGST (9%):</span>
                                 <strong>₹{scannedData.taxes.cgst.toFixed(2)}</strong>
-                            </div>
-
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-light)", paddingBottom: "12px" }}>
-                                <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>Freight/Shipping (+):</span>
-                                <input 
-                                    type="number" 
-                                    className="form-input" 
-                                    style={{ width: "100px", padding: "4px 8px", textAlign: "right" }}
-                                    value={scannedData.shipping} 
-                                    onChange={(e) => updateFinancials("shipping", e.target.value)}
-                                />
                             </div>
 
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "18px", color: "var(--brand-accent)", paddingTop: "5px" }}>
