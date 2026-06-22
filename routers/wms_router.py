@@ -309,8 +309,7 @@ async def export_grn_preview(payload: dict, user: dict = Depends(verify_bearer_t
     totals = calculate_grn_totals(items, shipping)
 
     row += 2
-    
-    ws.cell(row=row, column=8, value="Shipping Charges")
+    ws.cell(row=row, column=8, value="Shipping charges:")
     ws.cell(row=row, column=9, value=shipping)
 
     ws.cell(row=row+1, column=8, value="Subtotal")

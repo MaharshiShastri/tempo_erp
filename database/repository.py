@@ -9,7 +9,7 @@ import os
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -396,13 +396,14 @@ class PostgresRepository:
                 try:
                     # 1. Create Partner
                     cur.execute("""
-                        INSERT INTO logistics_partners (name, cft_factor, minimum_weight, minimum_freight_value, 
+                        INSERT INTO logistics_partners (name, partner_link, cft_factor, minimum_weight, minimum_freight_value, 
                                                         documentation_charge, fov_percentage, gst_percentage)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                    """, (p.name, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
+                    """, (p.name, p.partner_link, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
                           p.documentation_charge, p.fov_percentage, p.gst_percentage))
                     
-                    partner_id = cur.fetchone()['id']
+                    row = cur.fetchone()
+                    partner_id = row["id"] if row else None
 
                     # 2. Insert Zones
                     for z in p.zones:
@@ -425,7 +426,7 @@ class PostgresRepository:
                                     (partner_id, o.km_from, o.km_to, o.weight_from, o.weight_to, o.oda_charge))
 
                     conn.commit()
-                    return {"partner_id": partner_id, "status": "created", "partner_name": p['name']}
+                    return {"partner_id": partner_id, "status": "created", "partner_name": p.name}
                 
                 except Exception as e:
                     conn.rollback()
@@ -554,18 +555,36 @@ class PostgresRepository:
                 }
     def get_partner_zones(self, partner_id):
         with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT
-                        zone_code,
-                        zone_name
+                    SELECT zone_code, zone_name, states
                     FROM logistics_zones
                     WHERE partner_id=%s
                 """, (partner_id,))
 
-                return cur.fetchall()
-    # --- LOGISTICS PARTNET end---
+                rows = cur.fetchall()
+
+                # NORMALIZE OUTPUT
+                zones = []
+                state_map = {}
+
+                for r in rows:
+                    zone_code = r["zone_code"]
+
+                    zones.append({
+                        "zone_code": zone_code,
+                        "zone_name": r["zone_name"],
+                        "states": r["states"] or []
+                    })
+
+                    for s in (r["states"] or []):
+                        state_map[s] = zone_code
+
+                return {
+                    "zones": zones,
+                    "state_map": state_map
+                }
+    # --- LOGISTICS PARTNER end---
     # --- ITEM MASTERY start---
     def get_item(self, item_code):
 

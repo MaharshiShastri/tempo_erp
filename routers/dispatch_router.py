@@ -10,13 +10,37 @@ import shutil
 import PyPDF2
 from pathlib import Path
 from services.ai_contract_parser import extract_logistics_profile_from_text
+from services.ai_region_classifier import classify_city_zone
 
 router = APIRouter(prefix="/api/v1/dispatch", tags=["Dispatch Logistics Engine"])
 
-@router.get("/partners", dependencies=[Depends(check_department("Transport"))])
+@router.get("/partners", dependencies=[Depends(check_department("Dispatch Engineers"))])
 def get_partners(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_logistics_partners()
 
+@router.get("/partners/active", dependencies=[Depends(check_department("Sales"))])
+def get_partners(user: dict = Depends(verify_bearer_token)):
+    return EDBR.get_logistics_partners()
+
+"""@router.post("/pre-identify-zones")
+def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token)):
+    city = payload.get("city")
+    state = payload.get("state")
+    partners =  EDBR.get_logistics_partners()
+
+    identified_zones = {}
+    for p in partners:
+        zone_data = EDBR.get_partner_zones(p["id"])
+
+        zone = classify_city_zone(city, zone_data["zones"])
+        if isinstance(zone, list) and len(zone) > 0:
+            identified_zones[str(p['id'])] = zone[0]
+        elif isinstance(zone, str):
+            identified_zones[str(p['id'])] = zone
+        
+    print(identified_zones)
+    return identified_zones
+"""
 @router.post("/evaluate", dependencies=[Depends(check_department("Sales"))])
 def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
     evaluation_session = { "started": True, "options": [], "failed_providers": 0 }
@@ -63,7 +87,7 @@ def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
         if evaluation_session.get("failed_providers", 0) > 0:
             logging.info(f"Dispatch evaluated with {evaluation_session['failed_providers']} dropped partners.")
 
-@router.post("/partners/save", dependencies=[Depends(check_department("Transport"))])
+@router.post("/partners/save", dependencies=[Depends(check_department("Dispatch Engineers"))])
 def save_full_partner(payload: FullPartnerProfile, user: dict = Depends(verify_bearer_token)):
     try:
         # Use the compound profile method instead of the flat one
@@ -71,17 +95,15 @@ def save_full_partner(payload: FullPartnerProfile, user: dict = Depends(verify_b
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to configure partner: {str(e)}")
     
-@router.put("/partners/{partner_id}",
-    dependencies=[Depends(check_department("Transport"))]
-)
-def patch_partner(partner_id: int, payload: dict, user: dict = Depends(verify_bearer_token)):
+@router.put("/partners/{partner_id}", dependencies=[Depends(check_department("Dispatch Engineers"))])
+def patch_partner(partner_id: int, payload: FullPartnerProfile, user: dict = Depends(verify_bearer_token)):
     try:
         return EDBR.update_full_partner_profile(partner_id, payload)
     except Exception as e:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=f"Failed to patch partner: {str(e)}")
 
-@router.get("/partners/{partner_id}/profile", dependencies=[Depends(check_department("Transport"))])
+@router.get("/partners/{partner_id}/profile", dependencies=[Depends(check_department("Dispatch Engineers"))])
 def get_partner_profile(partner_id: int, user: dict = Depends(verify_bearer_token)):
     try:
         profile = EDBR.get_full_partner_profile(partner_id)
@@ -117,7 +139,7 @@ def save_dispatch_record(payload: dict, user: dict = Depends(verify_bearer_token
 UPLOAD_DIR = Path("local_contract_uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-@router.post("/partners/extract-from-file", dependencies=[Depends(check_department("Transport"))])
+@router.post("/partners/extract-from-file", dependencies=[Depends(check_department("Dispatch Engineers"))])
 async def extract_partner_from_file(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are currently supported for auto-extraction.")
@@ -152,3 +174,10 @@ async def extract_partner_from_file(file: UploadFile = File(...), user: dict = D
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Parsing Failed: {str(e)}")
     
+"""@router.post("/calculate", dependencies=[Depends(check_department("Sales"))])
+def calculate_dispatch(payload: dict, user: dict = Depends(verify_bearer_token)):
+    try:
+        return process_dispatch_calculation(payload)
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        raise HTTPException( status_code=500, detail=f"Dispatch calculation failed: {str(e)}")"""

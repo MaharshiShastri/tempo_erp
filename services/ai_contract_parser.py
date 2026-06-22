@@ -10,7 +10,7 @@ def extract_logistics_profile_from_text(contract_text: str) -> dict:
     You are an expert logistics data extraction AI. 
     Analyze the provided transport contract text and extract the commercial parameters into a STRICT JSON structure.
     If a specific value is missing, use sensible defaults (0 for numbers, empty strings for text).
-
+    If zones are explicity not defined, then group states/regions by common rates. For example Maharashtra, Gujarat have 10 rupees and Telagana and Andhra Pradesh have 15 rupees but no zone code defined, then simply state them as WEST-1 and SOUTH-1.
     REQUIRED JSON SCHEMA:
     {
         "name": "Transporter Name",

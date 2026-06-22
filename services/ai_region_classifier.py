@@ -8,12 +8,8 @@ print(API_KEY)
 client = Groq(api_key=API_KEY)
 
 def classify_city_zone(city: str, zones: list):
-    
-    if API_KEY:
-        print("API KEY found")
-    else:
-        print("NO API KEY")
-    
+    print("zones type:", type(zones))
+    print("zones value:", zones)
     zone_text = "\n".join([
         f"{z['zone_code']} = {z['zone_name']}"
         for z in zones
@@ -33,7 +29,7 @@ City:
 
 Available Zones:
 
-{zone_text if zone_text else zones}
+{zone_text}
 """
 
     response = client.chat.completions.create(
@@ -46,5 +42,5 @@ Available Zones:
             }
         ]
     )
-
+    
     return (response.choices[0].message.content.strip())

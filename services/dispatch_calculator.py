@@ -18,13 +18,13 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         destination_city = shipment["destination_city"]
 
         source_zone = "W1"
-        partner_zones = EDBR.get_partner_zones(partner_id)
+        partner_zones_data = EDBR.get_partner_zones(partner_id)
 
-        destination_zone = classify_city_zone(destination_city,partner_zones)
+        destination_zone = classify_city_zone(destination_city, partner_zones_data["zones"])
 
         debug["destination_city"] = destination_city
         debug["destination_zone"] = destination_zone
-        debug["partner_zone_options"] = partner_zones
+        debug["partner_zone_options"] = partner_zones_data
 
         if not destination_zone:
             raise ValueError(f"Zone not resolved for city: {destination_city}")
@@ -32,7 +32,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         # Step 2: Rate Extraction
         rate = EDBR.get_zone_rate(partner_id, destination_zone)
         if not rate:
-            raise ValueError(f"No freight matrix found for {destination_zone}")
+             raise ValueError(f"No freight matrix found for {destination_zone}")
 
         # Step 3: Volumetric Mathematics
         width = float(shipment["width"])
@@ -54,7 +54,10 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         print("fuel percentage: ", fuel_percentage, " and fuel charge is: ", fuel_charge)
 
         fov_charge = (float(shipment["invoice_value"]) * float(partner["fov_percentage"]) / 100)
-        oda_charge = float(EDBR.get_oda_charge(partner_id, shipment.get("delivery_distance", 0), chargeable_weight) or 0)
+        partner_distances = shipment.get("partner_distances", {})
+        distance = float(partner_distances.get(str(partner["id"]), partner_distances.get(partner["id"], 0)))
+
+        oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
         print("ODA charge: ", oda_charge)
         hamali_cost = float(shipment.get("hamali_cost", 0))
         hamali_detail = shipment.get("hamali_detail", "")
@@ -82,19 +85,33 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         }
 
     except KeyError as ke:
+        calculation_state = {
+            "partner_name": partner.get("name", "Unknown"),
+            "status": "error",
+            "data": None,
+            "error": None
+        }
         # Catches missing payload requirements before calculating
+        print("Key error: ", ke)
         calculation_state["status"] = "error"
         calculation_state["error"] = f"Missing mandatory field: {str(ke)}"
-        
+
     except Exception as e:
         # Catches division by zero, float casting errors, or DB disconnects
+        print("Other exceptions:", str(e))
+        calculation_state = {
+            "partner_name": partner.get("name", "Unknown"),
+            "status": "error",
+            "data": None,
+            "error": None
+        }
         calculation_state["status"] = "error"
         calculation_state["error"] = f"Evaluation failure: {str(e)}"
-        
+
     finally:
         # The finally block ALWAYS executes. 
         # This guarantees the frontend receives a predictable dictionary structure, preventing false UI renders.
         if calculation_state["status"] == "error":
             logging.warning(f"Dispatch logic failed for {calculation_state['partner_name']} - {calculation_state.get('error')}")
-            
-        return calculation_state
+
+    return calculation_state

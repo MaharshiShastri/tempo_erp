@@ -19,7 +19,9 @@ export default function useERPState() {
     const [dispatch, setDispatch] = useState([]);
     const [companiesMaster, setCompaniesMaster] = useState([]);
     const [itemsMaster, setItemsMaster] = useState([]);
-    
+    const [errorModalOpen, setErrorModalOpen] = useState(false);
+
+    const [errorModal, setErrorModal] = useState({title: "", message: "" });
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
@@ -87,6 +89,15 @@ export default function useERPState() {
             setUser(null);
         }
     }, [user]);
+
+    const showErrorModal = ( title, message) => {
+        setErrorModal({
+            title,
+            message
+        });
+
+        setErrorModalOpen(true);
+    };
 
     const dispatchSystemNotification = (title, message) => {
         setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
@@ -413,7 +424,8 @@ export default function useERPState() {
         orderHeader, setOrderHeader, orderItems, appendOrderItemRow, popOrderItemRow, updateOrderItemField, commitOrderSubmit, handleCustomerMasterSelection, handleItemMasterSelection, triggerNewOrderInitialization,
         billHeader, setBillHeader, billItems, setBillItems, triggerInvoiceSetupForOrder, commitBillSubmit, handleLogin, handleLogout,
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
-        tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard
+        tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
+        showErrorModal, errorModal, errorModalOpen, setErrorModalOpen,
     };
 }
 

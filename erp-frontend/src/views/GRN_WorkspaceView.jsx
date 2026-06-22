@@ -105,7 +105,7 @@ export default function GRN_WorkspaceView({ state }) {
             discount_total += discAmt;
             subtotal += net;
         });
-        subtotal = items_net_total + Number(currentShipping);
+        subtotal += Number(currentShipping);
         const cgst = subtotal * 0.09;
         const sgst = subtotal * 0.09;
         const grand_total = subtotal + cgst + sgst;
@@ -348,6 +348,7 @@ export default function GRN_WorkspaceView({ state }) {
                                                 className="form-input" 
                                                 style={{ border: item.isMatched ? "1px solid var(--border-subtle)" : "1px solid var(--brand-danger)" }}
                                                 value={item.item_code} 
+                                                required
                                                 onChange={(e) => updateItem(idx, "item_code", e.target.value)}
                                                 placeholder="Code..."
                                             />
@@ -356,13 +357,13 @@ export default function GRN_WorkspaceView({ state }) {
                                             </div>}
                                         </td>
                                         <td style={{ padding: "10px" }}>
-                                            <input className="form-input" value={item.item_name} onChange={(e) => updateItem(idx, "item_name", e.target.value)} />
+                                            <input className="form-input" required value={item.item_name} onChange={(e) => updateItem(idx, "item_name", e.target.value)} />
                                         </td>
                                         <td style={{ padding: "10px" }}>
-                                            <input type="number" className="form-input" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} />
+                                            <input type="number" className="form-input" required value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} />
                                         </td>
                                         <td style={{ padding: "10px" }}>
-                                            <input type="number" step="0.01" className="form-input" value={item.rate} onChange={(e) => updateItem(idx, "rate", e.target.value)} />
+                                            <input type="number" step="0.01" className="form-input" required value={item.rate} onChange={(e) => updateItem(idx, "rate", e.target.value)} />
                                         </td>
                                         
                                         {/* Read Only Gross */}
@@ -414,22 +415,11 @@ export default function GRN_WorkspaceView({ state }) {
                                 <strong style={{ color: "var(--brand-danger)" }}>₹{(scannedData.discount_total || 0).toFixed(2)}</strong>
                             </div>
 
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid var(--border-light)", paddingBottom: "12px" }}>
-                                <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>Freight/Shipping (+):</span>
-                                <input 
-                                    type="number" 
-                                    className="form-input" 
-                                    style={{ width: "100px", padding: "4px 8px", textAlign: "right" }}
-                                    value={scannedData.shipping} 
-                                    onChange={(e) => updateFinancials("shipping", e.target.value)}
-                                />
-                            </div>
-                            
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderTop: "1px dashed var(--border-light)", paddingTop: "8px" }}>
                                 <span style={{ color: "var(--text-primary)", fontSize: "13px", fontWeight: "600" }}>Subtotal (Taxable):</span>
                                 <strong style={{ fontSize: "14px" }}>₹{(scannedData.subtotal || 0).toFixed(2)}</strong>
                             </div>
-                            
+                                                                                    
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                                 <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>SGST (9%):</span>
                                 <strong>₹{scannedData.taxes.sgst.toFixed(2)}</strong>
