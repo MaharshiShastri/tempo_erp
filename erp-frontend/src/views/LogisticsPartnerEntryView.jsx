@@ -50,7 +50,7 @@ export default function LogisticsPartnerEntryView({ state }) {
         });
 
         return {
-            name: partner.name || "", cft_factor: parseFloat(partner.cft_factor) || 0,
+            name: partner.name || "", partner_link: partner.partner_link || "", cft_factor: parseFloat(partner.cft_factor) || 0,
             minimum_weight: parseFloat(partner.minimum_weight) || 0, minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
             documentation_charge: parseFloat(partner.documentation_charge) || 0, fov_percentage: parseFloat(partner.fov_percentage) || 0,
             gst_percentage: parseFloat(partner.gst_percentage) || 0,
@@ -64,7 +64,7 @@ export default function LogisticsPartnerEntryView({ state }) {
     // Shared function to populate UI state (used by Database Fetch AND AI Extraction)
     const populateState = (profile) => {
         setPartner({
-            name: profile.name || "", cft_factor: profile.cft_factor ?? 10,
+            name: profile.name || "", partner_link: profile.partner_link || "", cft_factor: profile.cft_factor ?? 10,
             minimum_weight: profile.minimum_weight ?? 0, minimum_freight_value: profile.minimum_freight_value ?? 0,
             documentation_charge: profile.documentation_charge ?? 0, fov_percentage: profile.fov_percentage ?? 0,
             gst_percentage: profile.gst_percentage ?? 18
@@ -239,6 +239,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 <h4 style={{ color: "var(--brand-accent)", marginTop: "20px" }}>Core Contract Parameters</h4>
                 <div className="form-grid-layout" style={{ gap: "15px" }}>
                     <div className="form-group"><label className="input-label">Transporter Name</label><input required className="form-input" value={partner.name} onChange={e => setPartner({ ...partner, name: e.target.value })} /></div>
+                    <div className="form-group"><label className="input-label">Distance Calculator Link</label><input type="url" className="form-input" value={partner.partner_link || ""} onChange={e => setPartner({ ...partner, partner_link: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">CFT Factor</label><input required type="number" step="0.01" className="form-input" value={partner.cft_factor} onChange={e => setPartner({ ...partner, cft_factor: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Min Weight (KG)</label><input required type="number" className="form-input" value={partner.minimum_weight} onChange={e => setPartner({ ...partner, minimum_weight: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Min Freight Value (₹)</label><input required type="number" className="form-input" value={partner.minimum_freight_value} onChange={e => setPartner({ ...partner, minimum_freight_value: e.target.value })} /></div>

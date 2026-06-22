@@ -1,8 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 class LogisticsPartnerCreate(BaseModel):
     name: str
+    partner_link: Optional[str] = None
     destination_rate: float = 0.0
     fuel_charge_percentage: float = 0.0
     documentation_charge: float = 0.0
@@ -32,6 +33,7 @@ class ODASlab(BaseModel):
 
 class FullPartnerProfile(BaseModel):
     name: str
+    partner_link: Optional[str] = None
     cft_factor: float = 10.0
     minimum_weight: float = 0.0
     minimum_freight_value: float = 0.0
@@ -61,3 +63,16 @@ class PartnerPatch(BaseModel):
     rates: Optional[MatrixDiff] = None
     fuel_matrix: Optional[MatrixDiff] = None
     oda_matrix: Optional[MatrixDiff] = None
+
+class DispatchCalcInput(BaseModel):
+    destination_city: str
+    destination_state: str
+    weight_kg: float
+    dimensions_l_in: float
+    dimensions_w_in: float
+    dimensions_h_in: float
+    invoice_value: float
+    hamali_charges: float = 0.0
+
+    partner_distances: Dict[str, float] = {}
+    pre_identified_zones: Dict[str, str] = {}

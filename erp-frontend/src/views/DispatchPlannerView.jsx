@@ -1,163 +1,365 @@
 import { useState, useEffect } from "react";
-import API from "../api/api";
+import { FiArrowRight, FiTruck, FiMapPin, FiCheckCircle, FiBox, FiMap } from "react-icons/fi";
 
 export default function DispatchPlannerView({ state }) {
-    // Removed source_state
-    const [dim, setDim] = useState({
-        width: 0, height: 0, depth: 0, weight: 0, invoice_value: 0, destination_city: "", delivery_distance: 0, diesel_price: 98, cft_charge: 0, min_weight: 0, hamali_detail: "", hamali_cost: 0
-    });
-
-    const [newPartner, setNewPartner] = useState({
-        name: "Walk-In Transporter", destination_rate: 0, fuel_charge_percentage: 0, documentation_charge: 0, delivery_destination_charge: 0, freight_invoice_brokerage_percentage: 0, hamali_detail: "", hamali_cost: 0
-    });
-
-    const [showHamali, setShowHamali] = useState(false);
-    const [includeNew, setIncludeNew] = useState(false);
-    const [resultsData, setResultsData] = useState(null);
-    const [selectedTransport, setSelectedTransport] = useState(null);
+    const [step, setStep] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [activePartners, setActivePartners] = useState([]);
     
-    // Custom Alert Modal State
-    const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
+    // Background AI State
+    const [zonePromise, setZonePromise] = useState(null);
+    const [identifiedZones, setIdentifiedZones] = useState(null);
+    const [debugData, setDebugData] = useState(null);
+    const [partnerDistances, setPartnerDistances] = useState({});
+    const [results, setResults] = useState([]);
 
-    const handleEvaluate = async (e) => {
+    const [dispatchParams, setDispatchParams] = useState({
+        destination_city: "",
+        destination_state: "",
+        weight_kg: "",
+        dimensions_l_in: "",
+        dimensions_w_in: "",
+        dimensions_h_in: "",
+        invoice_value: "",
+        hamali_charges: ""
+    });
+
+    useEffect(() => {
+        const fetchPartners = async () => {
+            try {
+                const response = await fetch("/api/v1/dispatch/partners/active", {
+                    headers: { 'Authorization': `Bearer ${state.user.access_token}` }
+                });
+
+                const data = await response.json();
+
+                // ✅ FIX: ensure array always
+                const partnersArray = Array.isArray(data)
+                    ? data
+                    : (data?.partners || data?.data || []);
+
+                setActivePartners(partnersArray);
+
+                const distMap = {};
+                partnersArray.forEach(p => {
+                    if (p?.id !== undefined) {
+                        distMap[p.id] = "";
+                    }
+                });
+
+                setPartnerDistances(distMap);
+
+            } catch (err) {
+                console.error("Failed to load partners", err);
+                setActivePartners([]); // safe fallback
+            }
+        };
+
+        fetchPartners();
+    }, [state.user.access_token]);
+
+    // Dynamically checks for admin-provided link, falls back to Google
+    const getPartnerLink = (partnerObj) => {
+        if (partnerObj.partner_link && partnerObj.partner_link.trim() !== "") {
+            return partnerObj.partner_link;
+        }
+        return `https://www.google.com/search?q=${encodeURIComponent(partnerObj.name)}+pincode+distance+calculator`;
+    };
+
+    // STEP 1 -> STEP 2: Triggers Background AI Groq call
+    const startBackgroundZoneIdentification = (e) => {
         e.preventDefault();
+        setStep(2);
+        
+        // Fire request to Groq without awaiting it here
+        const promise = fetch("/api/v1/dispatch/pre-identify-zones", {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${state.user.access_token}` 
+            },
+            body: JSON.stringify({
+                city: dispatchParams.destination_city,
+                state: dispatchParams.destination_state
+            })
+        }).then(res => res.json())
+          .then(data => setIdentifiedZones(data));
+
+        setZonePromise(promise);
+    };
+
+    // STEP 2 -> STEP 3
+    const handleMoveToDistances = (e) => {
+        e.preventDefault();
+        setStep(3);
+    };
+
+    const handleDistanceChange = (partnerId, value) => {
+        setPartnerDistances(prev => ({ ...prev, [partnerId]: value }));
+    };
+
+    // FINAL CALCULATE
+    const handleCalculate = async () => {
+        setLoading(true);
+
         try {
-            const response = await API.evaluateDispatch(dim, state.user.access_token);
-            setResultsData(response); 
+            // Safety measure: If Groq hasn't finished in the background yet, wait for it now.
+            if (!identifiedZones && zonePromise) {
+                if (state.setAlertMessage) {
+                    state.setAlertMessage("⏳ Waiting for AI to finalize regional routing...");
+                    state.setIsAlertOpen(true);
+                }
+                await zonePromise; 
+            }
+
+            const payload = {
+                ...dispatchParams,
+                weight_kg: parseFloat(dispatchParams.weight_kg) || 0,
+                dimensions_l_in: parseFloat(dispatchParams.dimensions_l_in) || 0,
+                dimensions_w_in: parseFloat(dispatchParams.dimensions_w_in) || 0,
+                dimensions_h_in: parseFloat(dispatchParams.dimensions_h_in) || 0,
+                invoice_value: parseFloat(dispatchParams.invoice_value) || 0,
+                hamali_charges: parseFloat(dispatchParams.hamali_charges) || 0,
+                partner_distances: partnerDistances,
+                pre_identified_zones: identifiedZones // Pass the background-mapped zones
+            };
+
+            const response = await fetch("/api/v1/dispatch/calculate", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${state.user.access_token}` 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Calculation engine failed.");
+            
+            const data = await response.json();
+            const safeResults = Array.isArray(data) ? data : (data?.results || data?.data || [])
+            setResults(safeResults);
+            console.log("DISPATCH DEBUG:", data.debug);
+            setStep(4);
+            setDebugData(data?.debug || null);
+            
         } catch (err) {
-            setModalAlert({ isOpen: true, title: "Evaluation Failed", message: err.message, isError: true });
+            if (state.setAlertMessage) {
+                state.setAlertMessage("Error: " + err.message);
+                state.setIsAlertOpen(true);
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
-    useEffect(() => {
-        if (!resultsData?.options?.length) return;
-        const best = [...resultsData.options].sort((a, b) => a.dispatch_cost_gst - b.dispatch_cost_gst)[0];
-        setSelectedTransport(best);
-    }, [resultsData]);
-
-    const confirmTransport = async (provider) => {
-        try {
-            const response = await API.saveDispatchRecord(provider, state.user.access_token);
-            setModalAlert({ isOpen: true, title: "Success", message: response.message || "Dispatch option saved successfully.", isError: false });
-            setSelectedTransport(provider);
-            setTimeout(() => window.print(), 800); 
-        } catch (err) {
-            setModalAlert({ isOpen: true, title: "System Halt", message: err.message, isError: true });
-        }
+    const resetForm = () => {
+        setStep(1);
+        setIdentifiedZones(null);
+        setZonePromise(null);
+        setResults([]);
     };
 
     return (
-        <div className="frappe-card">
-            <div className="system-header">
+        <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 30 }}>
+            
+            {/* Header / Progress Bar */}
+            <div className="system-header" style={{ marginBottom: "20px" }}>
                 <div>
-                    <h2>Freight Logistics Evaluator</h2>
-                    <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Contract Rate Comparison</p>
+                    <h3><FiTruck style={{ marginRight: '8px' }}/> Smart Dispatch Planner</h3>
+                    <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "13px" }}>
+                        AI-Driven Multi-Carrier Freight Optimizer
+                    </p>
                 </div>
+                {step < 4 && (
+                    <div style={{ fontSize: "12px", background: "var(--bg-main)", padding: "6px 12px", borderRadius: "15px", fontWeight: "bold" }}>
+                        Step {step} of 3
+                    </div>
+                )}
             </div>
 
-            <form onSubmit={handleEvaluate} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "20px", border: "1px solid var(--border-light)" }}>
-                <h4>Shipment Details</h4>
+            {/* STEP 1: CITY & STATE */}
+            {step === 1 && (
+                <form onSubmit={startBackgroundZoneIdentification} style={{ animation: "fadeIn 0.3s ease-in-out" }}>
+                    <div style={{ padding: "15px", background: "var(--bg-surface)", borderLeft: "4px solid var(--brand-accent)", borderRadius: "var(--radius-sm)", marginBottom: "20px" }}>
+                        <h4 style={{ margin: "0 0 5px 0", color: "var(--text-primary)" }}>Destination Details</h4>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Enter the destination to initiate AI zone mapping in the background.</p>
+                    </div>
 
-                <div className="form-grid-layout" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-                    <label className="input-label">Width:</label>
-                    <input className="form-input" value={dim.width} onChange={(e) => setDim({ ...dim, width: +e.target.value })} />
-                    <label className="input-label">Height:</label>
-                    <input className="form-input" value={dim.height} onChange={(e) => setDim({ ...dim, height: +e.target.value })} />
-                    <label className="input-label">Depth:</label>
-                    <input className="form-input" value={dim.depth} onChange={(e) => setDim({ ...dim, depth: +e.target.value })} />
-                    <label className="input-label">Weight (kg):</label>
-                    <input className="form-input" value={dim.weight} onChange={(e) => setDim({ ...dim, weight: +e.target.value })} />
-                    <label className="input-label">Invoice Value</label>
-                    <input className="form-input" value={dim.invoice_value} onChange={(e) => setDim({ ...dim, invoice_value: +e.target.value })} />
-                    
-                    {/* Source City Removed */}
-                    
-                    <label className="input-label">Destination City (CITY ONLY!):</label>
-                    <input className="form-input" value={dim.destination_city} onChange={(e) => setDim({ ...dim, destination_city: e.target.value })} />
-                    <label className="input-label">Distance from hub to destination:</label>
-                    <input className="form-input" value={dim.delivery_distance} onChange={(e) => setDim({ ...dim, delivery_distance: +e.target.value })} />
-                    <label className="input-label">Diesel Price:</label>
-                    <input className="form-input" value={dim.diesel_price} onChange={(e) => setDim({ ...dim, diesel_price: +e.target.value })} />
-                </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-light)" }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="input-label">Destination City *</label>
+                            <input required className="form-input" value={dispatchParams.destination_city} onChange={e => setDispatchParams({...dispatchParams, destination_city: e.target.value})} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="input-label">Destination State *</label>
+                            <input required className="form-input" value={dispatchParams.destination_state} onChange={e => setDispatchParams({...dispatchParams, destination_state: e.target.value})} />
+                        </div>
+                    </div>
 
-                <div style={{ marginTop: "15px" }}>
-                    <button type="button" className="btn btn-secondary" style={{ fontSize: "12px", background: showHamali ? "#eee" : "transparent" }} onClick={() => setShowHamali(!showHamali)}>
-                        {showHamali ? "− Hide Hamali Charges" : "+ Add Hamali Charges(Confirm from Sachin Sir)"}
-                    </button>
-                    {showHamali && (
-                        <div style={{ marginTop: "10px", padding: "15px", background: "var(--bg-surface)", border: "1px dashed var(--brand-accent)", borderRadius: "var(--radius-sm)" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
-                                <div><label className="input-label" style={{ fontSize: "11px" }}>Hamali Detail</label><input className="form-input" placeholder="e.g., Loading" value={dim.hamali_detail} onChange={(e) => setDim({ ...dim, hamali_detail: e.target.value })} /></div>
-                                <div><label className="input-label" style={{ fontSize: "11px" }}>Cost Amount (₹)</label><input className="form-input" type="number" value={dim.hamali_cost} onChange={(e) => setDim({ ...dim, hamali_cost: +e.target.value })} /></div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
+                        <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px", fontSize: "15px" }}>
+                            Next Step <FiArrowRight />
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* STEP 2: PARCEL PARAMETERS */}
+            {step === 2 && (
+                <form onSubmit={handleMoveToDistances} style={{ animation: "fadeIn 0.3s ease-in-out" }}>
+                    <div style={{ padding: "15px", background: "var(--bg-surface)", borderLeft: "4px solid var(--brand-success)", borderRadius: "var(--radius-sm)", marginBottom: "20px" }}>
+                        <h4 style={{ margin: "0 0 5px 0", color: "var(--brand-success)", display: "flex", alignItems: "center", gap: "6px" }}><FiBox /> Parcel Specifications</h4>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>AI is currently identifying transport zones. Please enter the parcel details.</p>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-light)" }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="input-label">Actual Weight (KG) *</label>
+                            <input required type="number" step="0.1" className="form-input" value={dispatchParams.weight_kg} onChange={e => setDispatchParams({...dispatchParams, weight_kg: e.target.value})} />
+                        </div>
+                        
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="input-label">Dimensions (L x W x H in Inches) *</label>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <input required type="number" placeholder="L (in)" className="form-input" value={dispatchParams.dimensions_l_in} onChange={e => setDispatchParams({...dispatchParams, dimensions_l_in: e.target.value})} />
+                                <input required type="number" placeholder="W (in)" className="form-input" value={dispatchParams.dimensions_w_in} onChange={e => setDispatchParams({...dispatchParams, dimensions_w_in: e.target.value})} />
+                                <input required type="number" placeholder="H (in)" className="form-input" value={dispatchParams.dimensions_h_in} onChange={e => setDispatchParams({...dispatchParams, dimensions_h_in: e.target.value})} />
                             </div>
                         </div>
-                    )}
+
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="input-label">Invoice Value (₹) *</label>
+                            <input required type="number" step="0.01" className="form-input" value={dispatchParams.invoice_value} onChange={e => setDispatchParams({...dispatchParams, invoice_value: e.target.value})} />
+                        </div>
+                        
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="input-label">Hamali/Loading Charges (₹)</label>
+                            <input type="number" step="0.01" className="form-input" placeholder="0.00" value={dispatchParams.hamali_charges} onChange={e => setDispatchParams({...dispatchParams, hamali_charges: e.target.value})} />
+                        </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
+                        <button type="button" className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
+                        <button type="submit" className="btn btn-primary" style={{ padding: "12px 24px", fontSize: "15px" }}>
+                            Proceed to Distance Inputs <FiArrowRight />
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {/* STEP 3: INDIVIDUAL PARTNER DISTANCE CARDS */}
+            {step === 3 && (
+                <div style={{ animation: "fadeIn 0.3s ease-in-out" }}>
+                    <div style={{ marginBottom: "20px", padding: "15px", background: "var(--bg-surface)", borderLeft: "4px solid var(--brand-accent)", borderRadius: "var(--radius-sm)" }}>
+                        <h4 style={{ margin: "0 0 5px 0", color: "var(--text-primary)" }}>Partner-Specific Distances Required</h4>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>
+                            Distances vary by company hub. Use the provided links to verify exact pincode distances.
+                        </p>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "15px", marginBottom: "25px" }}>
+                        {activePartners.map(p => (
+                            <div key={p.id} style={{ background: "var(--bg-main)", border: "1px solid var(--border-light)", padding: "20px", borderRadius: "var(--radius-md)" }}>
+                                <h4 style={{ margin: "0 0 5px 0", fontSize: "16px", color: "var(--text-primary)" }}>{p.name}</h4>
+                                
+                                {/* DYNAMIC PARTNER LINK INJECTED HERE */}
+                                <a 
+                                    href={getPartnerLink(p)} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    style={{ fontSize: "11px", color: "var(--brand-accent)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", marginBottom: "15px", background: "rgba(36, 144, 239, 0.1)", padding: "4px 8px", borderRadius: "4px" }}
+                                >
+                                    <FiMapPin /> Open Calculator Link
+                                </a>
+
+                                <div className="form-group" style={{ margin: 0 }}>
+                                    <label className="input-label" style={{ fontSize: "12px", color: "var(--text-primary)" }}>
+                                        Find and enter the distance by clicking on the link above
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        className="form-input" 
+                                        placeholder="Distance in KM"
+                                        style={{ marginTop: "5px" }}
+                                        value={partnerDistances[p.id]} 
+                                        onChange={e => handleDistanceChange(p.id, e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px", borderTop: "1px solid var(--border-light)", paddingTop: "20px" }}>
+                        <button type="button" className="btn btn-secondary" onClick={() => setStep(2)}>Back</button>
+                        <button type="button" className="btn btn-success" onClick={handleCalculate} disabled={loading} style={{ padding: "12px 24px", fontSize: "15px", fontWeight: "bold" }}>
+                            {loading ? "⏳ Finalizing..." : <><FiCheckCircle style={{ marginRight: '6px' }}/> Calculate Best Freight Options</>}
+                        </button>
+                    </div>
                 </div>
+            )}
 
-                <div style={{ marginTop: 15 }}>
-                    <label><input type="checkbox" checked={includeNew} onChange={(e) => setIncludeNew(e.target.checked)} /> Include Walk-In Transporter</label>
-                </div>
+            {/* STEP 4: RESULTS */}
+            {step === 4 && (
+                <div style={{ animation: "fadeIn 0.5s ease-in-out" }}>
+                    {results.length === 0 ? (
+                        <div style={{ padding: "30px", textAlign: "center", color: "var(--brand-danger)", background: "var(--warning-row)", borderRadius: "var(--radius-md)" }}>
+                            No viable dispatch partners found for this region/weight combination.
+                        </div>
+                    ) : (
+                        <div style={{ display: "grid", gap: "15px" }}>
+                            {(Array.isArray(results) ? results : []).map((r, idx) => (
+                                <div key={idx} style={{ 
+                                    border: idx === 0 ? "2px solid var(--brand-success)" : "1px solid var(--border-light)", 
+                                    borderRadius: "var(--radius-md)", 
+                                    padding: "20px",
+                                    background: idx === 0 ? "rgba(16, 185, 129, 0.03)" : "var(--bg-surface)",
+                                    position: "relative"
+                                }}>
+                                    {idx === 0 && (
+                                        <span style={{ position: "absolute", top: "-12px", right: "20px", background: "var(--brand-success)", color: "#fff", padding: "4px 12px", borderRadius: "12px", fontSize: "11px", fontWeight: "bold" }}>
+                                            Most Cost Effective
+                                        </span>
+                                    )}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", paddingBottom: "15px", borderBottom: "1px solid var(--border-light)" }}>
+                                        <div>
+                                            <h3 style={{ margin: "0 0 5px 0", color: "var(--text-primary)" }}>{r.partner_name}</h3>
+                                            <span style={{ fontSize: "12px", background: "var(--bg-main)", padding: "4px 8px", borderRadius: "4px", color: "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>
+                                                Identified Zone: <strong>{r.zone_code}</strong>
+                                            </span>
+                                        </div>
+                                        <div style={{ textAlign: "right" }}>
+                                            <div style={{ fontSize: "24px", fontWeight: "bold", color: idx === 0 ? "var(--brand-success)" : "var(--text-primary)" }}>
+                                                ₹{(r.total_cost ?? 0).toFixed(2)}
+                                            </div>
+                                            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>Chargeable Wt: {r.chargeable_weight} KG</div>
+                                        </div>
+                                    </div>
+                                    {debugData && (
+                                        <pre style={{ fontSize: 11, background: "#111", color: "#0f0", padding: 10 }}>
+                                            {JSON.stringify(debugData, null, 2)}
+                                        </pre>
+                                    )}
 
-                <button className="btn btn-primary" type="submit" style={{ marginTop: 20 }}>Evaluate Dispatch Options</button>
-            </form>
-
-            {resultsData?.options?.length > 0 && (
-                <div>
-                    <h4>Total Options: {resultsData.options.length}</h4>
-                    <div style={{ display: "flex", gap: 15, overflowX: "auto" }}>
-                        {resultsData.options.map((opt, idx) => {
-                            const isBest = selectedTransport?.partner_name === opt.partner_name;
-                            return (
-                                <div key={idx} style={{ minWidth: 280, padding: 15, border: isBest ? "2px solid var(--brand-success)" : "1px solid var(--border-subtle)", background: isBest ? "#eaffea" : "var(--bg-surface)" }}>
-                                    <strong style={{ color: "var(--brand-accent)" }}>Partners Evaluation:</strong>
-                                    <h4>{opt.partner_name}{isBest && <span style={{marginLeft: 8, padding: "2px 8px", fontSize: "11px", fontWeight: 600, borderRadius: "12px", background: "var(--brand-success)", color: "#fff", display: "inline-block", verticalAlign: "middle" }}>🟢 Cheapest</span>}</h4>
-                                    <p>Cost: ₹{opt.dispatch_cost_gst}</p>
-                                    <details style={{ marginTop: 10 }}>
-                                        <summary>Cost Breakdown</summary>
-                                        <div style={{ marginTop: 10, fontSize: "13px", display: "grid", gridTemplateColumns: "1fr auto", gap: "6px" }}>
-                                            {/* Source Zone Removed */}
-                                            <span>Destination Zone</span><strong>{opt.destination_zone}</strong>
-                                            <span>Chargeable Weight</span><strong>{opt.chargeable_weight} kg</strong>
-                                            <span>Basic Freight</span><strong>₹{opt.basic_freight}</strong>
-                                            <span>Fuel Charge</span><strong>₹{opt.fuel_charge}</strong>
-                                            <span>Documentation Charge</span><strong>₹{opt.documentation_charge}</strong>
-                                            <span>FOV Charge</span><strong>₹{opt.fov_charge}</strong>
-                                            <span>ODA Charge</span><strong>₹{opt.oda_charge}</strong>
-                                            {opt.hamali_cost > 0 && (<><span style={{color: "var(--brand-accent)"}}>{opt.hamali_detail || "Hamali Charges"}</span><strong style={{color: "var(--brand-accent)"}}>₹{opt.hamali_cost}</strong></>)}
-                                            <span>Charges before Taxes</span><strong>₹{opt.subtotal}</strong>
-                                            <span>Total Cost after Taxes</span><strong>₹{opt.dispatch_cost_gst}</strong>
+                                    <details>
+                                        <summary>View Financial Breakdown</summary>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "13px", marginTop: "10px", padding: "10px", background: "var(--bg-main)", borderRadius: "var(--radius-sm)" }}>
+                                            <span>Base Freight:</span> <strong>₹{(r.breakdown?.freight ?? 0).toFixed(2)}</strong>
+                                            {/* FUEL SURCHARGE RENDERED HERE */}
+                                            <span>Fuel Surcharge:</span> <strong>₹{(r.breakdown?.fuel ?? 0).toFixed(2) || "0.00"}</strong>
+                                            <span>ODA Charge:</span> <strong>₹{(r.breakdown?.oda ?? 0).toFixed(2)}</strong>
+                                            <span>Documentation:</span> <strong>₹{(r.breakdown?.doc ?? 0).toFixed(2)}</strong>
+                                            <span>FOV (Risk):</span> <strong>₹{(r.breakdown?.fov ?? 0).toFixed(2)}</strong>
+                                            <span>Hamali:</span> <strong>₹{(r.breakdown?.hamali ?? 0).toFixed(2)}</strong>
+                                            <span>GST Applicable:</span> <strong>₹{(r.breakdown?.gst ?? 0).toFixed(2)}</strong>
                                         </div>
                                     </details>
-                                    <button className="btn btn-success" onClick={() => confirmTransport(opt)}>Select</button>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+                            ))}
+                        </div>
+                    )}
 
-            {/* Print Intent Modal */}
-            {selectedTransport && (
-                <div className="modal-overlay">
-                    <div className="modal-box">
-                        <h3>Confirmed Transport</h3>
-                        <p>{selectedTransport.partner_name}</p>
-                        <p>Final Cost: ₹{selectedTransport.dispatch_cost_gst}</p>
-                        <button className="btn btn-primary" onClick={() => confirmTransport(selectedTransport)}>Print Invoice</button>
-                        <button className="btn btn-secondary" onClick={() => setSelectedTransport(null)}>Close</button>
-                    </div>
-                </div>
-            )}
-
-            {/* User-Defined Alert Modal */}
-            {modalAlert.isOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-box" style={{ borderTop: `4px solid ${modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
-                        <h3 style={{ color: modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)" }}>
-                            {modalAlert.title}
-                        </h3>
-                        <p style={{ margin: "15px 0" }}>{modalAlert.message}</p>
-                        <button className="btn btn-secondary" onClick={() => setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
+                    <div style={{ marginTop: "25px", textAlign: "right" }}>
+                        <button className="btn btn-secondary" onClick={resetForm}>Start New Query</button>
                     </div>
                 </div>
             )}

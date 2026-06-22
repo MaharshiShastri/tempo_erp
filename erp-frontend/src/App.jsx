@@ -24,6 +24,7 @@ import ActivityDashboardView from "./views/ActivityDashboardView";
 import ItemMasterUploadView from "./views/ItemMasterUploadView";
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
+import ErrorModal from "./components/shared/ErrorModal";
 
 function App() {
     const state = useERPState();
@@ -59,13 +60,37 @@ function App() {
     const isFactory = state.user.department === 'Factory' || state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer';
     const isSales = state.user.department === 'Sales' || state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer';
     const isTransporter = state.user?.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' ;
+
+    useEffect(() => {
+        const handleError = (event) => { 
+            state.showErrorModal("Application Error", event.error?.message || event.message);
+
+            console.error(event.error);
+        };
+
+        const handleRejection = (event) => {
+            state.showErrorModal("Unhandled Promise Rejection", event.reason?.message || String(event.reason));
+
+            console.error(event.reason);
+        };
+
+        window.addEventListener("error", handleError);
+        window.addEventListener("unhandledrejection", handleRejection);
+
+        return () => {
+            window.removeEventListener("error", handleError);
+            window.removeEventListener("unhandledrejection", handleRejection);
+        };
+    }, []);
+    
     return (
         <div className="frappe-layout">
+            <ErrorModal isOpen={state.errorModalOpen} title={state.errorModal.title} message={state.errorModal.message} onClose={() => state.setErrorModalOpen(false)}/>
             {state.printType === 'invoice' && <PrintInvoiceTemplate invoiceData={state.activePrintJob} />}
             {state.printType === 'order' && <PrintOrderTemplate orderData={state.activePrintJob} />}
 
             {/* FRAPPE SIDEBAR */}
-            <aside className="frappe-sidebar" className={`frappe-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+            <aside className={`frappe-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
                 <div className="sidebar-header">
                     {!sidebarCollapsed && <h2>Tempo ERP</h2>}
                     <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
