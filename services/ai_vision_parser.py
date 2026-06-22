@@ -9,9 +9,9 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
 def calculate_grn_totals(items: list, shipping: float = 0):
     subtotal = sum(i["net_amount"] for i in items)
     discount_total = sum(i["discount_amount"] for i in items)
-
-    cgst = round(subtotal * 0.09, 2)
-    sgst = round(subtotal * 0.09, 2)
+    taxable_subtotal = subtotal + shipping
+    cgst = round(taxable_subtotal * 0.09, 2)
+    sgst = round(taxable_subtotal * 0.09, 2)
 
     return {
         "subtotal": round(subtotal, 2),

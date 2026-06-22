@@ -309,18 +309,20 @@ async def export_grn_preview(payload: dict, user: dict = Depends(verify_bearer_t
     totals = calculate_grn_totals(items, shipping)
 
     row += 2
+    ws.cell(row=row, column=8, value="Shipping charges:")
+    ws.cell(row=row, column=9, value=shipping)
 
-    ws.cell(row=row, column=8, value="Subtotal")
-    ws.cell(row=row, column=9, value=totals["subtotal"])
+    ws.cell(row=row+1, column=8, value="Subtotal")
+    ws.cell(row=row+1, column=9, value=totals["subtotal"])
 
-    ws.cell(row=row+1, column=8, value="CGST")
-    ws.cell(row=row+1, column=9, value=totals["taxes"]["cgst"])
+    ws.cell(row=row+2, column=8, value="CGST")
+    ws.cell(row=row+2, column=9, value=totals["taxes"]["cgst"])
 
-    ws.cell(row=row+2, column=8, value="SGST")
-    ws.cell(row=row+2, column=9, value=totals["taxes"]["sgst"])
+    ws.cell(row=row+3, column=8, value="SGST")
+    ws.cell(row=row+3, column=9, value=totals["taxes"]["sgst"])
 
-    ws.cell(row=row+3, column=8, value="Grand Total")
-    ws.cell(row=row+3, column=9, value=totals["grand_total"])
+    ws.cell(row=row+4, column=8, value="Grand Total")
+    ws.cell(row=row+4, column=9, value=totals["grand_total"])
 
     stream = io.BytesIO()
     wb.save(stream)
