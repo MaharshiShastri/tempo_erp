@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database.repository import EDBR
 from security import verify_bearer_token
-from services.dispatch_calculator import execute_dispatch_algorithm, process_dispatch_calculation
+from services.dispatch_calculator import execute_dispatch_algorithm
 from .dependencies import check_department
 import logging
 from schemas.logistics_schema import FullPartnerProfile, LogisticsPartnerCreate
@@ -10,7 +10,7 @@ import shutil
 import PyPDF2
 from pathlib import Path
 from services.ai_contract_parser import extract_logistics_profile_from_text
-from services.ai_region_classifier import get_zone_for_city, classify_city_zone
+from services.ai_region_classifier import classify_city_zone
 
 router = APIRouter(prefix="/api/v1/dispatch", tags=["Dispatch Logistics Engine"])
 
@@ -22,7 +22,7 @@ def get_partners(user: dict = Depends(verify_bearer_token)):
 def get_partners(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_logistics_partners()
 
-@router.post("/pre-identify-zones")
+"""@router.post("/pre-identify-zones")
 def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token)):
     city = payload.get("city")
     state = payload.get("state")
@@ -33,13 +33,14 @@ def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token))
         zone_data = EDBR.get_partner_zones(p["id"])
 
         zone = classify_city_zone(city, zone_data["zones"])
-        print("Zones in router: ", zone)
-        if zone:
+        if isinstance(zone, list) and len(zone) > 0:
+            identified_zones[str(p['id'])] = zone[0]
+        elif isinstance(zone, str):
             identified_zones[str(p['id'])] = zone
         
     print(identified_zones)
     return identified_zones
-
+"""
 @router.post("/evaluate", dependencies=[Depends(check_department("Sales"))])
 def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
     evaluation_session = { "started": True, "options": [], "failed_providers": 0 }
@@ -173,10 +174,10 @@ async def extract_partner_from_file(file: UploadFile = File(...), user: dict = D
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Parsing Failed: {str(e)}")
     
-@router.post("/calculate", dependencies=[Depends(check_department("Sales"))])
+"""@router.post("/calculate", dependencies=[Depends(check_department("Sales"))])
 def calculate_dispatch(payload: dict, user: dict = Depends(verify_bearer_token)):
     try:
         return process_dispatch_calculation(payload)
     except Exception as e:
         logging.error(traceback.format_exc())
-        raise HTTPException( status_code=500, detail=f"Dispatch calculation failed: {str(e)}")
+        raise HTTPException( status_code=500, detail=f"Dispatch calculation failed: {str(e)}")"""
