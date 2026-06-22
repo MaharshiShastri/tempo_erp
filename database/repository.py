@@ -556,16 +556,34 @@ class PostgresRepository:
     def get_partner_zones(self, partner_id):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-
                 cur.execute("""
-                    SELECT
-                        zone_code,
-                        zone_name
+                    SELECT zone_code, zone_name, states
                     FROM logistics_zones
                     WHERE partner_id=%s
                 """, (partner_id,))
 
-                return cur.fetchall()
+                rows = cur.fetchall()
+
+                # NORMALIZE OUTPUT
+                zones = []
+                state_map = {}
+
+                for r in rows:
+                    zone_code = r["zone_code"]
+
+                    zones.append({
+                        "zone_code": zone_code,
+                        "zone_name": r["zone_name"],
+                        "states": r["states"] or []
+                    })
+
+                    for s in (r["states"] or []):
+                        state_map[s] = zone_code
+
+                return {
+                    "zones": zones,
+                    "state_map": state_map
+                }
     # --- LOGISTICS PARTNER end---
     # --- ITEM MASTERY start---
     def get_item(self, item_code):

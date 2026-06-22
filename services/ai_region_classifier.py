@@ -1,5 +1,6 @@
 import os
 from groq import Groq
+import json
 
 API_KEY = os.getenv("GROQ_API_KEY", "")
 
@@ -8,46 +9,45 @@ print(API_KEY)
 client = Groq(api_key=API_KEY)
 
 def classify_city_zone(city: str, zones: list):
-    
-    if API_KEY:
-        print("API KEY found")
-    else:
-        print("NO API KEY")
-    
-    zone_text = "\n".join([
-        f"{z['zone_code']} = {z['zone_name']}"
+
+    zone_text = "\n".join(
+        f"{z['zone_code']} -> {', '.join(z['states'])}"
         for z in zones
-    ])
+    )
 
     prompt = f"""
 You are a logistics routing classifier.
 
-Return ONLY the zone_code.
-
-No explanation.
-No markdown.
-No JSON.
+Return ONLY a JSON array of valid zone_codes from the allowed list.
+If multiple match, return all.
+If none match, return [].
 
 City:
 {city}
 
 Available Zones:
 
-{zone_text if zone_text else zones}
+{zone_text}
 """
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         temperature=0,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    return (response.choices[0].message.content.strip())
+    content = response.choices[0].message.content.strip()
+    print("RAW MODEL OUTPUT:", content)
+
+    try:
+        result = json.loads(content)
+        print("JSONed output: ", result)   # ✅ correct parsing
+    except json.JSONDecodeError:
+        # fallback safety
+        print("In the fallback")
+        result = []
+
+    return result
 
 def get_zone_for_city(city: str, state: str, zones: list):
     zone_text = "\n".join(

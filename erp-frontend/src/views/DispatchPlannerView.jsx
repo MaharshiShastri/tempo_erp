@@ -82,8 +82,19 @@ export default function DispatchPlannerView({ state }) {
                 city: dispatchParams.destination_city,
                 state: dispatchParams.destination_state
             })
-        }).then(res => res.json())
-          .then(data => setIdentifiedZones(data));
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log("IDENTIFIED ZONES FROM API:", data);
+
+            const normalized = Object.entries(data || {}).map(([partner_id, zones]) => ({
+                partner_id: Number(partner_id),
+                zones
+            }));
+
+            setIdentifiedZones(normalized);
+            return normalized;
+        });
 
         setZonePromise(promise);
     };
@@ -109,7 +120,8 @@ export default function DispatchPlannerView({ state }) {
                     state.setAlertMessage("⏳ Waiting for AI to finalize regional routing...");
                     state.setIsAlertOpen(true);
                 }
-                await zonePromise; 
+                const data = await zonePromise;
+                setIdentifiedZones(data); 
             }
 
             const payload = {

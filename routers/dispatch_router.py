@@ -30,9 +30,14 @@ def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token))
 
     identified_zones = {}
     for p in partners:
-        zone = classify_city_zone(city, p.get('zones', []))
+        zone_data = EDBR.get_partner_zones(p["id"])
+
+        zone = classify_city_zone(city, zone_data["zones"])
+        print("Zones in router: ", zone)
         if zone:
             identified_zones[str(p['id'])] = zone
+        
+    print(identified_zones)
     return identified_zones
 
 @router.post("/evaluate", dependencies=[Depends(check_department("Sales"))])
