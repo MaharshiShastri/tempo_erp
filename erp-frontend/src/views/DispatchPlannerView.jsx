@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import API from "../api/api";
+import { FiExternalLink } from "react-icons/fi";
 
 export default function DispatchPlannerView({ state }) {
     // Removed source_state
@@ -126,7 +127,7 @@ export default function DispatchPlannerView({ state }) {
                         </h4>
 
                         <p style={{ marginTop: "4px", fontSize: "12px", color: "var(--text-muted)"}}>
-                            {partner.partner_link}
+                            {partner.partner_link && (<a href={partner.partner_link} target="_blank" rel="noopener noreferrer" title="Open Partner Website"><FiExternalLink size={18} /></a>)}
                         </p>
 
                         <label className="input-label">
