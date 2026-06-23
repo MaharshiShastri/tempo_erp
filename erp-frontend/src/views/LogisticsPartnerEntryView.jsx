@@ -16,8 +16,9 @@ export default function LogisticsPartnerEntryView({ state }) {
     };
 
     const [partner, setPartner] = useState(defaultPartner);
+    
+    // Unifying zones and rates into a single state array
     const [zones, setZones] = useState([]);
-    const [rates, setRates] = useState([]);
     const [fuelMatrix, setFuelMatrix] = useState([]);
     const [odaDistances, setOdaDistances] = useState([]); 
     const [odaWeights, setOdaWeights] = useState([]);     
@@ -54,14 +55,25 @@ export default function LogisticsPartnerEntryView({ state }) {
             minimum_weight: parseFloat(partner.minimum_weight) || 0, minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
             documentation_charge: parseFloat(partner.documentation_charge) || 0, fov_percentage: parseFloat(partner.fov_percentage) || 0,
             gst_percentage: parseFloat(partner.gst_percentage) || 0,
-            zones: zones.filter(z => z.zone_code).map(z => ({ zone_code: z.zone_code.trim(), zone_name: (z.zone_name || "").trim(), states: (z.states_raw || "").split(",").map(s => s.trim()).filter(Boolean) })),
-            rates: rates.filter(r => r.destination_zone).map(r => ({ destination_zone: r.destination_zone.trim(), rate_per_kg: parseFloat(r.rate_per_kg) || 0 })),
+            
+            // Build the Zones list for the backend
+            zones: zones.filter(z => z.zone_code).map(z => ({ 
+                zone_code: z.zone_code.trim(), 
+                zone_name: (z.zone_name || "").trim(), 
+                states: (z.states_raw || "").split(",").map(s => s.trim()).filter(Boolean) 
+            })),
+            
+            // Automatically derive the Rates list from the unified UI table for the backend
+            rates: zones.filter(z => z.zone_code && z.rate_per_kg !== "").map(z => ({ 
+                destination_zone: z.zone_code.trim(), 
+                rate_per_kg: parseFloat(z.rate_per_kg) || 0 
+            })),
+            
             fuel_matrix: fuelMatrix.filter(f => f.fuel_price_from !== "" && f.fuel_price_to !== "").map(f => ({ fuel_price_from: parseFloat(f.fuel_price_from) || 0, fuel_price_to: parseFloat(f.fuel_price_to) || 0, surcharge_percentage: parseFloat(f.surcharge_percentage) || 0 })),
             oda_matrix: compiledOdaMatrix
         };
     };
 
-    // Shared function to populate UI state (used by Database Fetch AND AI Extraction)
     const populateState = (profile) => {
         setPartner({
             name: profile.name || "", partner_link: profile.partner_link || "", cft_factor: profile.cft_factor ?? 10,
@@ -70,8 +82,20 @@ export default function LogisticsPartnerEntryView({ state }) {
             gst_percentage: profile.gst_percentage ?? 18
         });
 
-        setZones(profile.zones?.map(z => ({ ...z, states_raw: z.states_raw || (z.states ? z.states.join(', ') : "") })) || []);
-        setRates(profile.rates || []);
+        // Smart merge: Map the backend's separate rates back onto their matching zones for the UI
+        const loadedZones = profile.zones || [];
+        const loadedRates = profile.rates || [];
+        
+        const unifiedZones = loadedZones.map(z => {
+            const matchingRate = loadedRates.find(r => r.destination_zone === z.zone_code);
+            return {
+                ...z,
+                states_raw: z.states_raw || (z.states ? z.states.join(', ') : ""),
+                rate_per_kg: matchingRate ? matchingRate.rate_per_kg : ""
+            };
+        });
+
+        setZones(unifiedZones);
         setFuelMatrix(profile.fuel_matrix || []);
 
         const loadedOda = profile.oda_matrix || [];
@@ -100,7 +124,6 @@ export default function LogisticsPartnerEntryView({ state }) {
 
         setIsDeleting(true);
         try {
-            // We use a direct fetch here matching the style of your AI File Upload handler
             const response = await fetch(`/api/v1/logistics/config/partners/${selectedPartnerId}`, {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${state.user.access_token}` }
@@ -113,7 +136,6 @@ export default function LogisticsPartnerEntryView({ state }) {
 
             const result = await response.json();
             
-            // Show success message
             setModalAlert({ 
                 isOpen: true, 
                 title: "Partner Deleted", 
@@ -121,7 +143,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                 isError: false 
             });
             
-            // Reset UI back to a blank "Create" slate
             setSelectedPartnerId("");
             populateState(defaultPartner);
             loadPartnersList(); 
@@ -146,7 +167,6 @@ export default function LogisticsPartnerEntryView({ state }) {
         }
     };
 
-    // --- NEW: AI File Upload Handler ---
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -160,7 +180,7 @@ export default function LogisticsPartnerEntryView({ state }) {
         try {
             const response = await fetch("/api/v1/dispatch/partners/extract-from-file", {
                 method: "POST",
-                headers: { "Authorization": `Bearer ${state.user.access_token}` }, // Do NOT set Content-Type, fetch sets multipart boundaries automatically
+                headers: { "Authorization": `Bearer ${state.user.access_token}` },
                 body: formData
             });
 
@@ -171,8 +191,7 @@ export default function LogisticsPartnerEntryView({ state }) {
 
             const result = await response.json();
             
-            // Populate the UI with AI data
-            setSelectedPartnerId(""); // Ensure we are in "Create" mode
+            setSelectedPartnerId(""); 
             populateState(result.data);
             
             setModalAlert({ isOpen: true, title: "Extraction Complete", message: "Please review the auto-filled data below before saving to the database.", isError: false });
@@ -180,7 +199,7 @@ export default function LogisticsPartnerEntryView({ state }) {
             setModalAlert({ isOpen: true, title: "AI Extraction Failed", message: err.message, isError: true });
         } finally {
             setIsExtracting(false);
-            if(fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+            if(fileInputRef.current) fileInputRef.current.value = ""; 
         }
     };
 
@@ -220,7 +239,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                 <h3>🚚 Master Logistics Onboarding</h3>
                 
                 <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-                    {/* NEW AI BUTTON */}
                     <div>
                         <input type="file" accept=".pdf" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
                         <button type="button" className="btn btn-secondary" style={{ background: "var(--brand-accent)", color: "#fff", border: "none" }} onClick={() => fileInputRef.current.click()} disabled={isExtracting}>
@@ -249,35 +267,19 @@ export default function LogisticsPartnerEntryView({ state }) {
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>Zone Definitions</h4>
-                    <button type="button" className="btn btn-secondary" onClick={() => addRow(setZones, { zone_code: "", zone_name: "", states_raw: "" })}>+ Add Zone</button>
+                    <h4 style={{ color: "var(--brand-accent)" }}>Zone Definitions & Freight Rates</h4>
+                    <button type="button" className="btn btn-secondary" onClick={() => addRow(setZones, { zone_code: "", zone_name: "", states_raw: "", rate_per_kg: "" })}>+ Add Zone Rate</button>
                 </div>
                 <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead><tr style={{ textAlign: "left" }}><th>Code</th><th>Regions Served</th><th>States (Comma Separated)</th><th></th></tr></thead>
+                    <thead><tr style={{ textAlign: "left" }}><th>Zone Code</th><th>Regions Served</th><th>States (Comma Separated)</th><th>Rate (₹/kg)</th><th></th></tr></thead>
                     <tbody>
                         {zones.map((z, i) => (
                             <tr key={i}>
                                 <td><input className="form-input" style={{ textTransform: "uppercase" }} value={z.zone_code} onChange={e => handleTableChange(zones, setZones, i, "zone_code", e.target.value)} /></td>
                                 <td><input className="form-input" value={z.zone_name} onChange={e => handleTableChange(zones, setZones, i, "zone_name", e.target.value)} /></td>
                                 <td><input className="form-input" value={z.states_raw} onChange={e => handleTableChange(zones, setZones, i, "states_raw", e.target.value)} /></td>
+                                <td><input className="form-input" type="number" step="0.01" placeholder="0.00" value={z.rate_per_kg} onChange={e => handleTableChange(zones, setZones, i, "rate_per_kg", e.target.value)} /></td>
                                 <td><button type="button" className="btn-text-danger" onClick={() => removeRow(zones, setZones, i)}>✕</button></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>Commercial Freight Rates</h4>
-                    <button type="button" className="btn btn-secondary" onClick={() => addRow(setRates, {destination_zone: "", rate_per_kg: "" })}>+ Add Rate</button>
-                </div>
-                <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead><tr style={{ textAlign: "left" }}><th>To Zone</th><th>Rate Per Kg (₹)</th><th></th></tr></thead>
-                    <tbody>
-                        {rates.map((r, i) => (
-                            <tr key={i}>
-                                <td><input className="form-input" style={{ textTransform: "uppercase" }} value={r.destination_zone} onChange={e => handleTableChange(rates, setRates, i, "destination_zone", e.target.value)} /></td>
-                                <td><input className="form-input" type="number" step="0.01" value={r.rate_per_kg} onChange={e => handleTableChange(rates, setRates, i, "rate_per_kg", e.target.value)} /></td>
-                                <td><button type="button" className="btn-text-danger" onClick={() => removeRow(rates, setRates, i)}>✕</button></td>
                             </tr>
                         ))}
                     </tbody>
@@ -356,7 +358,6 @@ export default function LogisticsPartnerEntryView({ state }) {
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-light)", paddingTop: "20px", marginTop: "20px" }}>
                     <div>
-                        {/* Only show Delete if an existing partner is selected */}
                         {selectedPartnerId && (
                             <button 
                                 type="button" 
@@ -371,7 +372,6 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </div>
                     
                     <div>
-                        {/* Only show Save/Update if the user actually changed something */}
                         {hasChanges && (
                             <button type="submit" className="btn btn-success" style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold" }}>
                                 {selectedPartnerId ? "Update Changed Matrices" : "Save New Transporter Master"}
