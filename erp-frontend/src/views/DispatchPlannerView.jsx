@@ -127,7 +127,7 @@ export default function DispatchPlannerView({ state }) {
                         </h4>
 
                         <p style={{ marginTop: "4px", fontSize: "12px", color: "var(--text-muted)"}}>
-                            {partner.partner_link && (<a href={partner.partner_link} target="_blank" rel="noopener noreferrer" title="Open Partner Website"><FiExternalLink size={18} /></a>)}
+                            {partner.partner_link && (<a href={partner.partner_link} style={{color: '#C6DAF1'}} target="_blank" rel="noopener noreferrer" title="Open Partner Website">Go to {partner.name} website to find the distance.<FiExternalLink size={18} /></a>)}
                         </p>
 
                         <label className="input-label">

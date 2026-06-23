@@ -9,7 +9,7 @@ import os
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -320,10 +320,10 @@ class PostgresRepository:
                     # 1. Update the parent partner record (Changed bracket notation to dot notation)
                     cur.execute("""
                         UPDATE logistics_partners 
-                        SET name=%s, cft_factor=%s, minimum_weight=%s, minimum_freight_value=%s, 
+                        SET name=%s, partner_link=%s, cft_factor=%s, minimum_weight=%s, minimum_freight_value=%s, 
                             documentation_charge=%s, fov_percentage=%s, gst_percentage=%s
                         WHERE id=%s
-                    """, (p.name, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
+                    """, (p.name, p.partner_link, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
                             p.documentation_charge, p.fov_percentage, p.gst_percentage, partner_id))
 
                     # 2. THE WIPE - Delete all existing child matrices for this partner

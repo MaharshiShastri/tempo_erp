@@ -11,7 +11,7 @@ export default function LogisticsPartnerEntryView({ state }) {
     const fileInputRef = useRef(null);
 
     const defaultPartner = {
-        name: "", cft_factor: 10.0, minimum_weight: 0.0, minimum_freight_value: 0.0,
+        name: "", partner_link: "", cft_factor: 10.0, minimum_weight: 0.0, minimum_freight_value: 0.0,
         documentation_charge: 0.0, fov_percentage: 0.0, gst_percentage: 18.0
     };
 
