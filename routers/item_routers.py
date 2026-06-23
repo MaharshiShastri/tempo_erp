@@ -6,11 +6,11 @@ from .dependencies import check_department
 
 router = APIRouter(prefix="/api/v1/master/items", tags=["Item Master Subsystem"])
 
-@router.get("/{item_code}", dependencies=[Depends(check_department("Factory"))])
+@router.get("/{item_code}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def list_items(item_code: str, user_profile: dict=Depends(verify_bearer_token)):
     return EDBR.get_item(item_code)
 
-@router.post("/create", dependencies=[Depends(check_department("Factory"))])
+@router.post("/create", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def create_item(payload: ItemMasterCreate, user_profile: dict=Depends(verify_bearer_token)):
     try:
         return EDBR.create_item(payload.dict())
@@ -18,11 +18,11 @@ def create_item(payload: ItemMasterCreate, user_profile: dict=Depends(verify_bea
     except Exception as e:
         raise HTTPException(status_code=400, detail="Item Code already exists or data is invalid.")
     
-@router.put("/{item_code}", dependencies=[Depends(check_department("Factory"))])
+@router.put("/{item_code}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def update_item(item_code: str, payload: ItemMasterUpdate, user_profile=Depends(verify_bearer_token)):
     return EDBR.update_item(item_code, payload.dict(exclude_none=True))
 
-@router.delete("/{item_code}", dependencies=[Depends(check_department("Factory"))])
+@router.delete("/{item_code}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def delete_item(item_code: str,user_profile=Depends(verify_bearer_token)):
     return EDBR.disable_item(item_code)
 

@@ -7,22 +7,22 @@ from .dependencies import check_department
 
 router = APIRouter(prefix="/api/v1/orders", tags=["Orders Operations Engine"])
 
-@router.get("", dependencies=[Depends(check_department("Sales"))])
+@router.get("", dependencies=[Depends(check_department("Sales Representative"))])
 def get_orders(user_profile: dict = Depends(verify_bearer_token)):
     return EDBR.get_all_orders()
 
-@router.post("/create", dependencies=[Depends(check_department("Sales"))])
+@router.post("/create", dependencies=[Depends(check_department("Sales Representative"))])
 def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify_bearer_token)):
     try:
         return EDBR.create_order(payload.model_dump())
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/master/companies", dependencies=[Depends(check_department("Sales"))])
+@router.get("/master/companies", dependencies=[Depends(check_department("Sales Representative"))])
 def list_companies_master(user_profile: dict = Depends(verify_bearer_token)):
     return MOCK_COMPANIES
 
-@router.post("/master/companies/create", dependencies=[Depends(check_department("Sales"))])
+@router.post("/master/companies/create", dependencies=[Depends(check_department("Sales Representative"))])
 def create_company_master(payload: CompanyCreateInput, user_profile: dict = Depends(verify_bearer_token)):
     if any(c["name"].lower() == payload.name.lower() for c in MOCK_COMPANIES):
         raise HTTPException(status_code=400, detail="A corporate account profile with this designation already exists.")
@@ -45,7 +45,7 @@ def create_company_master(payload: CompanyCreateInput, user_profile: dict = Depe
     MOCK_COMPANIES.append(new_company)
     return new_company
 
-@router.get("/master/items", dependencies=[Depends(check_department("Sales"))])
+@router.get("/master/items", dependencies=[Depends(check_department("Sales Representative"))])
 def list_items_master(user_profile: dict = Depends(verify_bearer_token)):
     return  EDBR.get_all_items()
 
@@ -58,7 +58,7 @@ def search_companies(q: str):
                 #FROM unnest(%s::text[], %s::text[], %s::text[]) -- ignore (remove mock later)
 """, ())   placeholder if still mock-based"""
 
-@router.get("/search/companies", dependencies=[Depends(check_department("Sales"))])
+@router.get("/search/companies", dependencies=[Depends(check_department("Sales Representative"))])
 def search_companies(q: str):
     q = q.lower()
     results = [

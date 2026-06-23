@@ -292,18 +292,17 @@ async def export_grn_preview(payload: dict, user: dict = Depends(verify_bearer_t
     for idx, item in enumerate(items, 1):
         ws.cell(row=row, column=1, value=idx)
         ws.cell(row=row, column=2, value=item["item_code"])
-        display_text = item.get("item_name", "")
-        if item.get("item_description"):
-            display_text += f"\n{item['item_description']}"
-        cell = ws.cell(row=row, column=3, value=display_text)
-        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.cell(row=row, column=3, value=(item.get("item_name") or item.get("description") or ""))
+        erp_desc = item.get("item_description", "")
+        if erp_desc != "":
+            ws.cell(row=row+1, column=3, value=f"\nInternal Specification: {item['item_description']}")
         ws.cell(row=row, column=4, value=item["quantity"])
         ws.cell(row=row, column=5, value=item["rate"])
         ws.cell(row=row, column=6, value=item["gross_amount"])
         ws.cell(row=row, column=7, value=item["discount_percent"])
         ws.cell(row=row, column=8, value=item["discount_amount"])
         ws.cell(row=row, column=9, value=item["net_amount"])
-        row += 1
+        row += 2
 
     shipping = float(payload.get("shipping", 0))
     totals = calculate_grn_totals(items, shipping)

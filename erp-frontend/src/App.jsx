@@ -57,8 +57,8 @@ function App() {
 
     const pendingTasksCount = (state.tasks || []).filter(t => t.is_incomplete && t.direction === 'received').length;
     const isSuperUser = state.user.role === 'Chief Full Stack Developer' || state.user.role === 'Admin';
-    const isFactory = state.user.department === 'Factory' || state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer';
-    const isSales = state.user.department === 'Sales' || state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer';
+    const isFactory = state.user.role === 'Shop Floor Administrator' || state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer';
+    const isSales = state.user.role === 'Sales Representative' || state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer';
     const isTransporter = state.user?.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' ;
 
     useEffect(() => {

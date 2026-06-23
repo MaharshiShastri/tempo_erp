@@ -6,7 +6,6 @@ export default function GRN_WorkspaceView({ state }) {
     const [scannedData, setScannedData] = useState(null);
     const [isScanning, setIsScanning] = useState(false);
     
-    // Modal State for Unmapped Items
     const [showUnmappedModal, setShowUnmappedModal] = useState(false);
     const [unmappedDrafts, setUnmappedDrafts] = useState([]);
     
@@ -27,7 +26,10 @@ export default function GRN_WorkspaceView({ state }) {
             
             // Map and calculate initial values from AI
             let initialItems = result.data.items.map(aiItem => {
-                const masterMatch = state.itemsMaster.find(m => m.item_code === aiItem.item_code);
+                const cleanAicode = (aiItem.item_code || "").toString().trim();
+                
+                // NATIVELY TRUST THE BACKEND'S DB LOOKUP
+                const isMatched = aiItem.matched_from_master === true || cleanAicode === "";
                 
                 const qty = parseFloat(aiItem.quantity) || 0;
                 const rate = parseFloat(aiItem.rate) || 0;
@@ -39,9 +41,11 @@ export default function GRN_WorkspaceView({ state }) {
 
                 return {
                     ...aiItem,
-                    item_name: masterMatch?.item_name || aiItem.description || "",
-                    description: masterMatch?.item_specification || "",
-                    isMatched: !!masterMatch || (aiItem.item_code === "" || !aiItem.item_code),
+                    item_code: cleanAicode,
+                    item_name: aiItem.description|| aiItem.item_name || "",
+                    item_description: aiItem.item_description,
+                    description: isMatched ? aiItem.description : (aiItem.item_name || aiItem.description || ""),
+                    isMatched,
                     quantity: qty,
                     rate: rate,
                     discount_percent: discPct,
@@ -63,10 +67,7 @@ export default function GRN_WorkspaceView({ state }) {
                 gross_total: totals.gross_total,
                 discount_total: totals.discount_total,
                 subtotal: totals.subtotal,
-                taxes: {
-                    cgst: totals.cgst,
-                    sgst: totals.sgst
-                },
+                taxes: { cgst: totals.cgst, sgst: totals.sgst },
                 grand_total: totals.grand_total
             });      
         } catch (err) {
@@ -80,11 +81,10 @@ export default function GRN_WorkspaceView({ state }) {
         }
     };
 
-    // Centralized Calculation Engine (Gross -> Disc % -> Disc Amt -> Net)
     const calculateTotals = (items, currentShipping = 0) => {
         let gross_total = 0;
         let discount_total = 0;
-        let subtotal = 0; // Subtotal represents total Net Amount
+        let subtotal = 0; 
 
         items.forEach(item => {
             const q = parseFloat(item.quantity) || 0;
@@ -95,12 +95,10 @@ export default function GRN_WorkspaceView({ state }) {
             const discAmt = gross * (dp / 100);
             const net = gross - discAmt;
 
-            // Update item row values
             item.gross_amount = gross;
             item.discount_amount = discAmt;
             item.net_amount = net;
 
-            // Add to running totals
             gross_total += gross;
             discount_total += discAmt;
             subtotal += net;
@@ -134,18 +132,11 @@ export default function GRN_WorkspaceView({ state }) {
         });
     };
 
+    // Fast instant updates for typing
     const updateItem = (index, field, value) => {
         const newItems = [...scannedData.items];
         newItems[index][field] = value;
         
-        if (field === 'item_code') {
-            const masterMatch = state.itemsMaster.find(m => m.item_code === value);
-            newItems[index].isMatched = !!masterMatch || value === "";
-            if (masterMatch) {
-                newItems[index].description = masterMatch.item_name;
-            }
-        }
-
         const totals = calculateTotals(newItems, scannedData.shipping);
 
         setScannedData({
@@ -159,9 +150,46 @@ export default function GRN_WorkspaceView({ state }) {
         });
     };
 
+    // DYNAMIC ENDPOINT CHECK: Fires only when user finishes typing item code
+    const verifyItemCode = async (index, code) => {
+        const cleanCode = (code || "").toString().trim();
+        
+        if (!cleanCode) {
+            updateItem(index, "isMatched", true); // Treat empty as "not an error yet"
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/v1/wms/test-item/${encodeURIComponent(cleanCode)}`, {
+                headers: { 'Authorization': `Bearer ${state.user.access_token}` }
+            });
+            
+            const data = response.ok ? await response.json() : null;
+
+            setScannedData(prev => {
+                if (!prev) return prev;
+                const newItems = [...prev.items];
+                
+                if (data && data.item_specification) {
+                    newItems[index].isMatched = true;
+                    newItems[index].item_description = data.item_specification;
+                } else {
+                    newItems[index].isMatched = false;
+                    newItems[index].item_description = "";
+                }
+                
+                return { ...prev, items: newItems };
+            });
+
+        } catch (err) {
+            console.error("Lookup failed:", err);
+            updateItem(index, "isMatched", false);
+        }
+    };
+
     const addNewRow = () => {
         const newItems = [...scannedData.items, { 
-            item_code: "", description: "", quantity: 0, rate: 0, discount_percent: 0, 
+            item_code: "", item_name: "", description: "", quantity: 0, rate: 0, discount_percent: 0, 
             gross_amount: 0, discount_amount: 0, net_amount: 0, isMatched: true 
         }];
         const totals = calculateTotals(newItems, scannedData.shipping);
@@ -211,7 +239,7 @@ export default function GRN_WorkspaceView({ state }) {
             const drafts = unmatched.map(item => ({
                 originalIndex: scannedData.items.indexOf(item),
                 item_code: item.item_code || `NEW-${Date.now().toString().slice(-4)}`,
-                item_name: item.description || 'Unknown Component',
+                item_name: item.item_name || item.description || 'Unknown Component',
                 item_group: 'Raw Material',
                 rate: item.rate || 0,
                 unit_measure: 'NOS',
@@ -256,7 +284,7 @@ export default function GRN_WorkspaceView({ state }) {
             unmappedDrafts.forEach(draft => {
                 newItems[draft.originalIndex].item_code = draft.item_code;
                 newItems[draft.originalIndex].isMatched = true;
-                newItems[draft.originalIndex].description = draft.item_name;
+                newItems[draft.originalIndex].item_name = draft.item_name;
             });
             
             const payloadToSave = { ...scannedData, items: newItems };
@@ -344,12 +372,12 @@ export default function GRN_WorkspaceView({ state }) {
                                     }}>
                                         <td style={{ padding: "10px" }}>
                                             <input 
-                                                list="master-items-list"
                                                 className="form-input" 
                                                 style={{ border: item.isMatched ? "1px solid var(--border-subtle)" : "1px solid var(--brand-danger)" }}
                                                 value={item.item_code} 
                                                 required
                                                 onChange={(e) => updateItem(idx, "item_code", e.target.value)}
+                                                onBlur={(e) => verifyItemCode(idx, e.target.value)}
                                                 placeholder="Code..."
                                             />
                                             {!item.isMatched && <div style={{ fontSize: "10px", color: "var(--brand-danger)", marginTop: "4px", fontWeight: "bold", display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -358,6 +386,7 @@ export default function GRN_WorkspaceView({ state }) {
                                         </td>
                                         <td style={{ padding: "10px" }}>
                                             <input className="form-input" required value={item.item_name} onChange={(e) => updateItem(idx, "item_name", e.target.value)} />
+                                            {item.item_description && (<div style={{marginTop: "6px", padding: "6px 8px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", fontSize: "11px", color: "var(--text-muted)"}}><strong>Matched Spec:</strong><br/>{item.item_description}</div>)}
                                         </td>
                                         <td style={{ padding: "10px" }}>
                                             <input type="number" className="form-input" required value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} />
@@ -366,7 +395,6 @@ export default function GRN_WorkspaceView({ state }) {
                                             <input type="number" step="0.01" className="form-input" required value={item.rate} onChange={(e) => updateItem(idx, "rate", e.target.value)} />
                                         </td>
                                         
-                                        {/* Read Only Gross */}
                                         <td style={{ padding: "10px", background: "var(--bg-main)", color: "var(--text-muted)", fontWeight: "500" }}>
                                             ₹{(item.gross_amount || 0).toFixed(2)}
                                         </td>
@@ -375,12 +403,10 @@ export default function GRN_WorkspaceView({ state }) {
                                             <input type="number" step="0.01" className="form-input" value={item.discount_percent || 0} onChange={(e) => updateItem(idx, "discount_percent", e.target.value)} />
                                         </td>
                                         
-                                        {/* Read Only Disc Amt */}
                                         <td style={{ padding: "10px", background: "var(--bg-main)", color: "var(--brand-danger)", fontWeight: "500" }}>
                                             ₹{(item.discount_amount || 0).toFixed(2)}
                                         </td>
 
-                                        {/* Final Net Amount */}
                                         <td className="grn-amount-cell" style={{ padding:"10px" }}>
                                             ₹{(item.net_amount || 0).toFixed(2)}
                                         </td>
@@ -394,12 +420,6 @@ export default function GRN_WorkspaceView({ state }) {
                                 ))}
                             </tbody>
                         </table>
-                        
-                        <datalist id="master-items-list">
-                            {state.itemsMaster.map(m => (
-                                <option key={m.item_code} value={m.item_code}>{m.item_name}</option>
-                            ))}
-                        </datalist>
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>

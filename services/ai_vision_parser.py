@@ -41,7 +41,7 @@ RULES:
 - Item codes are always written after item descriptions.
 - The item code always follows XX-XXXXX format.
 - Range of item code is 02-0010 to 70-0045 inclusive.
-
+- Ignore HSN/SAC Columns, codes are human-written only.
 OUTPUT:
 
 {
@@ -68,7 +68,7 @@ OUTPUT:
 }"""
 
     response = client.chat.completions.create(
-        model="qwen/qwen3.6-27b",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[
             {
                 "role": "system",
@@ -88,9 +88,8 @@ OUTPUT:
             }
         ],
         temperature=0.3,
-        max_completion_tokens=4096,
+        max_completion_tokens=2048,
         top_p=0.95,
-        reasoning_effort="default",
         response_format={"type": "json_object"},
     )
 
@@ -171,7 +170,7 @@ def enrich_items_from_master(items: list) -> list:
 
         if master:
             enriched_item.update({
-                "description": master.get("item_specification", ""),
+                "item_description": master.get("item_specification", ""),
                 "matched_from_master": True,
                 "master_item_id": master.get("id"),
                 "master_version": master.get("revision_no", 0),

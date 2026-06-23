@@ -398,26 +398,7 @@ export default function useERPState() {
                 eventSource.close();
             }
         };
-        const ws = new WebSocket(`ws://${API_HOST}:8000/api/v1/ws/floor?token=${sessionToken}`);
-
-        ws.onmessage = (event) => {
-            try{
-                const data = JSON.parse(event.data);
-                addToast(`[${data.entity_id}] ${data.message}`, data.type || 'info');
-            } catch(e){
-                addToast(event.data, info);
-            }
-        };
-
-        ws.onerror = (error) => {
-            alert("WebSocket error: ", error);
-        };
-
-        return () =>{
-            if(ws.readyState === 1){
-                ws.close();
-            }
-        };
+        
     }, [sessionToken]);
     return {
         systemUsers, user, setUser, activeTab, setActiveTab, orders, bills, companiesMaster, itemsMaster, isAlertOpen, setIsAlertOpen, alertMessage, errorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword,

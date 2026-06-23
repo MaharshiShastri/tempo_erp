@@ -6,11 +6,11 @@ from .dependencies import check_department
 
 router = APIRouter(prefix="/api/v1/bills", tags=["Billing Execution Engine"])
 
-@router.get("", dependencies=[Depends(check_department("Sales"))])
+@router.get("", dependencies=[Depends(check_department("Sales Representative"))])
 def get_bills(user_profile: dict = Depends(verify_bearer_token)):
     return EDBR.get_all_bills()
 
-@router.post("/create", dependencies=[Depends(check_department("Sales"))])
+@router.post("/create", dependencies=[Depends(check_department("Sales Representative"))])
 def create_bill(payload: BillHeaderCreate, user_profile: dict = Depends(verify_bearer_token)):
     try:
         return EDBR.create_bill(payload.model_dump())
