@@ -20,38 +20,10 @@ MOCK_COMPANIES = [
     {"id": "C002", "name": "Reliance Industries", "address": "Maker Chambers IV, Nariman Point, Mumbai"}
 ]
 """
-CREATE TABLE crm_leads (
-    id SERIAL PRIMARY KEY,
-    full_name VARCHAR(255) NOT NULL,
-    designation VARCHAR(100),
-    company_name VARCHAR(255),
-    contact_email VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(50),
-    city_state VARCHAR(255) NOT NULL,
-    product_query TEXT, 
-    gdpr_consent BOOLEAN DEFAULT FALSE,
-    assigned_region VARCHAR(100),
-    assigned_to VARCHAR(255),
-    status VARCHAR(50) DEFAULT 'New',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE grn_headers (
-    id SERIAL PRIMARY KEY,
-    grn_number VARCHAR(100) UNIQUE NOT NULL,
-    vendor_name VARCHAR(255),
-    receipt_date DATE DEFAULT CURRENT_DATE,
-    operator_email VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE grn_items (
-    id SERIAL PRIMARY KEY,
-    grn_id INT REFERENCES grn_headers(id) ON DELETE CASCADE,
-    item_code VARCHAR(100),
-    quantity NUMERIC(10,2),
-    rate NUMERIC(10,2),
-    amount NUMERIC(10,2) GENERATED ALWAYS AS (quantity * rate) STORED
-);
+ALTER TABLE tasks 
+ADD COLUMN attachment_url VARCHAR(500), 
+ADD COLUMN deadline TIMESTAMP, 
+ADD COLUMN completed_at TIMESTAMP;
 """
 class PostgresRepository:
     def _get_connection(self):
@@ -264,28 +236,34 @@ class PostgresRepository:
                     SELECT * FROM tasks WHERE assigned_by = %s OR %s = ANY(assigned_to) ORDER BY created_at DESC
                 """, (user_email, user_email))
                 tasks = cur.fetchall()
-                for t in tasks: t['created_at'] = t['created_at'].isoformat() if t['created_at'] else None
+                for t in tasks: 
+                    t['created_at'] = t['created_at'].isoformat() if t['created_at'] else None
+                    t['deadline'] = t['deadline'].isoformat() if t.get('deadline') else None
+                    t['completed_at'] = t['completed_at'].isoformat() if t.get('completed_at') else None
                 return tasks
 
     def create_task(self, task_dict: dict, assigned_by: str) -> dict:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO tasks (title, details, direction, is_incomplete, assigned_by, assigned_to)
-                    VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
-                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', [])))
+                    INSERT INTO tasks (title, details, direction, is_incomplete, assigned_by, assigned_to, attachment_url, deadline)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', []), task_dict.get('attachment_path'), task_dict.get('deadline')))
                 conn.commit()
                 new_task = cur.fetchone()
                 new_task['created_at'] = new_task['created_at'].isoformat()
+                new_task['deadline'] = new_task['deadline'].isoformat() if new_task.get('deadline') else None
                 return new_task
 
     def toggle_task_status(self, task_id: int) -> dict:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE tasks SET is_incomplete = NOT is_incomplete WHERE id = %s RETURNING *", (task_id,))
+                cur.execute("UPDATE tasks SET is_incomplete = NOT is_incomplete, completed_at = CASE WHEN is_incomplete = TRUE THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = %s RETURNING *", (task_id,))
                 conn.commit()
                 updated = cur.fetchone()
-                updated['created_at'] = updated['created_at'].isoformat()
+                updated['created_at'] = updated['created_at'].isoformat() if updated.get('created_at') else None
+                updated['completed_at'] = updated['completed_at'].isoformat() if updated.get('completed_at') else None
+                updated['deadline'] = updated['deadline'].isoformat() if updated.get('deadline') else None
                 return updated
     
     def create_dispatch_record(self, record: dict, operator_email: str):

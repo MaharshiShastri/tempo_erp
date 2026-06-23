@@ -122,13 +122,45 @@ const API = {
   },
   
   async saveTask(payload, token) {
-    const r = await fetch("/api/v1/tasks/create", {
-      method: "POST",
-      headers: this.headers(token),
-      body: JSON.stringify(payload),
-    });
+    if (payload.attachment) {
+      const formData = new FormData();
+      formData.append("title", payload.title);
+      formData.append("details", payload.details);
+      formData.append("direction", payload.direction || "dispatched");
+      
+      // Append each element of the assigned_to array individually
+      if (Array.isArray(payload.assigned_to)) {
+        payload.assigned_to.forEach(email => {
+          formData.append("assigned_to", email);
+        });
+      }
+      if (payload.deadline) {
+        formData.append("deadline", payload.deadline);
+      }
+      
+      formData.append("attachment", payload.attachment);
 
-    return r.json();
+      const r = await fetch("/api/v1/tasks/create", {
+        method: "POST",
+        headers: {
+          // CRITICAL: Do not define 'Content-Type' here. 
+          // Leaving it empty allows the browser to properly inject multipart boundaries.
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      return r.json();
+    } else {
+      // Fallback for standard JSON payload if no file is uploaded
+      const r = await fetch("/api/v1/tasks/create", {
+        method: "POST",
+        headers: this.headers(token),
+        body: JSON.stringify(payload),
+      });
+
+      return r.json();
+    }
   },
 
   async toggleTaskStatus(taskId, token) {

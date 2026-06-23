@@ -8,7 +8,9 @@ export default function TasksWorkspaceView({ state }) {
     const [newTaskTitle, setNewTaskTitle] = React.useState('');
     const [newTaskDetails, setNewTaskDetails] = React.useState('');
     const [selectedAssignees, setSelectedAssignees] = React.useState([]);
-
+    const [newTaskDeadline, setNewTaskDeadline] = React.useState('');
+    const [newTaskFile, setNewTaskFile] = React.useState(null);
+    
     const tasksArray = state.tasks || [];
     
     const filteredTasks = tasksArray.filter(t => {
@@ -22,11 +24,16 @@ export default function TasksWorkspaceView({ state }) {
             title: newTaskTitle,
             details: newTaskDetails,
             direction: 'dispatched',
-            assigned_to: selectedAssignees
+            assigned_to: selectedAssignees,
+            attachment: newTaskFile,
+            deadline: newTaskDeadline
         });
         setNewTaskTitle('');
         setNewTaskDetails('');
         setSelectedAssignees([]);
+        setNewTaskFile(null);
+        setNewTaskDeadline('');
+        document.getElementById('task-file-input').value = "";
     };
 
     return (
@@ -50,6 +57,9 @@ export default function TasksWorkspaceView({ state }) {
                 setNewTaskTitle={setNewTaskTitle}
                 newTaskDetails={newTaskDetails}
                 setNewTaskDetails={setNewTaskDetails}
+                setNewTaskFile={setNewTaskFile}
+                newTaskDeadline={newTaskDeadline} // NEW
+                setNewTaskDeadline={setNewTaskDeadline} // NEW
                 handleFormSubmit={handleFormSubmit}
             />
 
