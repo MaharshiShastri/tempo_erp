@@ -9,7 +9,7 @@ import os
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -72,7 +72,11 @@ class PostgresRepository:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT email, name, role, regions, phone_business FROM users")
-                return cur.fetchall()
+                data = cur.fetchall()
+                print(data)
+                if not data:
+                    return None
+                return data
 
     def create_user(self, user_data: dict):
         with self._get_connection() as conn:

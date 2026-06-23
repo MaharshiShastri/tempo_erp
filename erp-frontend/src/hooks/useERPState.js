@@ -195,8 +195,8 @@ export default function useERPState() {
                 API.fetchBills(sessionToken),
                 API.fetchCompaniesMaster(sessionToken),
                 API.fetchTasks(sessionToken),
+                fetch('/api/v1/auth/users', {headers: {'Authorization': `Bearer ${sessionToken}`}}).then(r => r.json()),
                 API.getPartners(sessionToken).then(r => r.data),
-                fetch('/api/v1/auth/users', {headers: {'Authorization': `Bearer ${sessionToken}`}}).then(r => r.json())
             ]);
             setOrders(ord); setBills(bl); setCompaniesMaster(comp); setTasks(tsk); setSystemUsers(usersData); setDispatch(dispatchData);
         } catch (e) {
