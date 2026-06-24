@@ -20,7 +20,7 @@ from routers.item_routers import router as item_router
 from routers.dashboard_router import router as dashboard_router
 from routers.crm_router import router as crm_router
 from routers.wms_router import router as wms_router
-
+from routers.company_router import router as company_router
 
 app = FastAPI(title="Tempo Instruments ERP - Decoupled Enterprise Solution")
 
@@ -32,10 +32,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-
     try:
         response = await call_next(request)
-
         duration = time.time() - start_time
 
         if response.status_code >= 400:
@@ -70,17 +68,13 @@ app.include_router(item_router)
 app.include_router(dashboard_router)
 app.include_router(crm_router)
 app.include_router(wms_router)
+app.include_router(company_router)
 
 BASE_DIR = Path(__file__).resolve().parent
-print(BASE_DIR)
 
 FRONTEND_DIST = BASE_DIR / "erp-frontend" / "dist"
 
-app.mount(
-    "/assets",
-    StaticFiles(directory=FRONTEND_DIST / "assets"),
-    name="assets"
-)
+app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
 @app.get("/")
 def serve_index_root():

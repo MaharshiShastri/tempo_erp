@@ -216,7 +216,7 @@ body {
 .btn-success { background: var(--brand-success); color: white; }
 .btn-secondary { background: var(--bg-main); border-color: var(--border-subtle); color: var(--text-primary); }
 .btn-text-danger { background: none; border: none; color: var(--brand-danger); font-size: 13px; cursor: pointer; font-weight: 600;}
-
+.btn-text {background: none; border: none; color: var(--brand-accent); font-size: 13px; cursor: pointer; font-weight: 500;}
 /* Inputs */
 .form-input, .form-select-native {
     width: 100%;

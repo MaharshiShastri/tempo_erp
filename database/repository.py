@@ -14,16 +14,24 @@ DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:54
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
 logger.info(f"DB URI: {DB_DSN}")
-# We keep companies and items mock arrays temporarily as requested until Phase 2
-MOCK_COMPANIES = [
-    {"id": "C001", "name": "Tata Power", "address": "Bombay House, Fort, Mumbai"},
-    {"id": "C002", "name": "Reliance Industries", "address": "Maker Chambers IV, Nariman Point, Mumbai"}
-]
-"""
-ALTER TABLE tasks 
-ADD COLUMN attachment_url VARCHAR(500), 
-ADD COLUMN deadline TIMESTAMP, 
-ADD COLUMN completed_at TIMESTAMP;
+
+"""CREATE TABLE client_companies (
+    id VARCHAR(20) PRIMARY KEY,
+
+    name VARCHAR(255) NOT NULL UNIQUE,
+
+    address_line_1 VARCHAR(255) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    pincode VARCHAR(10) NOT NULL,
+
+    contact_name VARCHAR(255) NOT NULL,
+    contact_role VARCHAR(100) NOT NULL,
+    contact_phone VARCHAR(20) NOT NULL,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
 """
 class PostgresRepository:
     def _get_connection(self):
@@ -35,7 +43,7 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 if password:
                     cur.execute("SELECT * FROM users WHERE email = %s AND password_hash = %s", (email, password))
-                    logger.info("Email ID:", email, "Password: ", password)                    
+                    logger.info(email, password)                    
                 else:
                     cur.execute("SELECT email, name, role, regions FROM users WHERE email = %s", (email,))
                 return cur.fetchone()
@@ -45,7 +53,7 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute("SELECT email, name, role, regions, phone_business FROM users")
                 data = cur.fetchall()
-                print(data)
+                
                 if not data:
                     return None
                 return data
@@ -966,5 +974,94 @@ class PostgresRepository:
                     return None
                 
                 return dict(row)
+    # --- Companies START ---
+    def get_all_companies(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    SELECT *
+                    FROM client_companies
+                    ORDER BY name
+                """)
+
+                return cur.fetchall()
+    
+    def get_company(self, company_id: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    SELECT *
+                    FROM client_companies
+                    WHERE id = %s
+                """, (company_id,))
+
+                return cur.fetchone()
+    def create_company(self, company_data: dict):
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""SELECT COUNT(*) AS total FROM client_companies""")
+
+                total = cur.fetchone()["total"]
+
+                company_id = f"C{str(total + 1).zfill(3)}"
+
+                cur.execute("""INSERT INTO client_companies (id, name, address_line_1, city, state, pincode, contact_name, contact_role, contact_phone)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING *
+                """, (company_id, company_data["name"].strip(), company_data["address_line_1"].strip(), company_data["city"], company_data["state"], company_data["pincode"], company_data["contact_name"].strip(), company_data["contact_role"], company_data["contact_phone"]))
+
+                company = cur.fetchone()
+
+                conn.commit()
+
+                return company
+    def update_company(self, company_id: str, company_data: dict):
+        updates = []
+        values = []
+
+        for field, value in company_data.items():
+            if value is not None:
+                updates.append(f"{field} = %s")
+                values.append(value)
+
+        if not updates:
+            return self.get_company(company_id)
+
+        updates.append("updated_at = NOW()")
+
+        values.append(company_id)
+
+        query = f"""UPDATE client_companies SET {", ".join(updates)} WHERE id = %s RETURNING *"""
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, tuple(values))
+                company = cur.fetchone()
+                conn.commit()
+                return company
             
+    def delete_company(self, company_id: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""DELETE FROM client_companies WHERE id = %s RETURNING *""", (company_id,))
+                company = cur.fetchone()
+                conn.commit()
+                return company
+            
+    def search_companies(self, q: str):
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+
+                search = f"%{q}%"
+
+                cur.execute("""SELECT * FROM client_companies WHERE LOWER(name) LIKE LOWER(%s) OR LOWER(id) LIKE LOWER(%s) ORDER BY name LIMIT 10 """, (search, search))
+
+                return cur.fetchall()
+    # --- Companies END ---
+    
 EDBR = PostgresRepository()

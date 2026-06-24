@@ -68,15 +68,26 @@ const API = {
   },
 
   async fetchCompaniesMaster(token) {
-    const r = await fetch("/api/v1/orders/master/companies", {
+    const r = await fetch("/api/v1/companies/get", {
       headers: this.headers(token),
     });
 
     return r.json();
   },
+  async fetchCompany(companyId, token){
+    console.log(`/api/v1/companies/get/${companyId}`)
+    const r = await fetch(`/api/v1/companies/get/${companyId}`,{
+      headers: this.headers(token),
+    });
+    if (!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+    return r.json();
+  },
 
   async saveCompanyMaster(payload, token) {
-    const r = await fetch("/api/v1/orders/master/companies/create", {
+    const r = await fetch("/api/v1/companies/create", {
       method: "POST",
       headers: this.headers(token),
       body: JSON.stringify(payload),
@@ -89,7 +100,44 @@ const API = {
 
     return r.json();
   },
+  
+  async updateCompany(companyId, payload, token){
+    const r = await fetch(`/api/v1/companies/update/${companyId}`, {
+      method: "PUT",
+      headers: this.headers(token),
+      body: JSON.stringify(payload),
+    });
 
+    if (!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+    return r.json();
+  },
+
+  async deleteCompany(companyId, token){
+    const r = await fetch(`/api/v1/companies/delete/${companyId}`,{
+      method: "DELETE",
+      headers: this.headers(token),
+    });
+
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+
+    return r.json();
+  },
+  async searchCompanies(query, token){
+    const r = await fetch(`/api/v1/companies/search?q=${encodeURIComponent(query)}`, {
+      headers: this.headers(token),
+    });
+
+    if(!r.ok){
+      throw new Error(err.detail);
+    }
+    return r.json();
+  },
   async fetchTasks(token) {
     const r = await fetch("/api/v1/tasks", {
       headers: this.headers(token),

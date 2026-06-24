@@ -1,13 +1,17 @@
 import React from "react"
-export default function CompanyCard({ company }) {
+export default function CompanyCard({ company, state }) {
     return (
         <div key={company.id} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px', marginBottom: '8px' }}>
                 <span style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--combobox-hover)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{company.id}</span>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => state.triggerEditCompany(company.id)} className="btn-text" style={{ fontSize: '12px', padding: 0 }}>✏️ Edit</button>
+                    <button onClick={() => state.deleteCompany(company.id)} className="btn-text-danger" style={{ fontSize: '12px', padding: 0 }}>🗑️ Delete</button>
+                </div>
                 <strong style={{ color: 'var(--brand-accent)', fontSize: '15px' }}>{company.name}</strong>
                 </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div>📍 <strong>Address Vector:</strong> {company.address}</div>
+                        <div>📍 <strong>Address Vector:</strong> {" "}{company.address_line_1}, {" "}{company.city}, {" "}{company.state}, {" - "}{company.pincode} </div>
                         <div style={{ borderTop: '1px dashed var(--border-light)', paddingTop: '6px', marginTop: '4px' }}>
                         👤 <strong>Primary Rep:</strong> {company.contact_name} ({company.contact_role || 'QA/QC'})
                     </div>

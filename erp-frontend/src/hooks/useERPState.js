@@ -20,7 +20,8 @@ export default function useERPState() {
     const [companiesMaster, setCompaniesMaster] = useState([]);
     const [itemsMaster, setItemsMaster] = useState([]);
     const [errorModalOpen, setErrorModalOpen] = useState(false);
-
+    const [isEditingCompany, setIsEditingCompany] = useState(false);
+    const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [errorModal, setErrorModal] = useState({title: "", message: "" });
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
@@ -97,6 +98,51 @@ export default function useERPState() {
         });
 
         setErrorModalOpen(true);
+    };
+
+    const triggerNewCompany = () => {
+        setCompanyForm({ ...defaultCompanyForm });
+        setIsEditingCompany(false);
+        setSelectedCompanyId(null);
+        setActiveTab('company-new');
+    };
+
+    const triggerEditCompany = async (companyId) => {
+        try {
+            const companyData = await API.fetchCompany(companyId, sessionToken);
+            setCompanyForm({
+                name: companyData.name || '',
+                address_line_1: companyData.address_line_1 || '',
+                city: companyData.city || '',
+                state: companyData.state || '',
+                pincode: companyData.pincode || '',
+                contact_name: companyData.contact_name || '',
+                contact_role: companyData.contact_role || '',
+                contact_phone: companyData.contact_phone || ''
+            });
+            setIsEditingCompany(true);
+            setSelectedCompanyId(companyId);
+            setActiveTab('company-new');
+        } catch (err) {
+            setAlertMessage("Failed to load company details: " + err.message);
+            setIsAlertOpen(true);
+        }
+    };
+
+    const deleteCompany = async (companyId) => {
+        const confirm = window.confirm("Are you sure you want to permanently delete this corporate account?");
+        if (!confirm) return;
+        
+        try {
+            await API.deleteCompany(companyId, sessionToken);
+            setAlertMessage("Company profile deleted successfully.");
+            setIsAlertOpen(true);
+            await refreshDataHub();
+            if (activeTab === 'company-new') setActiveTab('companies-list');
+        } catch (err) {
+            setAlertMessage(err.message);
+            setIsAlertOpen(true);
+        }
     };
 
     const dispatchSystemNotification = (title, message) => {
@@ -304,10 +350,23 @@ export default function useERPState() {
     const commitCompanySubmit = async (e) => {
         e.preventDefault();
         try {
-            await API.saveCompanyMaster(companyForm, sessionToken);
+            if (isEditingCompany) {
+                await API.updateCompany(selectedCompanyId, companyForm, sessionToken);
+                setAlertMessage("Customer profile updated successfully.");
+            } else {
+                await API.saveCompanyMaster(companyForm, sessionToken);
+                setAlertMessage("Customer profile created successfully.");
+            }
             setCompanyForm({ ...defaultCompanyForm });
-            await refreshDataHub(); setActiveTab('companies-list');
-        } catch (err) { setAlertMessage(err.message); setIsAlertOpen(true); }
+            setIsEditingCompany(false);
+            setSelectedCompanyId(null);
+            setIsAlertOpen(true);
+            await refreshDataHub(); 
+            setActiveTab('companies-list');
+        } catch (err) { 
+            setAlertMessage(err.message); 
+            setIsAlertOpen(true); 
+        }
     };
 
     const triggerInvoiceSetupForOrder = (oaId) => {
@@ -406,7 +465,7 @@ export default function useERPState() {
         billHeader, setBillHeader, billItems, setBillItems, triggerInvoiceSetupForOrder, commitBillSubmit, handleLogin, handleLogout,
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
         tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
-        showErrorModal, errorModal, errorModalOpen, setErrorModalOpen,
+        showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId,
     };
 }
 
