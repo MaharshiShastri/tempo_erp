@@ -149,7 +149,21 @@ const API = {
 
     return r.json();
   },
+  // Add this inside the API object in api.js
+  async fetchTaskAttachment(fileName, token) {
+    // Extract base name in case a full path was passed
+    const baseName = fileName.split(/[\\/]/).pop(); 
+    const r = await fetch(`/api/v1/tasks/attachment/${encodeURIComponent(baseName)}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
 
+    if (!r.ok) {
+        const err = await r.json().catch(() => ({ detail: "File fetch failed" }));
+        throw new Error(err.detail || "File not found or unauthorized");
+    }
+    
+    return r.blob(); // Crucial: Return as Blob, not JSON!
+  },
   saveDispatchRecord: async (payload, token) => {
     const res = await fetch("/api/v1/dispatch/records/save", {
         method: "POST",

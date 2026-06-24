@@ -16,6 +16,7 @@ export default function TaskList({ tasks, viewTab, expandedTaskId, setExpandedTa
                     viewTab={viewTab}
                     expandedTaskId={expandedTaskId}
                     setExpandedTaskId={setExpandedTaskId}
+                    handleFileAction={handleFileAction}
                     state={state}
                 />
                 ))}

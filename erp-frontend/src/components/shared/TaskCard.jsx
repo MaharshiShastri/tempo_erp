@@ -1,8 +1,10 @@
 import React from "react";
-export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTaskId,  state}) {
+
+// NEW: Accept handleFileAction from props
+export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTaskId, state, handleFileAction}) {
     const getUserName = (email) => {
         const userMatch = state.systemUsers?.find(u => u.email === email);
-        return userMatch ? userMatch.name : email; // Fallback to email if name not found
+        return userMatch ? userMatch.name : email; 
     };
     
     const formatDateTime = (isoString) => {
@@ -15,6 +17,13 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
         return `${date}-${time}`;
     };
 
+    // NEW: Extracts just the original filename by dropping the DB path and the time hash
+    const getDisplayFileName = (path) => {
+        if (!path) return "";
+        const baseName = path.split(/[\\/]/).pop();
+        return baseName.substring(baseName.indexOf('_') + 1) || baseName;
+    };
+
     return (
         <div key={task.id} style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '15px', alignItems: 'center' }}>
@@ -25,13 +34,21 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                         </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {/* NEW: Download button for attachments */}
+                    
+                    {/* UPDATED: Displays Real Name and opens Authenticated Preview/Download */}
                     {task.attachment_url && (
-                        <a href={task.attachment_url} download className="btn btn-secondary" style={{ fontSize: '12px', padding: '6px 12px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            onClick={(e) => e.stopPropagation()} // Prevent card from expanding when clicking download
+                        <button 
+                            type="button"
+                            className="btn btn-secondary" 
+                            style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleFileAction(task.attachment_url);
+                            }} 
+                            title={getDisplayFileName(task.attachment_url)}
                         >
-                            📎 Download
-                        </a>
+                            📎 {getDisplayFileName(task.attachment_url)}
+                        </button>
                     )}
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', background: 'var(--bg-main)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
@@ -44,7 +61,6 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                 <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-main)', fontSize: '13px', color: 'var(--text-primary)' }}>
                     <p style={{ margin: '0 0 15px 0', lineHeight: 1.6 }}>{task.details}</p>
                     
-                    {/* Timestamp Details Block */}
                     <div style={{ display: 'flex', gap: '20px', padding: '10px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             <strong>Created:</strong> <br/>{formatDateTime(task.created_at)}
@@ -67,4 +83,4 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
             )}
         </div>
     );
-};
+}

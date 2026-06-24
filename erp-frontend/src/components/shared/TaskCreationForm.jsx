@@ -1,5 +1,6 @@
 import React from "react";
 import OperatorMultiSelect from "./OperatorMultiSelect";
+
 export default function TaskCreationForm({state, selectedAssignees, setSelectedAssignees, newTaskTitle, setNewTaskTitle, newTaskDetails, setNewTaskDetails, newTaskFile, setNewTaskFile, newTaskDeadline, setNewTaskDeadline, handleFormSubmit}) {
     const getTomorrowDateString = () => {
         const tomorrow = new Date();
@@ -7,13 +8,14 @@ export default function TaskCreationForm({state, selectedAssignees, setSelectedA
         const offset = tomorrow.getTimezoneOffset() * 60000;
         return (new Date(tomorrow.getTime() - offset)).toISOString().slice(0, 16);
     };
- return (
-    <form onSubmit={handleFormSubmit} style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px', border: '1px solid var(--border-light)' }}>
-        <h4 style={{ margin: '0 0 15px 0', fontSize: '14px' }}>Delegate New Workflow Target</h4>
-        <div className="form-grid-layout" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <div className="form-group">
-                <label className="input-label">FROM (Operator)</label>
-                <input type="text" disabled className="form-input" style={{ opacity: 0.7 }} value={state.user.name} />
+    
+    return (
+        <form onSubmit={handleFormSubmit} style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px', border: '1px solid var(--border-light)' }}>
+            <h4 style={{ margin: '0 0 15px 0', fontSize: '14px' }}>Delegate New Workflow Target</h4>
+            <div className="form-grid-layout" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div className="form-group">
+                    <label className="input-label">FROM (Operator)</label>
+                    <input type="text" disabled className="form-input" style={{ opacity: 0.7 }} value={state.user.name} />
                 </div>
 
                 <div className="form-group grid-span-2">
@@ -32,11 +34,20 @@ export default function TaskCreationForm({state, selectedAssignees, setSelectedA
                         <input type="text" placeholder="Detailed Instructions... *" required className="form-input" value={newTaskDetails} onChange={e => setNewTaskDetails(e.target.value)} />
                     </div>
                     <div style={{ flex: 1 }}>
-                        <input id="task-file-input" type="file"  className="form-input"  style={{ padding: '6px' }} onChange={e => setNewTaskFile(e.target.files[0])} title="Attach optional file (PDF, CAD, Image, etc.)"/>
+                        {/* NEW: Added accept constraint for file types */}
+                        <input 
+                            id="task-file-input" 
+                            type="file" 
+                            accept=".pdf, .jpg, .jpeg, .png, .xlsx, .xls, .doc, .docx" 
+                            className="form-input"  
+                            style={{ padding: '6px' }} 
+                            onChange={e => setNewTaskFile(e.target.files[0])} 
+                            title="Attach optional file (PDF, Image, Excel, Word)"
+                        />
                     </div>
                     <button type="submit" className="btn btn-success" disabled={selectedAssignees.length === 0} style={{ padding: '8px 24px', whiteSpace: 'nowrap' }}>Deploy Task</button>
+                </div>
             </div>
-        </div>
-    </form>
- );
+        </form>
+    );
 };
