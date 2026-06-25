@@ -5,7 +5,7 @@ def check_department(required_role: str):
     def dependency(user: dict = Depends(verify_bearer_token)):
 
         role = user.get("role")
-        print("Requested by", user.get("name"))
+        
         # Superusers bypass RBAC
         if role in ["Admin", "Chief Full Stack Developer"]:
             return user

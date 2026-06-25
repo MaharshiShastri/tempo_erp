@@ -6,7 +6,6 @@ export default function DispatchPlannerView({ state }) {
     // Extracted dimensions out of 'dim' into a multi-product array
     const [products, setProducts] = useState([{ width: "", height: "", depth: ""}]);
     const [unit, setUnit] = useState("cm"); // Default unit as requested
-    const [bestTransport, setBestTransport] = useState(null);
 
     const [dim, setDim] = useState({ 
         invoice_value: 0, 
@@ -261,7 +260,7 @@ export default function DispatchPlannerView({ state }) {
                      <h4>Total Options: {resultsData.options.length}</h4>
                     <div style={{ display: "flex", gap: 15, overflowX: "auto" }}>
                         {resultsData.options.map((opt, idx) => {
-                            const isBest = bestTransport?.partner_name === opt.partner_name;
+                            const isBest = selectedTransport?.partner_name === opt.partner_name;
                             return (
                                  <div key={idx} style={{ minWidth: 280, padding: 15, border: isBest ? "2px solid var(--brand-success)" : "1px solid var(--border-subtle)", background: isBest ? "#eaffea" : "var(--bg-surface)" }}>
                                     <strong style={{ color: "var(--brand-accent)" }}>Partners Evaluation:</strong>
@@ -298,6 +297,7 @@ export default function DispatchPlannerView({ state }) {
                         <p>{selectedTransport.partner_name}</p>
                         <p>Final Cost: ₹{selectedTransport.dispatch_cost_gst}</p>
                         <button className="btn btn-primary" onClick={() => confirmTransport(selectedTransport)}>Print Invoice</button>
+                        {" or "}
                         <button className="btn btn-secondary" onClick={() => setSelectedTransport(null)}>Close</button>
                     </div>
                 </div>

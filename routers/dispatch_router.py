@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/v1/dispatch", tags=["Dispatch Logistics Engine"]
 
 @router.get("/partners")
 def get_partners(user: dict = Depends(verify_bearer_token)):
+    print("User ", user['email'], "tried accessing the .")
     return EDBR.get_logistics_partners()
 
 @router.get("/partners/active", dependencies=[Depends(check_department("Sales Representative"))])
@@ -44,7 +45,7 @@ def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token))
 @router.post("/evaluate", dependencies=[Depends(check_department("Sales Representative"))])
 def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
     evaluation_session = { "started": True, "options": [], "failed_providers": 0 }
-    
+    print("User ", user['email'], "tried accessing the /evaluate.")
     try:
         partners = EDBR.get_logistics_partners()
         if not partners:
@@ -55,8 +56,10 @@ def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
             
             # Use the new status object returned from the finally block
             if result["status"] == "success":
+                print("User ",user['email'], " with partner ", result['partner_name'], " was successfully evaluated")
                 evaluation_session["options"].append(result["data"])
             else:
+                print("User ", user['email'], " failed evaluation due to: ", result['error'])
                 evaluation_session["failed_providers"] += 1
 
         # Sort the valid options by final cost
@@ -79,6 +82,7 @@ def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
     except Exception as e:
         # Catch unexpected fatal errors (like DB down)
         logging.error(f"Fatal Dispatch Error: {str(e)}")
+        print("User ", user['email'], " failed dispatch due to: ", str(e))
         raise HTTPException(status_code=500, detail=f"Internal Dispatch Engine Error: {str(e)}")
         
     finally:

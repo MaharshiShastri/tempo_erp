@@ -408,7 +408,7 @@ export default function useERPState() {
             setIsAlertOpen(true);
         }
     };
-
+    
     const handleToggleTask = async (taskId) => {
         try {
             const updatedTask = await API.toggleTaskStatus(taskId, sessionToken);

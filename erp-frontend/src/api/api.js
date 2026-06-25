@@ -501,6 +501,23 @@ const API = {
 
       return r.json();
   },
+  // Add this inside the API object in api.js
+  async syncTallyData(action, token) {
+    const r = await fetch("/api/v1/tally/sync", {
+        method: "POST",
+        headers: this.headers(token),
+        body: JSON.stringify({ 
+            action: action
+        }),
+    });
+
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "Tally proxy synchronization failed.");
+    }
+    
+    return r.json();
+  },
 };
 
 export default API;
