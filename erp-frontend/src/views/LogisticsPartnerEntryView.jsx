@@ -12,12 +12,11 @@ export default function LogisticsPartnerEntryView({ state }) {
 
     const defaultPartner = {
         name: "", partner_link: "", cft_factor: 10.0, minimum_weight: 0.0, minimum_freight_value: 0.0,
-        documentation_charge: 0.0, fov_percentage: 0.0, gst_percentage: 18.0
+        documentation_charge: 0.0, fov_percentage: 0.0, gst_percentage: 18.0, local_loading_cost: 0.0, hub_loading_max_cost: 0.0
     };
 
     const [partner, setPartner] = useState(defaultPartner);
     
-    // Unifying zones and rates into a single state array
     const [zones, setZones] = useState([]);
     const [fuelMatrix, setFuelMatrix] = useState([]);
     const [odaDistances, setOdaDistances] = useState([]); 
@@ -54,7 +53,8 @@ export default function LogisticsPartnerEntryView({ state }) {
             name: partner.name || "", partner_link: partner.partner_link || "", cft_factor: parseFloat(partner.cft_factor) || 0,
             minimum_weight: parseFloat(partner.minimum_weight) || 0, minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
             documentation_charge: parseFloat(partner.documentation_charge) || 0, fov_percentage: parseFloat(partner.fov_percentage) || 0,
-            gst_percentage: parseFloat(partner.gst_percentage) || 0,
+            gst_percentage: parseFloat(partner.gst_percentage) || 0, local_loading_cost: parseFloat(partner.local_loading_cost) || 0, 
+            hub_loading_max_cost: parseFloat(partner.hub_loading_max_cost) || 0,
             
             // Build the Zones list for the backend
             zones: zones.filter(z => z.zone_code).map(z => ({ 
@@ -79,7 +79,7 @@ export default function LogisticsPartnerEntryView({ state }) {
             name: profile.name || "", partner_link: profile.partner_link || "", cft_factor: profile.cft_factor ?? 10,
             minimum_weight: profile.minimum_weight ?? 0, minimum_freight_value: profile.minimum_freight_value ?? 0,
             documentation_charge: profile.documentation_charge ?? 0, fov_percentage: profile.fov_percentage ?? 0,
-            gst_percentage: profile.gst_percentage ?? 18
+            gst_percentage: profile.gst_percentage ?? 18, local_loading_cost: profile.local_loading_cost ?? 0, hub_loading_max_cost: profile.hub_loading_max_cost ?? 0
         });
 
         // Smart merge: Map the backend's separate rates back onto their matching zones for the UI
@@ -263,6 +263,8 @@ export default function LogisticsPartnerEntryView({ state }) {
                     <div className="form-group"><label className="input-label">Min Freight Value (₹)</label><input required type="number" className="form-input" value={partner.minimum_freight_value} onChange={e => setPartner({ ...partner, minimum_freight_value: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Docs/GC Charge</label><input required type="number" className="form-input" value={partner.documentation_charge} onChange={e => setPartner({ ...partner, documentation_charge: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">FOV Risk (%)</label><input required type="number" step="0.01" className="form-input" value={partner.fov_percentage} onChange={e => setPartner({ ...partner, fov_percentage: e.target.value })} /></div>
+                    <div className="form-group"><label className="input-label" style={{ color: 'var(--brand-success)'}}>Local Loading cost (₹)</label><input required type="number" step="1" className="form-input" value={partner.local_loading_cost} onChange={e => setPartner({ ...partner, local_loading_cost: e.target.value })} /></div>
+                    <div className="form-group"><label className="input-label" style={{ color: 'var(--brand-danger)'}}>Max Hub Loading Cap (₹)</label><input required type="number" step="1" className="form-input" value={partner.hub_loading_max_cost} onChange={e => setPartner({ ...partner, hub_loading_max_cost: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">GST Rate (%)</label><input required type="number" className="form-input" value={partner.gst_percentage} onChange={e => setPartner({ ...partner, gst_percentage: e.target.value })} /></div>
                 </div>
 

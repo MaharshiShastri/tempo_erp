@@ -280,7 +280,7 @@ class PostgresRepository:
                 cur.execute("""
                     INSERT INTO dispatch_records (
                         partner_name, destination_zone, chargeable_weight, 
-                        basic_freight, fuel_charge, fov_charge, oda_charge, 
+                        basic_freight, fuel_charge, fov_charge, oda_charge, loading_charge,
                         hamali_detail, hamali_cost, subtotal, dispatch_cost_gst,
                         operator_email
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
@@ -288,6 +288,7 @@ class PostgresRepository:
                     record.get("partner_name"), record.get("destination_zone"),
                     record.get("chargeable_weight"), record.get("basic_freight"), record.get("fuel_charge"),
                     record.get("fov_charge"), record.get("oda_charge"), 
+                    record.get("loading_charge", 0),
                     record.get("hamali_detail", ""), record.get("hamali_cost", 0),
                     record.get("subtotal"), record.get("dispatch_cost_gst"), operator_email
                 ))
@@ -311,10 +312,10 @@ class PostgresRepository:
                     cur.execute("""
                         UPDATE logistics_partners 
                         SET name=%s, partner_link=%s, cft_factor=%s, minimum_weight=%s, minimum_freight_value=%s, 
-                            documentation_charge=%s, fov_percentage=%s, gst_percentage=%s
+                            documentation_charge=%s, fov_percentage=%s, gst_percentage=%s, local_loading_cost=%s, hub_loading_max_cost=%s
                         WHERE id=%s
                     """, (p.name, p.partner_link, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
-                            p.documentation_charge, p.fov_percentage, p.gst_percentage, partner_id))
+                            p.documentation_charge, p.fov_percentage, p.gst_percentage, p.local_loading_cost, p.hub_loading_max_cost, partner_id))
 
                     # 2. THE WIPE - Delete all existing child matrices for this partner
                     cur.execute("DELETE FROM logistics_zones WHERE partner_id=%s", (partner_id,))
@@ -387,10 +388,10 @@ class PostgresRepository:
                     # 1. Create Partner
                     cur.execute("""
                         INSERT INTO logistics_partners (name, partner_link, cft_factor, minimum_weight, minimum_freight_value, 
-                                                        documentation_charge, fov_percentage, gst_percentage)
+                                                        documentation_charge, fov_percentage, gst_percentage, local_loading_cost, hub_loading_max_cost)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                     """, (p.name, p.partner_link, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
-                          p.documentation_charge, p.fov_percentage, p.gst_percentage))
+                          p.documentation_charge, p.fov_percentage, p.gst_percentage, p.local_loading_cost, p.hub_loading_max_cost))
                     
                     row = cur.fetchone()
                     partner_id = row["id"] if row else None
@@ -523,7 +524,8 @@ class PostgresRepository:
                 partner['documentation_charge'] = float(partner.get('documentation_charge') or 0.0)
                 partner['fov_percentage'] = float(partner.get('fov_percentage') or 0.0)
                 partner['gst_percentage'] = float(partner.get('gst_percentage') or 18.0)
-
+                partner["local_loading_cost"] = float(partner.get("local_loading_cost") or 0.0)
+                partner["hub_loading_max_cost"] = float(partner.get("hub_loading_max_cost") or 0.0)
                 for r in rates: r['rate_per_kg'] = float(r['rate_per_kg'])
                 for f in fuel:
                     f['fuel_price_from'] = float(f['fuel_price_from'])

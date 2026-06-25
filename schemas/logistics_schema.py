@@ -40,6 +40,9 @@ class FullPartnerProfile(BaseModel):
     documentation_charge: float = 0.0
     fov_percentage: float = 0.0
     gst_percentage: float = 18.0
+
+    local_loading_cost: float = 0.0
+    hub_loading_max_cost: float = 0.0
     
     # Nested data arrays
     zones: List[ZoneDef]

@@ -129,7 +129,7 @@ function App() {
                                 </a>
                             )}
 
-                            {isSales && (
+                            {(isSales || isTransporter) && (
                                 <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
                                     <span>🚚</span> 
                                     {!sidebarCollapsed &&(<span>Dispatch Planner</span>)}
@@ -236,7 +236,7 @@ function App() {
                     {isSales && state.activeTab === 'bills-list' && <BillsListView state={state} />}
                     {isSales && state.activeTab === 'bill-new' && <BillEntryFormView state={state} />}
                     {state.activeTab === 'admin-users' && isSuperUser && <AdminUserRegistryView state={state} />}
-                    {isSales && state.activeTab === 'dispatch-planner' && <DispatchPlannerView state={state}/>}
+                    {(isSales || isTransporter) && state.activeTab === 'dispatch-planner' && <DispatchPlannerView state={state}/>}
                     {isFactory && state.activeTab === 'items-master' && <ItemMasterView state={state} />}
                     {isFactory && state.activeTab === "item-detail" && <ItemMasterDetailView state={state}/>}
                     {isFactory && state.activeTab === "item-create" && <ItemMasterCreateView state={state}/>}

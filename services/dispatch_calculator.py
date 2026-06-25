@@ -14,12 +14,8 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         partner_id = partner["id"]
 
         # Step 1: Zone Identification
-        source_state = 'W1'
         destination_city = shipment["destination_city"]
-
-        source_zone = "W1"
         partner_zones_data = EDBR.get_partner_zones(partner_id)
-
         destination_zone = classify_city_zone(destination_city, partner_zones_data["zones"])
 
         debug["destination_city"] = destination_city
@@ -38,13 +34,12 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         width = float(shipment["width"])
         height = float(shipment["height"])
         depth = float(shipment["depth"])
-        gross_weight = float(shipment["weight"])
 
         cubic_feet = (width * height * depth) / 1728
         volumetric_weight = (cubic_feet * float(partner["cft_factor"]))
 
         # Step 4: Chargeable Weight Logic
-        chargeable_weight = max(gross_weight, volumetric_weight, float(partner["minimum_weight"]))
+        chargeable_weight = max(volumetric_weight, float(partner["minimum_weight"]))
         basic_freight = (chargeable_weight * float(rate))
         basic_freight = max(basic_freight, float(partner["minimum_freight_value"]))
 
@@ -56,13 +51,35 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         fov_charge = (float(shipment["invoice_value"]) * float(partner["fov_percentage"]) / 100)
         partner_distances = shipment.get("partner_distances", {})
         distance = float(partner_distances.get(str(partner["id"]), partner_distances.get(partner["id"], 0)))
-
+        
+        delivery_type = shipment.get("delivery_type", "door")
+        distance = 0
+        if delivery_type == "door":
+            partner_distances = shipment.get("partner_distances", {})
+            distance = float(partner_distances.get(str(partner["id"]), partner_distances.get(partner["id"], 0)))
+        
         oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
-        print("ODA charge: ", oda_charge)
+        
+        loading_type = shipment.get("loading_type", "local")
+        loading_charge = 0.0
+        
+        if loading_type == "local":
+            loading_charge = float(partner.get("local_loading_cost", 100000000))
+        elif loading_type == "hub":
+            user_hub_input = float(shipment.get("hub_loading_input", 100000000000000000000))
+            max_hub_cost = float(partner.get("hub_loading_max_cost", 10000000000000000000000000000))
+            
+            # If max cost is defined (>0), cap it. Otherwise, use user input raw.
+            if max_hub_cost > 0:
+                loading_charge = min(user_hub_input, max_hub_cost)
+            else:
+                loading_charge = user_hub_input
+
+
         hamali_cost = float(shipment.get("hamali_cost", 0))
         hamali_detail = shipment.get("hamali_detail", "")
 
-        subtotal = (basic_freight + fuel_charge + fov_charge + oda_charge + float(partner["documentation_charge"]) + hamali_cost)
+        subtotal = (basic_freight + fuel_charge + fov_charge + oda_charge + loading_charge + float(partner["documentation_charge"]) + hamali_cost)
 
         total = subtotal * (1 + float(partner["gst_percentage"]) / 100)
 
@@ -75,6 +92,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
             "chargeable_weight": round(chargeable_weight, 2),
             "basic_freight": round(basic_freight, 2),
             "fuel_charge": round(fuel_charge, 2),
+            "loading_charge": round(loading_charge, 2),
             "documentation_charge": round(partner["documentation_charge"], 2),
             "fov_charge": round(fov_charge, 2),
             "oda_charge": round(oda_charge, 2),
