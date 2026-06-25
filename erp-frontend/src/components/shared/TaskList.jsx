@@ -1,6 +1,6 @@
 import React from "react";
 import TaskCard from "./TaskCard";
-export default function TaskList({ tasks, viewTab, expandedTaskId, setExpandedTaskId, state}) {
+export default function TaskList({ tasks, viewTab, expandedTaskId, setExpandedTaskId, state, handleFileAction}) {
     if (tasks.length === 0) {
         return (
         <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>Queue clear. No pending operations logged here.</div>

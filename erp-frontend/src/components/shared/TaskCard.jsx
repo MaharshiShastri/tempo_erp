@@ -1,7 +1,7 @@
 import React from "react";
 
 // NEW: Accept handleFileAction from props
-export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTaskId, state, handleFileAction}) {
+export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTaskId, handleFileAction, state}) {
     const getUserName = (email) => {
         const userMatch = state.systemUsers?.find(u => u.email === email);
         return userMatch ? userMatch.name : email; 
