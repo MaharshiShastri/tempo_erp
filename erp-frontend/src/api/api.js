@@ -552,6 +552,47 @@ const API = {
     if (!r.ok) throw new Error("Simulation failed.");
     return r.json();
   },
+  async uploadLeadTargets(formData, token){
+
+    const r = await fetch(
+        "/api/v1/lead-engine/upload",
+        {
+            method:"POST",
+            headers:{
+                Authorization:`Bearer ${token}`
+            },
+            body:formData
+        }
+    );
+
+    if(!r.ok){
+
+        const err = await r.json();
+
+        throw new Error(err.detail);
+
+    }
+
+    return r.json();
+
+  },
+  async bulkUploadLeadTargets(formData, token) {
+    const r = await fetch("/api/v1/lead-engine/bulk-targets", {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`
+        },
+        body: formData,
+    });
+
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "Bulk upload failed.");
+    }
+
+    return r.json();
+  },
+  
 };
 
 export default API;

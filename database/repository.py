@@ -1143,5 +1143,37 @@ class PostgresRepository:
                     ))
                 conn.commit()
                 return True
+    def bulk_insert_targets(self, dataframe, operator_email):
+
+        inserted = 0
+        failed = []
+
+        with self._get_connection() as conn:
+
+            with conn.cursor() as cur:
+
+                for index,row in dataframe.iterrows():
+
+                    company = str(row["Company Name"]).strip()
+
+                    domain = str(row["Domain"]).strip().lower()
+
+                    try:
+
+                        cur.execute("""INSERT INTO lead_targets(company_name, domain, requested_by)
+                            VALUES (%s,%s,%s)""",
+                            (company, domain, operator_email)
+                        )
+
+                        inserted += 1
+
+                    except Exception as e:
+
+                        failed.append({"row": index + 2, "company": company, "reason": str(e)})
+
+                conn.commit()
+
+        return {"inserted": inserted, "failed": failed, "total": len(dataframe)}
+    
     # --- LEAD GENERATOR ENGINE end ---
 EDBR = PostgresRepository()

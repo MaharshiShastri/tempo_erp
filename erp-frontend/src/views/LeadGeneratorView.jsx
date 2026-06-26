@@ -8,7 +8,9 @@ export default function LeadGeneratorView({ state }) {
     const [expandedTargetId, setExpandedTargetId] = useState(null);
     const [contactsCache, setContactsCache] = useState({});
     const [isLoading, setIsLoading] = useState(false);
-
+    const [file, setFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const isBulkMode = !!file;
     useEffect(() => {
         loadTargets();
     }, []);
@@ -24,11 +26,15 @@ export default function LeadGeneratorView({ state }) {
 
     const handleTargetSubmit = async (e) => {
         e.preventDefault();
-        if (!domain.includes('.')) {
-            state.showErrorModal("Validation Error", "Please enter a valid domain (e.g., reliance.com).");
+        if (file) {
+            state.showErrorModal("Validation Error", "Please use 'Upload Excel' for bulk input. Clear file to use manual entry.");
             return;
         }
 
+        if (!companyName || !domain.includes('.')) {
+            state.showErrorModal("Validation Error", "Please enter both company name and valid domain.");
+            return;
+        }
         setIsLoading(true);
         try {
             await API.submitLeadTarget({ company_name: companyName, domain }, state.user.access_token);
@@ -65,7 +71,21 @@ export default function LeadGeneratorView({ state }) {
             }
         }
     };
+    
+    const downloadSampleFile = () => {
+        const csvContent = "company_name,domain\n";
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
 
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.setAttribute("href", url);
+        link.setAttribute("download", "lead_targets_sample.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+    
     const handleMockSync = async (e, targetId) => {
         e.stopPropagation(); // Prevent accordion from toggling
         try {
@@ -79,7 +99,29 @@ export default function LeadGeneratorView({ state }) {
             state.showErrorModal("Simulation Failed", err.message);
         }
     };
+  
+    const handleBulkUpload = async () => {
+        if (!file) {
+            state.showErrorModal("Validation Error", "Please select an Excel/CSV file.");
+            return;
+        }
 
+        setUploading(true);
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            await API.bulkUploadLeadTargets(formData, state.user.access_token);
+            setFile(null);
+            await loadTargets();
+            state.setAlertMessage("📊 Bulk upload successful. Targets queued.");
+            state.setIsAlertOpen(true);
+        } catch (err) {
+            state.showErrorModal("Bulk Upload Failed", err.message);
+        } finally {
+            setUploading(false);
+        }
+    };
     return (
         <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 25 }}>
             <div className="system-header" style={{ marginBottom: "20px" }}>
@@ -93,17 +135,30 @@ export default function LeadGeneratorView({ state }) {
             <form onSubmit={handleTargetSubmit} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "30px", border: "1px solid var(--border-light)" }}>
                 <h4 style={{ margin: "0 0 15px 0", fontSize: "14px" }}>Queue New Corporate Target</h4>
                 <div className="form-grid-layout" style={{ gridTemplateColumns: "2fr 2fr auto", alignItems: "end" }}>
+                    
                     <div className="form-group">
                         <label className="input-label">Company Name *</label>
                         <input type="text" required className="form-input" placeholder="e.g. Tata Motors" value={companyName} onChange={e => setCompanyName(e.target.value)} />
                     </div>
+                    
                     <div className="form-group">
                         <label className="input-label">Corporate Domain *</label>
                         <input type="text" required className="form-input" placeholder="e.g. tatamotors.com" value={domain} onChange={e => setDomain(e.target.value)} />
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={isLoading} style={{ padding: "10px 20px" }}>
+                    
+                    <div className="form-group">
+                        <label className="input-label">Upload Excel (Bulk Targets)</label>
+                        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files[0])} className="form-input" onChange={(e) => {setFile(e.target.files[0]); setCompanyName(""); setDomain("");}}/>
+                    </div>
+                    
+                    <button type="button" onClick={handleBulkUpload} className="btn btn-secondary" disabled={uploading} style={{background: "var(--bg-main)", justifyContent: "center", alignItems: "center"}}>
+                        {uploading ? "Uploading..." : "Upload Excel"}
+                    </button>
+
+                    <button type="submit" disabled={isLoading || isBulkMode} className="btn btn-primary" disabled={isLoading} style={{ padding: "10px 20px", justifyContent: "center", alignItems: "center"}}>
                         {isLoading ? "Queueing..." : "Add to Night Queue"}
                     </button>
+                    <button type="button" onClick={downloadSampleFile} className="bt btn-text" style={{fontSize: "12px", whiteSpace: "nowrap"}}>⬇ Download Sample</button>
                 </div>
             </form>
 
