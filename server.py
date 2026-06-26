@@ -22,6 +22,7 @@ from routers.crm_router import router as crm_router
 from routers.wms_router import router as wms_router
 from routers.company_router import router as company_router
 from routers.tally_router import router as tally_router
+from routers.lead_engine_router import router as lead_engine_router
 
 app = FastAPI(title="Tempo Instruments ERP - Decoupled Enterprise Solution")
 
@@ -71,6 +72,7 @@ app.include_router(crm_router)
 app.include_router(wms_router)
 app.include_router(company_router)
 app.include_router(tally_router)
+app.include_router(lead_engine_router)
 
 BASE_DIR = Path(__file__).resolve().parent
 

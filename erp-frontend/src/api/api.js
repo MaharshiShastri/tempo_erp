@@ -518,6 +518,40 @@ const API = {
     
     return r.json();
   },
+  // --- LEAD ENGINE API ---
+  async submitLeadTarget(payload, token) {
+    const r = await fetch("/api/v1/lead-engine/target", {
+      method: "POST",
+      headers: this.headers(token),
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "Failed to submit target.");
+    }
+    return r.json();
+  },
+
+  async fetchLeadTargets(token) {
+    const r = await fetch("/api/v1/lead-engine/targets", { headers: this.headers(token) });
+    if (!r.ok) throw new Error("Failed to fetch targets.");
+    return r.json();
+  },
+
+  async fetchLeadContacts(targetId, token) {
+    const r = await fetch(`/api/v1/lead-engine/targets/${targetId}/contacts`, { headers: this.headers(token) });
+    if (!r.ok) throw new Error("Failed to fetch contacts.");
+    return r.json();
+  },
+
+  async simulateOvernightSync(targetId, token) {
+    const r = await fetch(`/api/v1/lead-engine/targets/${targetId}/simulate-sync`, {
+      method: "POST",
+      headers: this.headers(token)
+    });
+    if (!r.ok) throw new Error("Simulation failed.");
+    return r.json();
+  },
 };
 
 export default API;

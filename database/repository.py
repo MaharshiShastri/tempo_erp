@@ -1065,5 +1065,83 @@ class PostgresRepository:
 
                 return cur.fetchall()
     # --- Companies END ---
-    
+    # --- LEAD GENERATOR ENGINE start ---
+    def request_lead_target(self, company_name: str, domain: str, operator_email: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO lead_targets (company_name, domain, requested_by)
+                    VALUES (%s, %s, %s) RETURNING *
+                """, (company_name.strip(), domain.strip().lower(), operator_email))
+                conn.commit()
+                
+                target = cur.fetchone()
+                target['created_at'] = target['created_at'].isoformat()
+                return target
+
+    def get_lead_targets(self, operator_email: str = None, role: str = "Admin"):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Admins see all targets, Sales reps see their own
+                if role in ["Admin", "Chief Full Stack Developer"]:
+                    cur.execute("SELECT * FROM lead_targets ORDER BY created_at DESC")
+                else:
+                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s ORDER BY created_at DESC", (operator_email,))
+                
+                targets = cur.fetchall()
+                for t in targets:
+                    t['created_at'] = t['created_at'].isoformat()
+                return targets
+
+    def get_lead_contacts(self, target_id: int):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Prioritize roles logically during retrieval
+                cur.execute("""
+                    SELECT * FROM lead_contacts 
+                    WHERE target_id = %s 
+                    ORDER BY is_priority DESC, full_name ASC
+                """, (target_id,))
+                
+                contacts = cur.fetchall()
+                for c in contacts:
+                    c['created_at'] = c['created_at'].isoformat()
+                return contacts
+
+    def mock_overnight_sync(self, target_id: int):
+        """MOCKS the overnight API fetch. In production, an external script calls an API and inserts here."""
+        import random
+        
+        roles = [
+            ("Purchase Manager", True), ("QA/QC Head", True), ("Production Supervisor", True), 
+            ("Procurement Executive", True), ("Marketing Associate", False), ("HR Manager", False), 
+            ("Software Engineer", False), ("Accounts Payable", False)
+        ]
+        
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Update status to completed
+                cur.execute("UPDATE lead_targets SET status = 'Completed' WHERE id = %s RETURNING company_name, domain", (target_id,))
+                target = cur.fetchone()
+                
+                if not target: return False
+                
+                domain = target['domain']
+                
+                # Generate 3 to 8 mock contacts
+                for i in range(random.randint(3, 8)):
+                    role, is_priority = random.choice(roles)
+                    cur.execute("""
+                        INSERT INTO lead_contacts (target_id, full_name, designation, email, is_priority)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (
+                        target_id, 
+                        f"Mock User {i+1}", 
+                        role, 
+                        f"user{i+1}@{domain}", 
+                        is_priority
+                    ))
+                conn.commit()
+                return True
+    # --- LEAD GENERATOR ENGINE end ---
 EDBR = PostgresRepository()

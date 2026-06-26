@@ -23,6 +23,7 @@ import GRN_WorkspaceView from "./views/GRN_WorkspaceView";
 import ActivityDashboardView from "./views/ActivityDashboardView";
 import ItemMasterUploadView from "./views/ItemMasterUploadView";
 import TallySyncView from "./views/TallySyncView";
+import LeadGeneratorView from "./views/LeadGeneratorView";
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 import ErrorModal from "./components/shared/ErrorModal";
@@ -31,6 +32,7 @@ function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('erp-theme', theme);
@@ -63,15 +65,31 @@ function App() {
     const isTransporter = state.user?.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' ;
 
     useEffect(() => {
-        const handleError = (event) => { 
-            state.showErrorModal("Application Error", event.error?.message || event.message);
+        // Helper to detect 401s regardless of how the fetch API or backend structures the error
+        const isUnauthorized = (err) => {
+            if (!err) return false;
+            const status = err.status || err.statusCode;
+            const msg = (err.message || String(err)).toLowerCase();
+            return status === 401 || status === "401" || msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid token");
+        };
 
+        const handleError = (event) => { 
+            if (isUnauthorized(event.error)) {
+                localStorage.removeItem("tempo_erp_user");
+                window.location.reload();
+                return;
+            }
+            state.showErrorModal("Application Error", event.error?.message || event.message);
             console.error(event.error);
         };
 
         const handleRejection = (event) => {
+            if (isUnauthorized(event.reason)) {
+                localStorage.removeItem("tempo_erp_user");
+                window.location.reload();
+                return;
+            }
             state.showErrorModal("Unhandled Promise Rejection", event.reason?.message || String(event.reason));
-
             console.error(event.reason);
         };
 
@@ -83,7 +101,7 @@ function App() {
             window.removeEventListener("unhandledrejection", handleRejection);
         };
     }, []);
-    
+
     return (
         <div className="frappe-layout">
             <ErrorModal isOpen={state.errorModalOpen} title={state.errorModal.title} message={state.errorModal.message} onClose={() => state.setErrorModalOpen(false)}/>
@@ -161,6 +179,13 @@ function App() {
                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+W</span>
                                 </a>
                             )}
+                            {isSales && (
+                                <a href="#lead-generation" className={`menu-item ${state.activeTab === 'lead-generation' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('lead-generation')}}>
+                                    <span>🏭</span>
+                                    {!sidebarCollapsed && (<span>Lead Generator Engine</span>)}
+                                    <span style={{fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto'}}>Alt+E</span>
+                                </a>
+                            )}
                         </div>
                     )}
                     
@@ -186,7 +211,7 @@ function App() {
                                 <span><FiPackage /></span>
                                 {!sidebarCollapsed && <span>GRN Workspace</span>}
                                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>
-                                    Alt+G
+                                    Alt+R
                                 </span>
                             </a>
 
@@ -206,10 +231,11 @@ function App() {
                                 {!sidebarCollapsed && (<span>Team Management</span>)}
                                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+M</span>
                             </a>
-                            <a href="#admin" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={() => state.setActiveTab('tally-sync')}>
-                                <span>🛡️</span> 
+                            <a href="#tally" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-sync')}}>
+                                {/* Stylized Tally "T" Icon */}
+                                <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
                                 {!sidebarCollapsed && (<span>Fetch Tally data</span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+M</span>
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
                             </a>
                         </div>
                         
@@ -242,7 +268,7 @@ function App() {
                     {isSales && state.activeTab === 'order-new' && <OrderEntryFormView state={state} />}
                     {isSales && state.activeTab === 'bills-list' && <BillsListView state={state} />}
                     {isSales && state.activeTab === 'bill-new' && <BillEntryFormView state={state} />}
-                    {state.activeTab === 'admin-users' && isSuperUser && <AdminUserRegistryView state={state} />}
+                    {isSuperUser && state.activeTab === 'admin-users' && <AdminUserRegistryView state={state} />}
                     {(isSales || isTransporter) && state.activeTab === 'dispatch-planner' && <DispatchPlannerView state={state}/>}
                     {isFactory && state.activeTab === 'items-master' && <ItemMasterView state={state} />}
                     {isFactory && state.activeTab === "item-detail" && <ItemMasterDetailView state={state}/>}
@@ -252,7 +278,8 @@ function App() {
                     {isSales && state.activeTab === 'crm-workspace' && <CRM_WorkspaceView state={state} />}
                     {isFactory && state.activeTab === 'grn-workspace' && (<GRN_WorkspaceView state={state} />)}
                     {isFactory && state.activeTab === 'items-upload' && <ItemMasterUploadView state={state} />}
-                    {state.activeTab === 'tally-sync' && <TallySyncView state={state}/>}
+                    {isSuperUser && state.activeTab === 'tally-sync' && <TallySyncView state={state}/>}
+                    {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
                 </div>
             </div>
 
