@@ -592,7 +592,45 @@ const API = {
 
     return r.json();
   },
-  
+  async updateLeadTarget(targetId, payload, token) {
+    const r = await fetch(`/api/v1/lead-engine/targets/${targetId}`, {
+        method: "PUT",
+        headers: this.headers(token),
+        body: JSON.stringify(payload),
+    });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async deleteLeadTarget(targetId, token) {
+    const r = await fetch(`/api/v1/lead-engine/targets/${targetId}`, {
+        method: "DELETE",
+        headers: this.headers(token),
+    });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async deactivateLeadTarget(targetId, token){
+    const r = await fetch(`/api/v1/lead-engine/target/${targetId}`, {
+        method: "DELETE",
+        headers: this.headers(token),
+    });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+  async fetchSalesKPIs(token) {
+    const r = await fetch("/api/v1/analytics/sales", { headers: this.headers(token) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async fetchTransportKPIs(token) {
+    const r = await fetch("/api/v1/analytics/transport", { headers: this.headers(token) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
 };
 
 export default API;

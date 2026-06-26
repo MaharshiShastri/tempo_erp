@@ -24,6 +24,7 @@ import ActivityDashboardView from "./views/ActivityDashboardView";
 import ItemMasterUploadView from "./views/ItemMasterUploadView";
 import TallySyncView from "./views/TallySyncView";
 import LeadGeneratorView from "./views/LeadGeneratorView";
+import SalesAnalyticsView from "./views/SalesAnalyticsView";
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 import ErrorModal from "./components/shared/ErrorModal";
@@ -237,6 +238,12 @@ function App() {
                                 {!sidebarCollapsed && (<span>Fetch Tally data</span>)}
                                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
                             </a>
+                            <a href="#analytics" className={`menu-item ${state.activeTab === 'sales-analytics' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('sales-analytics'); }}>
+                                <span>📊</span> 
+                                {!sidebarCollapsed && (<span>Sales Analytics</span>)}
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+S</span>
+                            </a>
+
                         </div>
                         
                     )}
@@ -280,6 +287,7 @@ function App() {
                     {isFactory && state.activeTab === 'items-upload' && <ItemMasterUploadView state={state} />}
                     {isSuperUser && state.activeTab === 'tally-sync' && <TallySyncView state={state}/>}
                     {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
+                    {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
                 </div>
             </div>
 

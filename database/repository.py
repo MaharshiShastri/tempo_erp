@@ -1086,7 +1086,7 @@ class PostgresRepository:
                 if role in ["Admin", "Chief Full Stack Developer"]:
                     cur.execute("SELECT * FROM lead_targets ORDER BY created_at DESC")
                 else:
-                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s ORDER BY created_at DESC", (operator_email,))
+                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s AND active = TRUE ORDER BY created_at DESC", (operator_email,))
                 
                 targets = cur.fetchall()
                 for t in targets:
@@ -1099,7 +1099,7 @@ class PostgresRepository:
                 # Prioritize roles logically during retrieval
                 cur.execute("""
                     SELECT * FROM lead_contacts 
-                    WHERE target_id = %s 
+                    WHERE target_id = %s AND active=TRUE
                     ORDER BY is_priority DESC, full_name ASC
                 """, (target_id,))
                 
@@ -1175,5 +1175,94 @@ class PostgresRepository:
 
         return {"inserted": inserted, "failed": failed, "total": len(dataframe)}
     
+    def update_lead_target(self, target_id: int, company_name: str, domain: str, user_email: str, user_role: str):
+            with self._get_connection() as conn:
+                with conn.cursor() as cur:
+                    if user_role in ['Admin', 'Chief Full Stack Developer']:
+                        cur.execute("UPDATE lead_targets SET company_name=%s, domain=%s WHERE id=%s RETURNING *", 
+                                    (company_name.strip(), domain.strip().lower(), target_id))
+                    else:
+                        cur.execute("UPDATE lead_targets SET company_name=%s, domain=%s WHERE id=%s AND requested_by=%s RETURNING *", 
+                                    (company_name.strip(), domain.strip().lower(), target_id, user_email))
+                    
+                    updated = cur.fetchone()
+                    if not updated:
+                        raise ValueError("Target not found or unauthorized.")
+                    conn.commit()
+                    return updated
+                
+    def delete_lead_target(self, target_id: int, user_email: str, user_role: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                if user_role in ['Admin', 'Chief Full Stack Developer']:
+                    cur.execute("DELETE FROM lead_targets WHERE id=%s RETURNING id", (target_id,))
+                else:
+                    cur.execute("DELETE FROM lead_targets WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
+                
+                deleted = cur.fetchone()
+                if not deleted:
+                    raise ValueError("Target not found or unauthorized.")
+                conn.commit()
+                return deleted
+    def deactivate_lead_target(self, target_id: int, user_email: str, user_role: str):
+        # SOFT DELETE: Updates status to 'Inactive' instead of dropping the row
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE lead_targets SET active=FALSE WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
+                
+                deactivated = cur.fetchone()
+                if not deactivated:
+                    raise ValueError("Target not found or unauthorized.")
+                conn.commit()
+                return deactivated
+            
     # --- LEAD GENERATOR ENGINE end ---
+    # --- SALES ANALYTICS & KPIs start ---
+    def get_sales_kpis(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Added 'targets_inactive' count
+                cur.execute("""
+                    SELECT 
+                        u.email, 
+                        u.name,
+                        u.role,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status != 'Inactive') as targets_queued,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Completed') as targets_harvested,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactive') as targets_inactive,
+                        (SELECT COUNT(*) FROM crm_leads WHERE assigned_to = u.email) as total_crm_leads,
+                        (SELECT COUNT(*) FROM dispatch_records WHERE operator_email = u.email) as dispatches_logged
+                    FROM users u
+                    WHERE u.role IN ('Sales Representative')
+                    ORDER BY targets_queued DESC
+                """)
+                return cur.fetchall()
+
+    def get_transport_kpis(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # 1. Get Total Active Partners
+                cur.execute("SELECT COUNT(id) as total_partners FROM logistics_partners")
+                total_partners = cur.fetchone()['total_partners']
+                
+                # 2. Get Monthly Spend Grouped by Month/Year
+                cur.execute("""
+                    SELECT 
+                        TO_CHAR(created_at, 'YYYY-MM') as month_period,
+                        COUNT(id) as total_dispatches,
+                        SUM(dispatch_cost_gst) as total_cost
+                    FROM dispatch_records
+                    GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+                    ORDER BY month_period DESC
+                """)
+                monthly_costs = cur.fetchall()
+                
+                # Ensure JSON float serialization
+                for row in monthly_costs:
+                    row['total_cost'] = float(row['total_cost'] or 0.0)
+
+                return {
+                    "total_partners": total_partners,
+                    "monthly_costs": monthly_costs
+                }        
 EDBR = PostgresRepository()

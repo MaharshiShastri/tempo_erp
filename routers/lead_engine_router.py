@@ -66,3 +66,31 @@ async def bulk_upload_targets(file: UploadFile = File(...), user: dict = Depends
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+@router.put("/targets/{target_id}", dependencies=[Depends(check_department("Sales Representative"))])
+def update_target(target_id: int, payload: TargetPayload, user: dict = Depends(verify_bearer_token)):
+    try:
+        return EDBR.update_lead_target(target_id, payload.company_name, payload.domain, user["email"], user["role"])
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/targets/{target_id}", dependencies=[Depends(check_department("Admin"))])
+def delete_target(target_id: int, user: dict = Depends(verify_bearer_token)):
+    try:
+        EDBR.delete_lead_target(target_id, user["email"], user["role"])
+        return {"status": "success", "message": "Target deleted."}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@router.delete("/target/{target_id}", dependencies=[Depends(check_department("Sales Representative"))])
+def deactivate_target(target_id: int, user: dict = Depends(verify_bearer_token)):
+    try:
+        EDBR.deactivate_lead_target(target_id, user["email"], user["role"])
+        return {"status": "success", "message": "Target marked as Inactive."}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
