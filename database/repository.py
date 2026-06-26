@@ -1069,10 +1069,11 @@ class PostgresRepository:
     def request_lead_target(self, company_name: str, domain: str, operator_email: str):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
+                safe_domain = domain.strip().lower() if domain else ""
                 cur.execute("""
                     INSERT INTO lead_targets (company_name, domain, requested_by)
                     VALUES (%s, %s, %s) RETURNING *
-                """, (company_name.strip(), domain.strip().lower(), operator_email))
+                """, (company_name.strip(), safe_domain, operator_email))
                 conn.commit()
                 
                 target = cur.fetchone()
@@ -1086,7 +1087,7 @@ class PostgresRepository:
                 if role in ["Admin", "Chief Full Stack Developer"]:
                     cur.execute("SELECT * FROM lead_targets ORDER BY created_at DESC")
                 else:
-                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s AND active = TRUE ORDER BY created_at DESC", (operator_email,))
+                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s AND status != Inactives ORDER BY created_at DESC", (operator_email,))
                 
                 targets = cur.fetchall()
                 for t in targets:
@@ -1099,7 +1100,7 @@ class PostgresRepository:
                 # Prioritize roles logically during retrieval
                 cur.execute("""
                     SELECT * FROM lead_contacts 
-                    WHERE target_id = %s AND active=TRUE
+                    WHERE target_id = %s AND status!=Inactives
                     ORDER BY is_priority DESC, full_name ASC
                 """, (target_id,))
                 
@@ -1178,12 +1179,13 @@ class PostgresRepository:
     def update_lead_target(self, target_id: int, company_name: str, domain: str, user_email: str, user_role: str):
             with self._get_connection() as conn:
                 with conn.cursor() as cur:
+                    safe_domain = domain.strip().lower() if domain else ""
                     if user_role in ['Admin', 'Chief Full Stack Developer']:
                         cur.execute("UPDATE lead_targets SET company_name=%s, domain=%s WHERE id=%s RETURNING *", 
-                                    (company_name.strip(), domain.strip().lower(), target_id))
+                                    (company_name.strip(), safe_domain, target_id))
                     else:
                         cur.execute("UPDATE lead_targets SET company_name=%s, domain=%s WHERE id=%s AND requested_by=%s RETURNING *", 
-                                    (company_name.strip(), domain.strip().lower(), target_id, user_email))
+                                    (company_name.strip(), safe_domain, target_id, user_email))
                     
                     updated = cur.fetchone()
                     if not updated:
@@ -1191,13 +1193,13 @@ class PostgresRepository:
                     conn.commit()
                     return updated
                 
-    def delete_lead_target(self, target_id: int, user_email: str, user_role: str):
+    def delete_lead_target(self, target_id: int, user_role: str):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 if user_role in ['Admin', 'Chief Full Stack Developer']:
                     cur.execute("DELETE FROM lead_targets WHERE id=%s RETURNING id", (target_id,))
                 else:
-                    cur.execute("DELETE FROM lead_targets WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
+                    raise ValueError("Unauthorized action.")
                 
                 deleted = cur.fetchone()
                 if not deleted:
@@ -1208,7 +1210,7 @@ class PostgresRepository:
         # SOFT DELETE: Updates status to 'Inactive' instead of dropping the row
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE lead_targets SET active=FALSE WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
+                cur.execute("UPDATE lead_targets SET status=FALSE WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
                 
                 deactivated = cur.fetchone()
                 if not deactivated:

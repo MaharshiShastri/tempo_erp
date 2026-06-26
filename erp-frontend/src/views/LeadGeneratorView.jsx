@@ -34,7 +34,7 @@ export default function LeadGeneratorView({ state }) {
             state.showErrorModal("Validation Error", "Please use 'Upload Excel' for bulk input. Clear file to use manual entry.");
             return;
         }
-        if (!companyName || !domain.includes('.')) {
+        if (!companyName.trim()) {
             state.showErrorModal("Validation Error", "Please enter both company name and valid domain.");
             return;
         }
@@ -206,6 +206,10 @@ export default function LeadGeneratorView({ state }) {
                                             )}
                                         </div>
                                         
+                                        {state.user.role === state.user.role === 'Chief Full Stack Developer' || state.user.role === 'Admin' && (
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>{target.requested_by.split('@')[0]}</span>
+                                        )}
+
                                         {/* Right Side: Actions */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                             {isEditing ? (
