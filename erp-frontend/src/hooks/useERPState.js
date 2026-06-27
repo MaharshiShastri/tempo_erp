@@ -9,7 +9,7 @@ export default function useERPState() {
         return cache ? JSON.parse(cache) : null;
     });
 
-    const [activeTab, setActiveTab] = useState('orders-list');
+    const [activeTab, setActiveTab] = useState('');
     const [orders, setOrders] = useState([]);
     const [bills, setBills] = useState([]);
     const [tasks, setTasks] = useState([]); 

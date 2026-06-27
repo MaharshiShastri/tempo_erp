@@ -207,7 +207,7 @@ export default function LeadGeneratorView({ state }) {
                                         </div>
                                         
                                         {state.user.role === state.user.role === 'Chief Full Stack Developer' || state.user.role === 'Admin' && (
-                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>{target.requested_by.split('@')[0]}</span>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>{state.user.email == target.requested_by ? state.user.name : target.requested_by.split('@')[0]}</span>
                                         )}
 
                                         {/* Right Side: Actions */}

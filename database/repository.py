@@ -1087,7 +1087,7 @@ class PostgresRepository:
                 if role in ["Admin", "Chief Full Stack Developer"]:
                     cur.execute("SELECT * FROM lead_targets ORDER BY created_at DESC")
                 else:
-                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s AND status != Inactives ORDER BY created_at DESC", (operator_email,))
+                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s AND status <> 'Inactives' ORDER BY created_at DESC", (operator_email,))
                 
                 targets = cur.fetchall()
                 for t in targets:
@@ -1100,7 +1100,7 @@ class PostgresRepository:
                 # Prioritize roles logically during retrieval
                 cur.execute("""
                     SELECT * FROM lead_contacts 
-                    WHERE target_id = %s AND status!=Inactives
+                    WHERE target_id = %s AND status<>'Inactives'
                     ORDER BY is_priority DESC, full_name ASC
                 """, (target_id,))
                 
@@ -1210,7 +1210,7 @@ class PostgresRepository:
         # SOFT DELETE: Updates status to 'Inactive' instead of dropping the row
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE lead_targets SET status=FALSE WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
+                cur.execute("UPDATE lead_targets SET status='Inactivates' WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
                 
                 deactivated = cur.fetchone()
                 if not deactivated:
@@ -1229,9 +1229,9 @@ class PostgresRepository:
                         u.email, 
                         u.name,
                         u.role,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status != 'Inactive') as targets_queued,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactives') as targets_queued,
                         (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Completed') as targets_harvested,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactive') as targets_inactive,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactives') as targets_inactive,
                         (SELECT COUNT(*) FROM crm_leads WHERE assigned_to = u.email) as total_crm_leads,
                         (SELECT COUNT(*) FROM dispatch_records WHERE operator_email = u.email) as dispatches_logged
                     FROM users u
