@@ -42,7 +42,7 @@ def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token))
     print(identified_zones)
     return identified_zones
 """
-@router.post("/evaluate", dependencies=[Depends(check_department("Sales Representative"))])
+@router.post("/evaluate")
 def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
     evaluation_session = { "started": True, "options": [], "failed_providers": 0 }
     print("User ", user['email'], "tried accessing the /evaluate.")

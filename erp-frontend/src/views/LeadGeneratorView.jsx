@@ -18,7 +18,7 @@ export default function LeadGeneratorView({ state }) {
     const [editForm, setEditForm] = useState({ company_name: "", domain: "" });
 
     const isBulkMode = !!file;
-
+    console.log(state.user.name);
     useEffect(() => { loadTargets(); }, []);
 
     const loadTargets = async () => {
