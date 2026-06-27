@@ -143,6 +143,7 @@ export default function AdminUserRegistryView({ state }) {
                             <option value="Admin">System Administrator</option>
                             <option value="Shop Floor Worker">Shop Floor Worker</option>
                             <option value="Shop Floor Administrator">Shop Floor Administrator</option>
+                            <option value="R&D Engineer"> R&D Engineer</option>
                         </select>
                     </div>
                     <div className="form-group">

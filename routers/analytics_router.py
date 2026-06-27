@@ -23,3 +23,12 @@ def get_transport_kpis(user: dict = Depends(verify_bearer_token)):
         return EDBR.get_transport_kpis()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/rnd", tags=["Admin Only"])
+def get_rnd_kpis(user: dict = Depends(verify_bearer_token)):
+    if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:
+        raise HTTPException(status_code=403, detail="Unauthorized access to KPIs.")
+    try:
+        return EDBR.get_rnd_kpis()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

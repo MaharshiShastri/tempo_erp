@@ -6,23 +6,25 @@ import { jsPDF } from "jspdf";
 
 export default function SalesAnalyticsView({ state }) {
     const [salesKpis, setSalesKpis] = useState([]);
+    const [rndKpis, setRndKpis] = useState([]);
     const [transportKpis, setTransportKpis] = useState({ total_partners: 0, monthly_costs: [] });
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("overview");
     const [isExporting, setIsExporting] = useState(false);
     
-    // Reference to the main dashboard container for the PDF snapshot
     const dashboardRef = useRef(null);
 
     useEffect(() => {
         const fetchAllKPIs = async () => {
             try {
-                const [salesData, transportData] = await Promise.all([
+                const [salesData, transportData, rndData] = await Promise.all([
                     API.fetchSalesKPIs(state.user.access_token),
-                    API.fetchTransportKPIs(state.user.access_token)
+                    API.fetchTransportKPIs(state.user.access_token),
+                    API.fetchRnDKPIs(state.user.access_token) // NEW
                 ]);
                 setSalesKpis(salesData);
                 setTransportKpis(transportData);
+                setRndKpis(rndData); // NEW
             } catch (err) {
                 state.showErrorModal("Analytics Error", err.message);
             } finally {
@@ -34,30 +36,24 @@ export default function SalesAnalyticsView({ state }) {
 
     const handleExportPDF = async () => {
         if (!dashboardRef.current) return;
-        
         setIsExporting(true);
         state.setAlertMessage("📸 Capturing high-resolution snapshot for PDF...");
         state.setIsAlertOpen(true);
 
         try {
             const element = dashboardRef.current;
-            
-            // Capture the DOM element as a high-res canvas
             const canvas = await html2canvas(element, {
-                scale: 2, // 2x scale for crisp text
+                scale: 2,
                 useCORS: true,
                 logging: false,
                 backgroundColor: document.documentElement.getAttribute('data-theme') === 'dark' ? '#1b1b29' : '#ffffff' 
             });
 
             const imgData = canvas.toDataURL('image/png');
-            
-            // A4 Document settings
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
             
-            // Handle Multi-Page PDFs if the dashboard is long
             let heightLeft = pdfHeight;
             let position = 0;
             const pageHeight = pdf.internal.pageSize.getHeight();
@@ -73,9 +69,7 @@ export default function SalesAnalyticsView({ state }) {
             }
 
             pdf.save(`Executive_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-            
             state.setAlertMessage("✅ PDF Downloaded Successfully.");
-            
         } catch (error) {
             console.error("PDF Export failed:", error);
             state.showErrorModal("PDF Generation Failed", "Could not render the document. " + error.message);
@@ -88,31 +82,46 @@ export default function SalesAnalyticsView({ state }) {
         return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Command Center Data...</div>;
     }
 
-    // Derived Metrics for the Dashboard
     const totalQueued = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.targets_queued || 0), 0);
     const totalHarvested = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.targets_harvested || 0), 0);
     const conversionRatio = totalQueued > 0 ? ((totalHarvested / totalQueued) * 100).toFixed(1) : 0;
     const totalCrmLeads = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.total_crm_leads || 0), 0);
+    const totalFaqsAsked = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.faqs_asked || 0), 0);
 
     return (
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
             
-            {/* Action Bar (Not included in PDF) */}
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "15px" }}>
-                <button 
-                    className="btn btn-primary" 
-                    onClick={handleExportPDF} 
-                    disabled={isExporting}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
-                >
+                <button className="btn btn-primary" onClick={handleExportPDF} disabled={isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}>
                     <FiDownload /> {isExporting ? "Generating PDF..." : "Export to PDF"}
                 </button>
             </div>
 
-            {/* THIS IS THE AREA THAT WILL BE CONVERTED TO PDF */}
             <div ref={dashboardRef} className="frappe-card" style={{ padding: 30, borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-main)' }}>
                 
-                {/* Header */}
+                {/* Print Isolation Styles */}
+                <style>{`
+                    @media print {
+                        body * { visibility: hidden; }
+                        .frappe-card, .frappe-card * { visibility: visible; }
+                        .frappe-card { position: absolute; left: 0; top: 0; width: 100%; padding: 0px; background: white !important;}
+                        .frappe-card {
+                            --bg-main: #ffffff !important;
+                            --bg-surface: #f9f9f9 !important;
+                            --border-light: #dddddd !important;
+                            --border-subtle: #eeeeee !important;
+                            --text-primary: #000000 !important;
+                            --text-muted: #444444 !important;
+                            color: black !important;
+                        }
+                        .no-print { display: none !important; }
+                        .print-header { text-align: center; margin-bottom: 30px; font-size: 20px; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 10px; display: block !important; color: black; }
+                        table { border-collapse: collapse; }
+                        th, td { border: 1px solid #ccc !important; }
+                        .print-section { page-break-inside: avoid; margin-bottom: 30px; }
+                    }
+                `}</style>
+
                 <div style={{ marginBottom: "30px", borderBottom: "1px solid var(--border-light)", paddingBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                     <div>
                         <h2 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '24px' }}>
@@ -127,16 +136,21 @@ export default function SalesAnalyticsView({ state }) {
                     </div>
                 </div>
 
-                {/* Dashboard Tabs (Visually distinct for the report) */}
-                <div style={{ display: "flex", gap: "10px", marginBottom: "25px" }} data-html2canvas-ignore="true">
+                <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "25px" }} data-html2canvas-ignore="true">
                     <button className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('overview')}>General Overview</button>
                     <button className={`btn ${activeTab === 'performance' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('performance')}><FiUsers /> Team Performance</button>
                     <button className={`btn ${activeTab === 'financial' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('financial')}><FiTruck /> Logistics & Financials</button>
                 </div>
 
+                {/* Print Only Header */}
+                <div style={{ display: "none" }} className="print-header">
+                    TEMPO INSTRUMENTS - EXECUTIVE ANALYTICS REPORT<br/>
+                    <span style={{ fontSize: "12px", fontWeight: "normal" }}>Generated: {new Date().toLocaleString()}</span>
+                </div>
+
                 {/* --- TAB: OVERVIEW --- */}
                 {(activeTab === 'overview') && (
-                    <div className="form-grid-layout" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '30px' }}>
+                    <div className="print-section form-grid-layout" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '30px' }}>
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Total Lead Targets Queued</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{totalQueued}</div>
@@ -148,8 +162,8 @@ export default function SalesAnalyticsView({ state }) {
                             </div>
                         </div>
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active CRM Deal Pipeline</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-success)' }}>{totalCrmLeads}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active CRM Pipeline & FAQs</div>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-success)' }}>{totalCrmLeads} <span style={{fontSize: '14px', color: 'var(--text-muted)'}}>({totalFaqsAsked} FAQs)</span></div>
                         </div>
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active Carrier Network</div>
@@ -160,25 +174,31 @@ export default function SalesAnalyticsView({ state }) {
 
                 {/* --- TAB: TEAM PERFORMANCE --- */}
                 {(activeTab === 'performance') && (
-                    <div style={{ marginBottom: "40px" }}>
+                    <div className="print-section" style={{ marginBottom: "40px" }}>
+                        
+                        {/* SALES PERFORMANCE TABLE */}
                         <h4 style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '18px' }}>
                             <FiActivity /> Sales Force Activity Matrix
                         </h4>
-                        <div style={{ background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-light)', overflowX: 'auto', marginTop: '15px' }}>
+                        <div style={{ background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-light)', overflowX: 'auto', marginTop: '15px', marginBottom: '30px' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                 <thead>
                                     <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
-                                        <th style={{ padding: '15px' }}>Executive Name</th>
-                                        <th style={{ padding: '15px', textAlign: 'center' }}>Target Generation<br/>(Queued / Harvested)</th>
-                                        <th style={{ padding: '15px', textAlign: 'center' }}>Inactive<br/>Targets</th>
-                                        <th style={{ padding: '15px', textAlign: 'center' }}>Active Deals<br/>(CRM)</th>
-                                        <th style={{ padding: '15px', textAlign: 'center' }}>Dispatches<br/>Processed</th>
-                                        <th style={{ padding: '15px', textAlign: 'center' }}>Activity Score</th>
+                                        <th style={{ padding: '15px', color: 'var(--text-primary)' }}>Executive Name</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>Targets<br/>(Queued/Harvested)</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>Active Deals<br/>(CRM)</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>Dispatches<br/>Processed</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>R&D FAQs<br/>Asked</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>Activity Score</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {salesKpis.map((kpi, idx) => {
-                                        const score = (parseInt(kpi.targets_queued) * 2) + (parseInt(kpi.total_crm_leads) * 5) + (parseInt(kpi.dispatches_logged) * 10);
+                                        // Expanded Formula: Targets(x2) + CRM(x5) + Dispatches(x10) + FAQs(x3) + General Actions(x0.5)
+                                        const baseScore = (parseInt(kpi.targets_queued) * 2) + (parseInt(kpi.total_crm_leads) * 5) + (parseInt(kpi.dispatches_logged) * 10) + (parseInt(kpi.faqs_asked) * 3);
+                                        const actionBonus = Math.floor(parseInt(kpi.actions_logged) * 0.5);
+                                        const score = baseScore + actionBonus;
+
                                         return (
                                             <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                                                 <td style={{ padding: '15px' }}>
@@ -188,10 +208,46 @@ export default function SalesAnalyticsView({ state }) {
                                                 <td style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>
                                                     {kpi.targets_queued} / <span style={{ color: 'var(--brand-success)', fontWeight: 'bold' }}>{kpi.targets_harvested}</span>
                                                 </td>
-                                                <td style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)' }}>{kpi.targets_inactive}</td>
                                                 <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-primary)' }}>{kpi.total_crm_leads}</td>
                                                 <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-primary)' }}>{kpi.dispatches_logged}</td>
+                                                <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: 'var(--brand-accent)' }}>{kpi.faqs_asked}</td>
                                                 <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', color: score > 50 ? 'var(--brand-success)' : 'var(--brand-accent)' }}>{score}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* R&D PERFORMANCE TABLE */}
+                        <h4 style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '18px' }}>
+                            <FiActivity /> R&D / Tech Resolution Matrix
+                        </h4>
+                        <div style={{ background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-light)', overflowX: 'auto', marginTop: '15px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
+                                        <th style={{ padding: '15px', color: 'var(--text-primary)' }}>Engineer Name</th>
+                                        <th style={{ padding: '15px', color: 'var(--text-primary)' }}>Role</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>Technical FAQs<br/>Resolved</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>System Actions<br/>Tracked</th>
+                                        <th style={{ padding: '15px', textAlign: 'center', color: 'var(--text-primary)' }}>Contribution Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rndKpis.map((kpi, idx) => {
+                                        // R&D Score: FAQs Answered(x15) + General Actions(x0.5)
+                                        const score = (parseInt(kpi.faqs_answered) * 15) + Math.floor(parseInt(kpi.actions_logged) * 0.5);
+                                        return (
+                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                                <td style={{ padding: '15px' }}>
+                                                    <strong style={{ color: 'var(--text-primary)', display: 'block', fontSize: '15px' }}>{kpi.name}</strong>
+                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{kpi.email}</span>
+                                                </td>
+                                                <td style={{ padding: '15px', color: 'var(--text-primary)' }}>{kpi.role}</td>
+                                                <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: 'var(--brand-success)' }}>{kpi.faqs_answered}</td>
+                                                <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-primary)' }}>{kpi.actions_logged}</td>
+                                                <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', color: score > 30 ? 'var(--brand-success)' : 'var(--brand-accent)' }}>{score}</td>
                                             </tr>
                                         );
                                     })}
@@ -203,7 +259,7 @@ export default function SalesAnalyticsView({ state }) {
 
                 {/* --- TAB: FINANCIALS --- */}
                 {(activeTab === 'financial') && (
-                    <div>
+                    <div className="print-section">
                         <h4 style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "12px", display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '18px' }}>
                             <FiMapPin /> Logistics Financial Exposure
                         </h4>

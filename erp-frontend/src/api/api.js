@@ -630,7 +630,36 @@ const API = {
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
+  async fetchFaqs(token) {
+    const r = await fetch("/api/v1/faq/list", { headers: this.headers(token) });
+    if (!r.ok) throw new Error("Failed to fetch FAQs.");
+    return r.json();
+  },
 
+  async askFaqQuestion(payload, token) {
+    const r = await fetch("/api/v1/faq/ask", {
+      method: "POST",
+      headers: this.headers(token),
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async answerFaqQuestion(faqId, payload, token) {
+    const r = await fetch(`/api/v1/faq/${faqId}/answer`, {
+      method: "PUT",
+      headers: this.headers(token),
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+  async fetchRnDKPIs(token) {
+    const r = await fetch("/api/v1/analytics/rnd", { headers: this.headers(token) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
 };
 
 export default API;

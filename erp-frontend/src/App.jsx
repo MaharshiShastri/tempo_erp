@@ -25,6 +25,7 @@ import ItemMasterUploadView from "./views/ItemMasterUploadView";
 import TallySyncView from "./views/TallySyncView";
 import LeadGeneratorView from "./views/LeadGeneratorView";
 import SalesAnalyticsView from "./views/SalesAnalyticsView";
+import FaqWorkspaceView from './views/FaqWorkspaceView';
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 import ErrorModal from "./components/shared/ErrorModal";
@@ -119,6 +120,11 @@ function App() {
                 </div>
                 
                 <div className="sidebar-menu">
+                    <a href="#faq" className={`menu-item ${state.activeTab === 'faq-workspace' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('faq-workspace')}}>
+                        <span>📚</span>
+                        {!sidebarCollapsed && (<span>R&D Knowledge Base</span>)}
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                    </a>
                     
                     {/* Render Sales group if the user has at least one of these roles */}
                     {(isSales || isTransporter) && (
@@ -219,6 +225,7 @@ function App() {
                             <a href="#items-upload" className={`menu-item ${state.activeTab === 'items-upload' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-upload')}}>
                                 <span>📥</span> 
                                 {!sidebarCollapsed && (<span>Bulk Import Items</span>)}
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                             </a>
                         </div>
                     )}
@@ -288,6 +295,7 @@ function App() {
                     {isSuperUser && state.activeTab === 'tally-sync' && <TallySyncView state={state}/>}
                     {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
                     {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
+                    {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
                 </div>
             </div>
 

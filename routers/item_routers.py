@@ -6,23 +6,23 @@ from .dependencies import check_department
 
 router = APIRouter(prefix="/api/v1/master/items", tags=["Item Master Subsystem"])
 
-@router.get("/{item_code}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+@router.get("/{item_code}")
 def list_items(item_code: str, user_profile: dict=Depends(verify_bearer_token)):
     return EDBR.get_item(item_code)
 
-@router.post("/create", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+@router.post("/create")
 def create_item(payload: ItemMasterCreate, user_profile: dict=Depends(verify_bearer_token)):
     try:
-        return EDBR.create_item(payload.dict())
+        return EDBR.create_item(payload)
     
     except Exception as e:
         raise HTTPException(status_code=400, detail="Item Code already exists or data is invalid.")
     
-@router.put("/{item_code}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+@router.put("/{item_code}")
 def update_item(item_code: str, payload: ItemMasterUpdate, user_profile=Depends(verify_bearer_token)):
     return EDBR.update_item(item_code, payload.dict(exclude_none=True))
 
-@router.delete("/{item_code}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+@router.delete("/{item_code}")
 def delete_item(item_code: str,user_profile=Depends(verify_bearer_token)):
     return EDBR.disable_item(item_code)
 

@@ -9,7 +9,7 @@ import os
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -599,6 +599,7 @@ class PostgresRepository:
                 return item
             
     def create_item(self, item_data: dict):
+        print(item_data)
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -1219,27 +1220,95 @@ class PostgresRepository:
                 return deactivated
             
     # --- LEAD GENERATOR ENGINE end ---
+    # --- SYSTEM AUDIT start ---
+    def log_system_action(self, email: str, name: str, route: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO system_audit_logs (user_email, user_name, action_route)
+                    VALUES (%s, %s, %s)
+                """, (email, name, route))
+                conn.commit()
+    # --- SYSTEM AUDIT end ---
+    # --- FAQ Engine start ---
+    def create_faq_query(self, question: str, asked_by: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO faq_queries (question, asked_by)
+                    VALUES (%s, %s) RETURNING *
+                """, (question.strip(), asked_by))
+                conn.commit()
+                res = cur.fetchone()
+                res['created_at'] = res['created_at'].isoformat()
+                res['updated_at'] = res['updated_at'].isoformat()
+                return res
+
+    def get_faq_queries(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM faq_queries ORDER BY created_at DESC")
+                data = cur.fetchall()
+                for d in data:
+                    d['created_at'] = d['created_at'].isoformat()
+                    d['updated_at'] = d['updated_at'].isoformat()
+                return data
+
+    def answer_faq_query(self, faq_id: int, answer: str, answered_by: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE faq_queries 
+                    SET answer=%s, answered_by=%s, status='Answered', updated_at=CURRENT_TIMESTAMP
+                    WHERE id=%s RETURNING *
+                """, (answer.strip(), answered_by, faq_id))
+                updated = cur.fetchone()
+                if not updated:
+                    raise ValueError("FAQ not found.")
+                conn.commit()
+                updated['created_at'] = updated['created_at'].isoformat()
+                updated['updated_at'] = updated['updated_at'].isoformat()
+                return updated
+    # --- FAQ Engine end ---                
     # --- SALES ANALYTICS & KPIs start ---
     def get_sales_kpis(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                # Added 'targets_inactive' count
+                # Replaced 'dispatches_logged' with 'actions_logged' targeting the new Audit table
                 cur.execute("""
                     SELECT 
                         u.email, 
                         u.name,
                         u.role,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactives') as targets_queued,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactive') as targets_queued,
                         (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Completed') as targets_harvested,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactives') as targets_inactive,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactive') as targets_inactive,
                         (SELECT COUNT(*) FROM crm_leads WHERE assigned_to = u.email) as total_crm_leads,
-                        (SELECT COUNT(*) FROM dispatch_records WHERE operator_email = u.email) as dispatches_logged
+                        (SELECT COUNT(*) FROM faq_queries WHERE asked_by = u.email) as faqs_asked,
+                        (SELECT COUNT(*) FROM dispatch_records WHERE operator_email = u.email) as dispatches_logged,
+                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged
                     FROM users u
                     WHERE u.role IN ('Sales Representative')
-                    ORDER BY targets_queued DESC
+                    ORDER BY actions_logged DESC
                 """)
                 return cur.fetchall()
-
+    def get_rnd_kpis(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # New metric to track R&D performance
+                cur.execute("""
+                    SELECT 
+                        u.email, 
+                        u.name,
+                        u.role,
+                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by = u.email) as faqs_answered,
+                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged
+                    FROM users u
+                    WHERE u.role IN ('R&D Engineer')
+                    ORDER BY faqs_answered DESC
+                """)
+                return cur.fetchall()
+            
     def get_transport_kpis(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
