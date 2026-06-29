@@ -29,13 +29,19 @@ import FaqWorkspaceView from './views/FaqWorkspaceView';
 import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 import ErrorModal from "./components/shared/ErrorModal";
+import GlobalProductionPulseView from "./views/GlobalProductionPulseView";
 
 function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-
+    const [openModules, setOpenModules] = useState({global: true, sales: true, factory: true, admin: false});
+    
+    const toggleModule = (moduleKey) => {
+        setOpenModules(prev => ({ ...prev, [moduleKey]: !prev[moduleKey] }));
+    };
+    
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('erp-theme', theme);
@@ -131,142 +137,165 @@ function App() {
                 </div>
                 
                 <div className="sidebar-menu">
+                    {/* GLOBAL WORKSPACE */}
                     <div className="menu-group">
-                        <span className="menu-title">Global Workspace</span>
-                        <a href="#faq" className={`menu-item ${state.activeTab === 'faq-workspace' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('faq-workspace')}}>
-                            <span>📚</span>
-                            {!sidebarCollapsed && (<span>R&D Knowledge Base</span>)}
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
-                        </a>
+                        <div className="menu-title" onClick={() => toggleModule('global')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Global Workspace</span>
+                            {!sidebarCollapsed && <span>{openModules.global ? '▼' : '▶'}</span>}
+                        </div>
+                        
+                        {openModules.global && (
+                            <>
+                                <a href="#pulse" className={`menu-item ${state.activeTab === 'global-pulse' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('global-pulse')}}>
+                                    <span>🌐</span>
+                                    {!sidebarCollapsed && <span>Production LifeCycle</span>}
+                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                </a>
+                                <a href="#faq" className={`menu-item ${state.activeTab === 'faq-workspace' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('faq-workspace')}}>
+                                    <span>📚</span>
+                                    {!sidebarCollapsed && <span>R&D Knowledge Base</span>}
+                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                </a>
+                            </>
+                        )}
                     </div>
 
-                    {/* Render Sales group if the user has at least one of these roles */}
+                    {/* SALES MODULE */}
                     {(isSales || isTransporter) && (
                         <div className="menu-group">
-                            <span className="menu-title">Sales Module</span>
+                            <div className="menu-title" onClick={() => toggleModule('sales')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Sales Module</span>
+                                {!sidebarCollapsed && <span>{openModules.sales ? '▼' : '▶'}</span>}
+                            </div>
                             
-                            {isSales && (
-                                <a href="#companies" className={`menu-item ${state.activeTab === 'companies-list' || state.activeTab === 'company-new' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('companies-list')}}>
-                                    <span>👥</span>
-                                    {!sidebarCollapsed && (<span>Clients Directory</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+C</span>
-                                </a>
-                            )}
-
-                            {isSales && (
-                                <a href="#orders" className={`menu-item ${state.activeTab === 'orders-list' || state.activeTab === 'order-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('orders-list')}}>
-                                    <span>📦</span> 
-                                    {!sidebarCollapsed &&(<span>Orders Blueprints</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+O</span>
-                                </a>
-                            )}
-
-                            {isSales && (
-                                <a href="#billing" className={`menu-item ${state.activeTab === 'bills-list' || state.activeTab === 'bill-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('bills-list')}}>
-                                    <span>🧾</span> 
-                                    {!sidebarCollapsed &&(<span>Billing Ledgers</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+B</span>
-                                </a>
-                            )}
-
-                            {(isSales || isTransporter) && (
-                                <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
-                                    <span>🚚</span> 
-                                    {!sidebarCollapsed &&(<span>Dispatch Planner</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+D</span>
-                                </a>
-                            )}
-
-                            {isTransporter && (
-                                <a href="#partner-new" className={`menu-item ${state.activeTab === 'partner-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('partner-new')}}>
-                                    <span>🤝</span>
-                                    {!sidebarCollapsed && (<span>Logistics Master</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
-                                </a>
-                            )}
-
-                            {isSales && (
-                                <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
-                                    <span>📦</span> 
-                                    {!sidebarCollapsed && (<span>Item Master</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
-                                </a>
-                            )}
-
-                            {isSales && (
-                                <a href="#crm" className={`menu-item ${state.activeTab === 'crm-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('crm-workspace')}}>
-                                    <span>🎯</span> 
-                                    {!sidebarCollapsed &&(<span>CRM Pipeline</span>)}
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+W</span>
-                                </a>
-                            )}
-                            {isSales && (
-                                <a href="#lead-generation" className={`menu-item ${state.activeTab === 'lead-generation' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('lead-generation')}}>
-                                    <span>🏭</span>
-                                    {!sidebarCollapsed && (<span>Lead Generator Engine</span>)}
-                                    <span style={{fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto'}}>Alt+E</span>
-                                </a>
+                            {openModules.sales && (
+                                <>
+                                    {isSales && (
+                                        <a href="#companies" className={`menu-item ${state.activeTab === 'companies-list' || state.activeTab === 'company-new' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('companies-list')}}>
+                                            <span>👥</span>
+                                            {!sidebarCollapsed && <span>Clients Directory</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+C</span>
+                                        </a>
+                                    )}
+                                    {isSales && (
+                                        <a href="#orders" className={`menu-item ${state.activeTab === 'orders-list' || state.activeTab === 'order-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('orders-list')}}>
+                                            <span>📦</span> 
+                                            {!sidebarCollapsed && <span>Orders Blueprints</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+O</span>
+                                        </a>
+                                    )}
+                                    {isSales && (
+                                        <a href="#billing" className={`menu-item ${state.activeTab === 'bills-list' || state.activeTab === 'bill-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('bills-list')}}>
+                                            <span>🧾</span> 
+                                            {!sidebarCollapsed && <span>Billing Ledgers</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+B</span>
+                                        </a>
+                                    )}
+                                    {(isSales || isTransporter) && (
+                                        <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
+                                            <span>🚚</span> 
+                                            {!sidebarCollapsed && <span>Dispatch Planner</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+D</span>
+                                        </a>
+                                    )}
+                                    {isTransporter && (
+                                        <a href="#partner-new" className={`menu-item ${state.activeTab === 'partner-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('partner-new')}}>
+                                            <span>🤝</span>
+                                            {!sidebarCollapsed && <span>Logistics Master</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
+                                        </a>
+                                    )}
+                                    {isSales && (
+                                        <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
+                                            <span>📦</span> 
+                                            {!sidebarCollapsed && <span>Item Master</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
+                                        </a>
+                                    )}
+                                    {isSales && (
+                                        <a href="#crm" className={`menu-item ${state.activeTab === 'crm-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('crm-workspace')}}>
+                                            <span>🎯</span> 
+                                            {!sidebarCollapsed && <span>CRM Pipeline</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+W</span>
+                                        </a>
+                                    )}
+                                    {isSales && (
+                                        <a href="#lead-generation" className={`menu-item ${state.activeTab === 'lead-generation' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('lead-generation')}}>
+                                            <span>🏭</span>
+                                            {!sidebarCollapsed && <span>Lead Generator</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+E</span>
+                                        </a>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
                     
-                    {/* Render Shop Floor group only if user has Factory access */}
+                    {/* SHOP FLOOR MODULE */}
                     {isFactory && (
                         <div className="menu-group">
-                            <span className="menu-title">Shop Floor</span>
+                            <div className="menu-title" onClick={() => toggleModule('factory')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Shop Floor</span>
+                                {!sidebarCollapsed && <span>{openModules.factory ? '▼' : '▶'}</span>}
+                            </div>
                             
-                            <a href="#tasks" className={`menu-item ${state.activeTab === 'tasks-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('tasks-workspace')}}>
-                                <span>⚙️</span> 
-                                {!sidebarCollapsed && (<span>Task Management </span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+T</span>
-                                {pendingTasksCount > 0 && <span className="sidebar-badge">{pendingTasksCount}</span>}
-                            </a>
-
-                            <a href="#activity-tree" className={`menu-item ${state.activeTab === 'accountability-hub' ? 'active': ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('accountability-hub')}}>
-                                <span>🛠️</span> 
-                                {!sidebarCollapsed && (<span>Production Pulse</span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+P</span>
-                            </a>
-                            
-                            <a href="#grn" className={`menu-item ${state.activeTab === 'grn-workspace' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('grn-workspace'); }}>
-                                <span><FiPackage /></span>
-                                {!sidebarCollapsed && <span>GRN Workspace</span>}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>
-                                    Alt+R
-                                </span>
-                            </a>
-
-                            <a href="#items-upload" className={`menu-item ${state.activeTab === 'items-upload' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-upload')}}>
-                                <span>📥</span> 
-                                {!sidebarCollapsed && (<span>Bulk Import Items</span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
-                            </a>
+                            {openModules.factory && (
+                                <>
+                                    <a href="#tasks" className={`menu-item ${state.activeTab === 'tasks-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('tasks-workspace')}}>
+                                        <span>⚙️</span> 
+                                        {!sidebarCollapsed && <span>Task Management </span>}
+                                        {pendingTasksCount > 0 && <span className="sidebar-badge">{pendingTasksCount}</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+T</span>
+                                    </a>
+                                    {/* Legacy Activity Tree if still needed */}
+                                    <a href="#activity-tree" className={`menu-item ${state.activeTab === 'accountability-hub' ? 'active': ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('accountability-hub')}}>
+                                        <span>🛠️</span> 
+                                        {!sidebarCollapsed && <span>Legacy Logs</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+P</span>
+                                    </a>
+                                    <a href="#grn" className={`menu-item ${state.activeTab === 'grn-workspace' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('grn-workspace'); }}>
+                                        <span><FiPackage /></span>
+                                        {!sidebarCollapsed && <span>GRN Workspace</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+R</span>
+                                    </a>
+                                    <a href="#items-upload" className={`menu-item ${state.activeTab === 'items-upload' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-upload')}}>
+                                        <span>📥</span> 
+                                        {!sidebarCollapsed && <span>Bulk Import Items</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                    </a>
+                                </>
+                            )}
                         </div>
                     )}
 
-                    {/* Administration group is already protected, but kept here for completeness */}
+                    {/* ADMINISTRATION MODULE */}
                     {isSuperUser && (
                         <div className="menu-group">
-                            <span className="menu-title">Administration</span>
-                            <a href="#admin" className={`menu-item ${state.activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => state.setActiveTab('admin-users')}>
-                                <span>🛡️</span> 
-                                {!sidebarCollapsed && (<span>Team Management</span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+M</span>
-                            </a>
-                            <a href="#tally" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-sync')}}>
-                                {/* Stylized Tally "T" Icon */}
-                                <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
-                                {!sidebarCollapsed && (<span>Fetch Tally data</span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
-                            </a>
-                            <a href="#analytics" className={`menu-item ${state.activeTab === 'sales-analytics' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('sales-analytics'); }}>
-                                <span>📊</span> 
-                                {!sidebarCollapsed && (<span>Sales Analytics</span>)}
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+S</span>
-                            </a>
-
+                            <div className="menu-title" onClick={() => toggleModule('admin')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Administration</span>
+                                {!sidebarCollapsed && <span>{openModules.admin ? '▼' : '▶'}</span>}
+                            </div>
+                            
+                            {openModules.admin && (
+                                <>
+                                    <a href="#admin" className={`menu-item ${state.activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => state.setActiveTab('admin-users')}>
+                                        <span>🛡️</span> 
+                                        {!sidebarCollapsed && <span>Team Management</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+M</span>
+                                    </a>
+                                    <a href="#tally" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-sync')}}>
+                                        <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
+                                        {!sidebarCollapsed && <span>Fetch Tally data</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
+                                    </a>
+                                    <a href="#analytics" className={`menu-item ${state.activeTab === 'sales-analytics' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('sales-analytics'); }}>
+                                        <span>📊</span> 
+                                        {!sidebarCollapsed && <span>Sales Analytics</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+S</span>
+                                    </a>
+                                </>
+                            )}
                         </div>
-                        
                     )}
                 </div>
             </aside>
@@ -293,7 +322,7 @@ function App() {
                                 <div style={{ position: 'absolute', top: '40px', right: '0', width: '320px', background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 1000, overflow: 'hidden' }}>
                                     <div style={{ padding: '12px 15px', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-light)', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Notifications Center</span>
-                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal', cursor: 'pointer' }} onClick={() => state.setNotifications([])}>Clear</span>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal', cursor: 'pointer' }} onClick={() => state.clearNotifications()}>Clear</span>
                                     </div>
                                     <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                                         {state.notifications.length === 0 ? (
@@ -355,6 +384,7 @@ function App() {
                     {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
                     {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
+                    {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
                 </div>
             </div>
 

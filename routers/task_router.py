@@ -31,15 +31,7 @@ def get_task_attachment(file_name: str, user_profile: dict = Depends(verify_bear
     return FileResponse(file_path, filename=clean_name)
 
 @router.post("/create", dependencies=[Depends(check_department("Shop Floor Administrator"))])
-async def create_new_task(
-    title: str = Form(...), 
-    details: str = Form(...), 
-    direction: str = Form("dispatched"), 
-    deadline: str = Form(None), 
-    assigned_to: List[str] = Form(...), 
-    attachment: UploadFile = File(None), 
-    user_profile: dict = Depends(verify_bearer_token)
-):
+async def create_new_task(title: str = Form(...), details: str = Form(...), direction: str = Form("dispatched"), deadline: str = Form(None), assigned_to: List[str] = Form(...), attachment: UploadFile = File(None), user_profile: dict = Depends(verify_bearer_token)):
     if not title.strip():
         raise HTTPException(status_code=400, detail="Metadata view header title required.")
     
@@ -67,8 +59,12 @@ async def create_new_task(
         "deadline": deadline
     }
 
-    return EDBR.create_task(db_payload, assigned_by=user_profile["email"])
+    new_task =  EDBR.create_task(db_payload, assigned_by=user_profile["email"])
+    
+    for email in assigned_to:
+        EDBR.create_system_notification(user_email=email, title=f"New Task: {title}", message=details[:100] + "..." if len(details) > 100 else details,notif_type="TASK")
 
+    return new_task
 @router.post("/{task_id}/toggle", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def toggle_task(task_id: int, user_profile: dict = Depends(verify_bearer_token)):
     try:

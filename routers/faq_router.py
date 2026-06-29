@@ -40,7 +40,7 @@ def answer_question(faq_id: int, payload: AnswerPayload, user: dict = Depends(ve
 
     try:
         updated_faq = EDBR.answer_faq_query(faq_id, payload.answer, user["email"])
-        
+        EDBR.create_system_notification(user_email=updated_faq["asked_by"], title="R&D Answered Your FAQ", message=f"Q: {updated_faq['question'][:50]}...",notif_type="FAQ")
         # --- VECTOR DB INGESTION (RAG FOUNDATION) ---
         # We embed the combination of Q&A so future LLMs can retrieve this exact context
         document_text = f"Question: {updated_faq['question']}\nAnswer: {updated_faq['answer']}"

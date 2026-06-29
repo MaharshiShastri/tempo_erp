@@ -22,6 +22,9 @@ class OrderItemCreate(BaseModel):
     rate: float = Field(..., ge=0.0)
     discount_percentage: float = Field(0.0, ge=0.0, le=100.0)
 
+class StageUpdatePayload(BaseModel):
+    stage: str
+
 class OrderHeaderCreate(BaseModel):
     order_acceptance_id: UUID  # Strict structural UUID verification pattern enforced
     order_acceptance_date: date

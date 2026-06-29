@@ -110,7 +110,9 @@ export default function useERPState() {
             new Notification(title, { body: message });
         }
     };
-
+    const clearNotifications = () => {
+        setNotifications([])
+    }
     const addToast = (message, type="info") => {
         const id = Date.now();
         setToasts(prev => [...prev, {id, message, type}]);
@@ -503,7 +505,7 @@ export default function useERPState() {
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
         tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
-        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts
+        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications
     };
 }
 

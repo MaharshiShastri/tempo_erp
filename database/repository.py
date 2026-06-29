@@ -1336,4 +1336,39 @@ class PostgresRepository:
                     "total_partners": total_partners,
                     "monthly_costs": monthly_costs
                 }        
+            
+    # --- SALES ANALYTICS & KPIs end ---
+    # --- SYSTEM NOTIFICATIONS start ---
+    def create_system_notification(self, user_email: str, title: str, message: str, notif_type: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO system_notifications (user_email, title, message, type)
+                    VALUES (%s, %s, %s, %s)
+                """, (user_email, title, message, notif_type))
+                conn.commit()
+    # --- SYSTEM NOTIFICATIONS end ---
+    # --- GLOBAL PRODUCTION PULSE start ---
+    def get_global_production_pulse(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT order_acceptance_id, billing_name, due_date, production_stage
+                    FROM order_headers
+                    ORDER BY due_date ASC
+                """)
+                orders = cur.fetchall()
+                for o in orders:
+                    o['due_date'] = str(o['due_date']) if o['due_date'] else None
+                return orders
+
+    def update_order_stage(self, order_id: str, new_stage: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE order_headers SET production_stage = %s WHERE order_acceptance_id = %s RETURNING *
+                """, (new_stage, str(order_id)))
+                conn.commit()
+                return cur.fetchone()
+    # --- GLOBAL PRODUCTION PULSE end ---
 EDBR = PostgresRepository()
