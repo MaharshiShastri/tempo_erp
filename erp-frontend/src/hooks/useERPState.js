@@ -27,6 +27,10 @@ export default function useERPState() {
     const [alertMessage, setAlertMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
 
+    const [isServerLive, setIsServerLive] = useState(true);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
 
@@ -99,6 +103,82 @@ export default function useERPState() {
 
         setErrorModalOpen(true);
     };
+    const dispatchSystemNotification = (title, message) => {
+        setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
+        setIsAlertOpen(true);
+        if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(title, { body: message });
+        }
+    };
+
+    const addToast = (message, type="info") => {
+        const id = Date.now();
+        setToasts(prev => [...prev, {id, message, type}]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));   
+        }, 5000);
+    };
+
+    useEffect(() => {
+        if (!sessionToken) return;
+        
+        // Connect to the unified stream router
+        const eventSource = new EventSource(`/api/v1/stream/events?token=${sessionToken}`);
+        
+        let timeoutTimer;
+
+        // Reset the timeout timer every time we receive data (heartbeat or payload)
+        const resetPulseTimer = () => {
+            setIsServerLive(true);
+            clearTimeout(timeoutTimer);
+            // If we don't hear from the server for 5 minutes, assume it's offline/restarting
+            timeoutTimer = setTimeout(() => setIsServerLive(false), 300000); 
+        };
+
+        eventSource.onmessage = (event) => {
+            resetPulseTimer();
+            try {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'SYSTEM_PULSE') {
+                    return; // Just a heartbeat, do nothing else.
+                }
+
+                // Handle actual incoming notification
+                if (data.type === 'TASK' || data.type === 'FAQ' || data.type === 'ORDER_STAGE') {
+                    setNotifications(prev => [{...data, read: false}, ...prev]);
+                    setUnreadNotifCount(prev => prev + 1);
+                    addToast(`${data.title}`, 'info');
+
+                    // If it's a task, refresh the tasks list
+                    if (data.type === 'TASK') {
+                        API.fetchTasks(sessionToken).then(setTasks).catch(console.error);
+                    }
+                }
+            } catch(e) {
+                console.error('Failed to parse SSE payload.', e);
+            }
+        };
+
+        eventSource.onerror = (error) => {
+            setIsServerLive(false);
+            console.log("SSE Connection dropped. Server might be restarting.");
+        };
+
+        resetPulseTimer(); // Start the initial timer
+
+        return () => {
+            clearTimeout(timeoutTimer);
+            if (eventSource.readyState !== 2){
+                eventSource.close();
+            }
+        };
+    }, [sessionToken]);
+
+    const markAllNotifsRead = () => {
+        setUnreadNotifCount(0);
+        setNotifications(prev => prev.map(n => ({...n, read: true})));
+    };
 
     const triggerNewCompany = () => {
         setCompanyForm({ ...defaultCompanyForm });
@@ -142,14 +222,6 @@ export default function useERPState() {
         } catch (err) {
             setAlertMessage(err.message);
             setIsAlertOpen(true);
-        }
-    };
-
-    const dispatchSystemNotification = (title, message) => {
-        setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
-        setIsAlertOpen(true);
-        if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(title, { body: message });
         }
     };
 
@@ -424,51 +496,14 @@ export default function useERPState() {
         setTimeout(() => { window.print(); setActivePrintJob(null); setPrintType(null); }, 300);
     };
 
-    const addToast = (message, type="info") => {
-        const id = Date.now();
-        setToasts(prev => [...prev, {id, message, type}]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id));   
-        }, 5000);
-    };
-    
-    //Web socket, later make websocket into dedicated api file
-    useEffect(()=>{
-        if (!sessionToken) return;
-        
-        const eventSource = new EventSource(`/api/v1/crm/stream?token=${sessionToken}`);
-        eventSource.onmessage = (event) => {
-            try{
-                const data = JSON.parse(event.data);
-
-                if (data.type === 'CRM_LEAD'){
-                    setAlertMessage(`🚨 INBOUND INQUIRY: ${data.message} Please check the CRM workspace.`);
-                    setIsAlertOpen(true);
-                } else {
-                    addToast(data.message, data.type || 'info');
-                }
-            } catch(e) {
-                console.error('Failed to parse SSE payload.');
-            }
-        };
-
-        eventSource.onerror = (error) => {
-            console.log("SSE Connection droppped. Attempting to reconnect...", error);
-        };
-        return () => {
-            if (eventSource.readyState !== 2){
-                eventSource.close();
-            }
-        };
-        
-    }, [sessionToken]);
     return {
         systemUsers, user, setUser, activeTab, setActiveTab, orders, bills, companiesMaster, itemsMaster, isAlertOpen, setIsAlertOpen, alertMessage, errorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword,
         orderHeader, setOrderHeader, orderItems, appendOrderItemRow, popOrderItemRow, updateOrderItemField, commitOrderSubmit, handleCustomerMasterSelection, handleItemMasterSelection, triggerNewOrderInitialization,
         billHeader, setBillHeader, billItems, setBillItems, triggerInvoiceSetupForOrder, commitBillSubmit, handleLogin, handleLogout,
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
         tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
-        showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage
+        showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
+        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts
     };
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage } from "react-icons/fi";
+import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw } from "react-icons/fi";
 import useERPState from "./hooks/useERPState";
 
 import LoginView from "./views/LoginView";
@@ -34,7 +34,8 @@ function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    
+    const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('erp-theme', theme);
@@ -106,6 +107,16 @@ function App() {
 
     return (
         <div className="frappe-layout">
+            
+            {!state.isServerLive && (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', background: 'var(--brand-danger)', color: '#fff', padding: '8px', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', fontWeight: 'bold', fontSize: '13px' }}>
+                    <FiAlertTriangle size={18} /> Server connection lost or updating. System is currently operating offline. 
+                    <button onClick={() => window.location.reload()} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FiRefreshCw /> Force Reload
+                    </button>
+                </div>
+            )}
+
             <ErrorModal isOpen={state.errorModalOpen} title={state.errorModal.title} message={state.errorModal.message} onClose={() => state.setErrorModalOpen(false)}/>
             {state.printType === 'invoice' && <PrintInvoiceTemplate invoiceData={state.activePrintJob} />}
             {state.printType === 'order' && <PrintOrderTemplate orderData={state.activePrintJob} />}
@@ -120,12 +131,15 @@ function App() {
                 </div>
                 
                 <div className="sidebar-menu">
-                    <a href="#faq" className={`menu-item ${state.activeTab === 'faq-workspace' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('faq-workspace')}}>
-                        <span>📚</span>
-                        {!sidebarCollapsed && (<span>R&D Knowledge Base</span>)}
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
-                    </a>
-                    
+                    <div className="menu-group">
+                        <span className="menu-title">Global Workspace</span>
+                        <a href="#faq" className={`menu-item ${state.activeTab === 'faq-workspace' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('faq-workspace')}}>
+                            <span>📚</span>
+                            {!sidebarCollapsed && (<span>R&D Knowledge Base</span>)}
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                        </a>
+                    </div>
+
                     {/* Render Sales group if the user has at least one of these roles */}
                     {(isSales || isTransporter) && (
                         <div className="menu-group">
@@ -264,6 +278,51 @@ function App() {
                         <span className="navbar-breadcrumb">Workspace / {state.activeTab.replace('-', ' ').toUpperCase()}</span>
                     </div>
                     <div className="navbar-right">
+                        <div style={{ position: 'relative' }}>
+                            <button className="btn-text" style={{ position: 'relative', fontSize: '18px', padding: '8px' }} onClick={() => { setShowNotifDropdown(!showNotifDropdown); state.markAllNotifsRead(); }}>
+                                <FiBell />
+                                {state.unreadNotifCount > 0 && (
+                                    <span style={{ position: 'absolute', top: '2px', right: '4px', background: 'var(--brand-danger)', color: 'var(--text-primary)', fontSize: '9px', fontWeight: 'bold', borderRadius: '50%', padding: '2px 5px' }}>
+                                        {state.unreadNotifCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* DROPDOWN MENU */}
+                            {showNotifDropdown && (
+                                <div style={{ position: 'absolute', top: '40px', right: '0', width: '320px', background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 1000, overflow: 'hidden' }}>
+                                    <div style={{ padding: '12px 15px', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-light)', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Notifications Center</span>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal', cursor: 'pointer' }} onClick={() => state.setNotifications([])}>Clear</span>
+                                    </div>
+                                    <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                                        {state.notifications.length === 0 ? (
+                                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>All caught up! No new notifications.</div>
+                                        ) : (
+                                            state.notifications.map((n, i) => (
+                                                <div key={i} style={{ padding: '12px 15px', borderBottom: '1px solid var(--border-subtle)', background: n.read ? 'transparent' : 'var(--bg-main)' }}>
+                                                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: n.type === 'TASK' ? 'var(--brand-accent)' : n.type === 'FAQ' ? 'var(--brand-success)' : 'var(--text-primary)', marginBottom: '4px' }}>
+                                                        {n.type} UPDATE
+                                                    </div>
+                                                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{n.title}</div>
+                                                    
+                                                    {/* If it's a task, just show title. If FAQ/Order, show message details */}
+                                                    {n.type !== 'TASK' && (
+                                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                                            {n.message}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                                        {new Date(n.timestamp).toLocaleTimeString()}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <button className="btn" style={{ background: 'none' }} onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}>
                             {theme === 'light' ? '🌙' : '☀️'}
                         </button>
