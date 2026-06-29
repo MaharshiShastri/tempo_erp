@@ -663,6 +663,20 @@ const API = {
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
+  async generateLeadEmail(payload, token) {
+    const r = await fetch("/api/v1/lead-engine/generate-email", {
+        method: "POST",
+        headers: this.headers(token),
+        body: JSON.stringify(payload),
+    });
+
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "AI Email generation failed.");
+    }
+
+    return r.json();
+  },
   
 };
 

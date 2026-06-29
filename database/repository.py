@@ -1100,8 +1100,8 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 # Prioritize roles logically during retrieval
                 cur.execute("""
-                    SELECT * FROM lead_contacts 
-                    WHERE target_id = %s AND status<>'Inactives'
+                    SELECT * FROM lead_contacts
+                    WHERE target_id = %s
                     ORDER BY is_priority DESC, full_name ASC
                 """, (target_id,))
                 

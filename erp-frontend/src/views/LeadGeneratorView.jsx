@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API from "../api/api";
+import { FiMail, FiRefreshCw, FiSend, FiPaperclip } from "react-icons/fi";
 
 export default function LeadGeneratorView({ state }) {
     const [companyName, setCompanyName] = useState("");
@@ -17,8 +18,16 @@ export default function LeadGeneratorView({ state }) {
     const [editingTargetId, setEditingTargetId] = useState(null);
     const [editForm, setEditForm] = useState({ company_name: "", domain: "" });
 
+    const [emailModal, setEmailModal] = useState({ isOpen: false, contact: null, target: null });
+    const [selectedProductCode, setSelectedProductCode] = useState("");
+    const [draftSubject, setDraftSubject] = useState("");
+    const [draftBody, setDraftBody] = useState("");
+    const [feedback, setFeedback] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [attachments, setAttachments] = useState([]);
+
     const isBulkMode = !!file;
-    console.log(state.user.name);
+
     useEffect(() => { loadTargets(); }, []);
 
     const loadTargets = async () => {
@@ -127,6 +136,82 @@ export default function LeadGeneratorView({ state }) {
         }
     };
 
+    const openEmailModal = (contact, target) => {
+        setEmailModal({ isOpen: true, contact, target });
+        setDraftSubject("");
+        setDraftBody("");
+        setFeedback("");
+        setSelectedProductCode("");
+        setAttachments([]);
+    };
+
+    const closeEmailModal = () => {
+        setEmailModal({ isOpen: false, contact: null, target: null });
+    };
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length + attachments.length > 5) {
+            state.showErrorModal("Limit Exceeded", "You can only attach a maximum of 5 files.");
+            return;
+        }
+        setAttachments(prev => [...prev, ...files]);
+    };
+
+    const removeAttachment = (idx) => {
+        setAttachments(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    const generateEmail = async (isRewrite = false) => {
+        if (!selectedProductCode && !isRewrite) {
+            state.showErrorModal("Selection Required", "Please select a product from the catalog to feature in this email.");
+            return;
+        }
+
+        const product = state.itemsMaster.find(i => i.item_code === selectedProductCode);
+        
+        setIsGenerating(true);
+        try {
+            const payload = {
+                contact_name: emailModal.contact.full_name,
+                designation: emailModal.contact.designation,
+                company_name: emailModal.target.company_name,
+                item_name: product?.item_name || selectedProductCode,
+                item_specs: product?.additional_spec_text || "Standard laboratory equipment specifications.",
+                feedback: isRewrite ? feedback : null,
+                previous_draft: isRewrite ? draftBody : null
+            };
+
+            const response = await API.generateLeadEmail(payload, state.user.access_token);
+            setDraftSubject(response.subject);
+            setDraftBody(response.body);
+            if (isRewrite) setFeedback(""); // Clear feedback after successful rewrite
+            
+        } catch (err) {
+            state.showErrorModal("AI Generation Failed", err.message);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleSendYahoo = () => {
+        if (!draftSubject || !draftBody) return;
+
+        // Construct Yahoo Compose URL
+        const encodedSubject = encodeURIComponent(draftSubject);
+        const encodedBody = encodeURIComponent(draftBody);
+        const yahooUrl = `https://compose.mail.yahoo.com/?to=${emailModal.contact.email}&subj=${encodedSubject}&body=${encodedBody}`;
+        
+        window.open(yahooUrl, "_blank");
+
+        if (attachments.length > 0) {
+            state.setAlertMessage(`⚠️ Yahoo Mail opened in a new tab. Because web browsers block automatic file transfers for security, please manually drag and drop your ${attachments.length} attached files into the Yahoo window.`);
+            state.setIsAlertOpen(true);
+        }
+        
+        closeEmailModal();
+    };
+
     const handleMockSync = async (e, targetId) => {
         e.stopPropagation();
         try {
@@ -138,6 +223,105 @@ export default function LeadGeneratorView({ state }) {
 
     return (
         <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 25 }}>
+        {emailModal.isOpen && (
+                <div className="modal-overlay" onClick={closeEmailModal}>
+                    <div className="modal-box" style={{ maxWidth: '800px', width: '90%', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+                        
+                        <div style={{ background: 'var(--brand-accent)', color: '#fff', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><FiMail /> AI Cold Outreach Drafter</h3>
+                            <button className="btn-text" style={{ color: '#fff', fontSize: '18px', padding: 0 }} onClick={closeEmailModal}>✕</button>
+                        </div>
+
+                        <div style={{ padding: '20px', overflowY: 'auto', flexGrow: 1 }}>
+                            
+                            {/* Contact Context */}
+                            <div style={{ background: 'var(--bg-main)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '20px' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Target Context</div>
+                                <strong>{emailModal.contact.full_name}</strong> - {emailModal.contact.designation} @ {emailModal.target.company_name}
+                                <div style={{ color: 'var(--brand-accent)', fontSize: '13px', marginTop: '4px' }}>{emailModal.contact.email}</div>
+                            </div>
+
+                            {/* Catalog Selection & Attachments */}
+                            <div className="form-grid-layout" style={{ gridTemplateColumns: '2fr 1fr', marginBottom: '20px' }}>
+                                <div className="form-group">
+                                    <label className="input-label">Feature Product from Catalog</label>
+                                    <select className="form-select-native" value={selectedProductCode} onChange={e => setSelectedProductCode(e.target.value)}>
+                                        <option value="">-- Select Product Context --</option>
+                                        {(state.itemsMaster || []).map(item => (
+                                            <option key={item.item_code} value={item.item_code}>{item.item_code} - {item.item_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="input-label">Attachments ({attachments.length}/5)</label>
+                                    <label className="btn btn-secondary" style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
+                                        <FiPaperclip style={{ marginRight: '6px' }}/> Add Files
+                                        <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png" style={{ display: 'none' }} onChange={handleFileChange} />
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Display Attachment Names */}
+                            {attachments.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
+                                    {attachments.map((file, idx) => (
+                                        <span key={idx} style={{ fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {file.name}
+                                            <span style={{ color: 'var(--brand-danger)', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => removeAttachment(idx)}>✕</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Generate Button (Initial) */}
+                            {!draftBody && (
+                                <button className="btn btn-primary" onClick={() => generateEmail(false)} disabled={isGenerating || !selectedProductCode} style={{ width: '100%', padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                                    {isGenerating ? "🧠 AI is drafting..." : "✨ Generate Intelligent Draft"}
+                                </button>
+                            )}
+
+                            {/* Draft Editor & Rewrite Feedback */}
+                            {draftBody && (
+                                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: '10px' }}>
+                                    <div className="form-group">
+                                        <label className="input-label">Subject Line</label>
+                                        <input className="form-input" value={draftSubject} onChange={e => setDraftSubject(e.target.value)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="input-label">Email Body (Human Edits Allowed)</label>
+                                        <textarea className="form-input" rows={8} value={draftBody} onChange={e => setDraftBody(e.target.value)} style={{ lineHeight: '1.5', fontFamily: 'sans-serif' }} />
+                                    </div>
+                                    
+                                    <div style={{ background: '#f8f4ff', border: '1px solid #dcd0ff', padding: '15px', borderRadius: '8px', marginTop: '20px' }}>
+                                        <label className="input-label" style={{ color: '#5e35b1' }}>AI Human-in-the-loop Rewrite</label>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <input 
+                                                className="form-input" 
+                                                placeholder="e.g. Make it shorter, change tone to highly formal, remove the question at the end..." 
+                                                value={feedback} 
+                                                onChange={e => setFeedback(e.target.value)} 
+                                                style={{ background: '#fff' }}
+                                            />
+                                            <button className="btn btn-secondary" onClick={() => generateEmail(true)} disabled={isGenerating || !feedback} style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <FiRefreshCw /> {isGenerating ? "Rewriting..." : "Rewrite"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer / Send Action */}
+                        <div style={{ padding: '15px 20px', background: 'var(--bg-main)', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button className="btn btn-secondary" onClick={closeEmailModal}>Discard</button>
+                            <button className="btn btn-success" onClick={handleSendYahoo} disabled={!draftBody || isGenerating} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 20px' }}>
+                                <FiSend /> Open in Yahoo Business
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="system-header" style={{ marginBottom: "20px" }}>
                 <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Lead Generator Engine</h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
@@ -264,6 +448,7 @@ export default function LeadGeneratorView({ state }) {
                                                                 </td>
                                                                 <td style={{ padding: '10px' }}>{c.designation}</td>
                                                                 <td style={{ padding: '10px', color: 'var(--brand-accent)' }}>{c.email}</td>
+                                                                <td style={{ padding: '10px', textAlign: 'right' }}><button className="btn btn-secondary" onClick={() => openEmailModal(c, target)} style={{ fontSize: '11px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FiMail /> Draft Email</button></td>
                                                             </tr>
                                                         ))}
                                                     </tbody>

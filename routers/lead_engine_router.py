@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
-from schemas.lead_generator_schema import TargetPayload
+from schemas.lead_generator_schema import TargetPayload, EmailGenPayload
 from fastapi import UploadFile, File
 import pandas as pd
 import io
+from services.ai_generate_email import generate_mail
 
 router = APIRouter(prefix="/api/v1/lead-engine", tags=["Lead Generation Engine"])
 
@@ -94,3 +95,13 @@ def deactivate_target(target_id: int, user: dict = Depends(verify_bearer_token))
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.post("/generate-email", dependencies=[Depends(check_department("Sales Representative"))])
+def generate_cold_email(payload: EmailGenPayload, user: dict = Depends(verify_bearer_token)):
+    email_data = generate_mail(payload)
+
+    if email_data["error"]:
+        raise HTTPException(status_code=500, detail=f"AI Generation Failed: {email_data["error"]}")
+    
+    else:
+        return email_data
