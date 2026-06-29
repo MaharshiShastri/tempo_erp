@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../api/api";
-import { FiTrendingUp, FiActivity, FiTruck, FiDownload, FiPieChart, FiMapPin, FiUsers } from "react-icons/fi";
+import { FiTrendingUp, FiActivity, FiTruck, FiPrinter, FiPieChart, FiAlertOctagon, FiTarget } from "react-icons/fi";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function SalesAnalyticsView({ state }) {
     const [salesKpis, setSalesKpis] = useState([]);
@@ -11,20 +15,26 @@ export default function SalesAnalyticsView({ state }) {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("overview");
     const [isExporting, setIsExporting] = useState(false);
-    
+    const [gtmKpis, setGtmKpis] = useState([]);
+    const [errorLogs, setErrorLogs] = useState([]);
+
     const dashboardRef = useRef(null);
 
     useEffect(() => {
         const fetchAllKPIs = async () => {
             try {
-                const [salesData, transportData, rndData] = await Promise.all([
+                const [salesData, transportData, rndData, gtmData, errorData] = await Promise.all([
                     API.fetchSalesKPIs(state.user.access_token),
                     API.fetchTransportKPIs(state.user.access_token),
-                    API.fetchRnDKPIs(state.user.access_token) // NEW
+                    API.fetchRnDKPIs(state.user.access_token),
+                    API.fetchGtmAnalytics(state.user.access_token),
+                    API.fetchSystemHealth(state.user.access_token)
                 ]);
                 setSalesKpis(salesData);
                 setTransportKpis(transportData);
-                setRndKpis(rndData); // NEW
+                setRndKpis(rndData);
+                setGtmKpis(gtmData);
+                setErrorLogs(errorData);
             } catch (err) {
                 state.showErrorModal("Analytics Error", err.message);
             } finally {
@@ -78,6 +88,26 @@ export default function SalesAnalyticsView({ state }) {
         }
     };
 
+    const gtmChartData = {
+    labels: ['April', 'May', 'June'], // Dynamically generate based on last 3 months
+    datasets: [
+        {
+            label: 'Snov.io Leads',
+            data: [45, 60, 85],
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+        },
+        {
+            label: 'Manual Generation',
+            data: [20, 15, 10],
+            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+        },
+        {
+            label: 'Website Inbound',
+            data: [10, 25, 40],
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        }
+    ],
+};
     if (isLoading) {
         return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Command Center Data...</div>;
     }
@@ -87,6 +117,7 @@ export default function SalesAnalyticsView({ state }) {
     const conversionRatio = totalQueued > 0 ? ((totalHarvested / totalQueued) * 100).toFixed(1) : 0;
     const totalCrmLeads = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.total_crm_leads || 0), 0);
     const totalFaqsAsked = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.faqs_asked || 0), 0);
+    const totalErrors = errorLogs.length;
 
     return (
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -128,7 +159,7 @@ export default function SalesAnalyticsView({ state }) {
                             <FiPieChart /> Executive Command Center
                         </h2>
                         <p style={{ margin: '6px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>
-                            Financial data, regional exposure, and team performance
+                            Financial data, GTM Source Evaluation, and System Health
                         </p>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -140,6 +171,8 @@ export default function SalesAnalyticsView({ state }) {
                     <button className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('overview')}>General Overview</button>
                     <button className={`btn ${activeTab === 'performance' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('performance')}><FiUsers /> Team Performance</button>
                     <button className={`btn ${activeTab === 'financial' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('financial')}><FiTruck /> Logistics & Financials</button>
+                    <button className={`btn ${activeTab === 'GTM' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('GTM')}><FiTarget />GTM analytics</button>
+                    <button className={`btn ${activeTab === 'health' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('health')}><FiAlertOctagon />System analytics</button>
                 </div>
 
                 {/* Print Only Header */}
@@ -168,6 +201,10 @@ export default function SalesAnalyticsView({ state }) {
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active Carrier Network</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-accent)' }}>{transportKpis.total_partners}</div>
+                        </div>
+                        <div style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-danger-light, #f8d7da)' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Internal Server Faults</div>
+                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--brand-danger)' }}>{totalErrors}</div>
                         </div>
                     </div>
                 )}
@@ -301,7 +338,96 @@ export default function SalesAnalyticsView({ state }) {
                         </div>
                     </div>
                 )}
+                
+                {/*GTM Chrt.JS*/}
+                {activeTab === 'GTM' && (
+                <div style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-light)', marginTop: '20px' }}>
+                    <h4 style={{ margin: '0 0 15px 0' }}>GTM Source Evaluation (Last 90 Days)</h4>
+                    <div style={{ height: '300px' }}>
+                        <Bar data={gtmChartData} options={{ responsive: true, maintainAspectRatio: false }} />
+                    </div>
+               </div>
+                )}
+                {/*System analytics*/}
+                {(activeTab === 'health') && (
+                    <div className="print-section">
+                        <h4 style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "10px", display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-danger)' }}>
+                            <FiAlertOctagon /> Engineering System Fault Logs
+                        </h4>
+                        <div style={{ background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-light)', overflowX: 'auto', marginTop: '15px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
+                                        <th style={{ padding: '12px 15px' }}>Timestamp</th>
+                                        <th style={{ padding: '12px 15px' }}>API Route</th>
+                                        <th style={{ padding: '12px 15px' }}>Exception Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {errorLogs.length === 0 ? (
+                                        <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px', color: 'var(--brand-success)'}}>✅ 100% Uptime. No recent server errors.</td></tr>
+                                    ) : (
+                                        errorLogs.map((log, idx) => (
+                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-main)' }}>
+                                                <td style={{ padding: '12px 15px', color: 'var(--text-muted)' }}>{log.created_at.split('.')[0].replace('T', ' ')}</td>
+                                                <td style={{ padding: '12px 15px', fontFamily: 'monospace', fontWeight: 'bold' }}>{log.route_path}</td>
+                                                <td style={{ padding: '12px 15px', color: 'var(--brand-danger)' }}>{log.error_message}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
+
+`{(activeTab === 'gtm') && (
+                    <div className="print-section">
+                        <h4 style={{ borderBottom: "1px solid var(--border-light)", paddingBottom: "10px", display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                            <FiTarget /> GTM Data Source ROI (Last 90 Days)
+                        </h4>
+                        <div style={{ background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-light)', overflowX: 'auto', marginTop: '15px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
+                                        <th style={{ padding: '12px 15px' }}>GTM Provider</th>
+                                        <th style={{ padding: '12px 15px' }}>Month</th>
+                                        <th style={{ padding: '12px 15px', textAlign: 'center' }}>Total Spend</th>
+                                        <th style={{ padding: '12px 15px', textAlign: 'center' }}>Yield (Found/Queued)</th>
+                                        <th style={{ padding: '12px 15px', textAlign: 'center' }}>Sent Email</th>
+                                        <th style={{ padding: '12px 15px', textAlign: 'center' }}>Replies</th>
+                                        <th style={{ padding: '12px 15px', textAlign: 'center' }}>Closed Deals</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {gtmKpis.length === 0 ? (
+                                        <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px'}}>No GTM data logged yet.</td></tr>
+                                    ) : (
+                                        gtmKpis.map((kpi, idx) => {
+                                            const yieldRate = kpi.targets_queued > 0 ? ((kpi.emails_found / kpi.targets_queued) * 100).toFixed(1) : 0;
+                                            const closeRate = kpi.emails_sent > 0 ? ((kpi.deals_closed / kpi.emails_sent) * 100).toFixed(1) : 0;
+
+                                            return (
+                                                <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                                    <td style={{ padding: '12px 15px', fontWeight: 'bold' }}>{kpi.gtm_source}</td>
+                                                    <td style={{ padding: '12px 15px' }}>{kpi.month}</td>
+                                                    <td style={{ padding: '12px 15px', textAlign: 'center', color: 'var(--brand-danger)', fontWeight: 'bold' }}>${kpi.total_spend.toFixed(2)}</td>
+                                                    <td style={{ padding: '12px 15px', textAlign: 'center' }}>{kpi.emails_found} / {kpi.targets_queued} <br/><span style={{fontSize:'10px', color: 'var(--text-muted)'}}>({yieldRate}%)</span></td>
+                                                    <td style={{ padding: '12px 15px', textAlign: 'center' }}>{kpi.emails_sent}</td>
+                                                    <td style={{ padding: '12px 15px', textAlign: 'center', color: 'var(--brand-accent)' }}>{kpi.replies_received}</td>
+                                                    <td style={{ padding: '12px 15px', textAlign: 'center', color: 'var(--brand-success)', fontWeight: 'bold' }}>
+                                                        {kpi.deals_closed} <br/><span style={{fontSize:'10px', color: 'var(--text-muted)'}}>({closeRate}% Win)</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}`

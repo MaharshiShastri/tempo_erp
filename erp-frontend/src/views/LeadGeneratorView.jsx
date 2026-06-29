@@ -449,6 +449,12 @@ export default function LeadGeneratorView({ state }) {
                                                                 <td style={{ padding: '10px' }}>{c.designation}</td>
                                                                 <td style={{ padding: '10px', color: 'var(--brand-accent)' }}>{c.email}</td>
                                                                 <td style={{ padding: '10px', textAlign: 'right' }}><button className="btn btn-secondary" onClick={() => openEmailModal(c, target)} style={{ fontSize: '11px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FiMail /> Draft Email</button></td>
+                                                                <div style={{ display: 'flex', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '6px', overflow: 'hidden', marginRight: '10px' }}>
+                                                                   <button className={`btn ${c.email_status === 'Sent Email' ? 'btn-primary' : 'btn-text'}`} style={{ padding: '4px 8px', fontSize: '10px', borderRadius: 0, borderRight: '1px solid var(--border-light)' }}onClick={() => updateContactStatus(c.id, 'Sent Email')}>Sent</button>
+                                                                   <button className={`btn ${c.email_status === 'Got Reply' ? 'btn-secondary' : 'btn-text'}`} style={{ padding: '4px 8px', fontSize: '10px', borderRadius: 0, borderRight: '1px solid var(--border-light)', background: c.email_status === 'Got Reply' ? '#fff8f0' : 'transparent', color: c.email_status === 'Got Reply' ? '#e67e22' : 'var(--text-muted)' }} onClick={() => updateContactStatus(c.id, 'Got Reply')}>Replied</button>
+                                                                   <button className={`btn ${c.email_status === 'Closed Enquiry' ? 'btn-success' : 'btn-text'}`} style={{ padding: '4px 8px', fontSize: '10px', borderRadius: 0 }}onClick={() => updateContactStatus(c.id, 'Closed Enquiry')}>Closed</button>
+                                                                </div>
+                                                                
                                                             </tr>
                                                         ))}
                                                     </tbody>

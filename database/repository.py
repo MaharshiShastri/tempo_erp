@@ -1336,9 +1336,30 @@ class PostgresRepository:
                     "total_partners": total_partners,
                     "monthly_costs": monthly_costs
                 }        
-            
+    def get_gtm_analytics(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        gtm_source,
+                        TO_CHAR(added_date, 'YYYY-MM') as month,
+                        COUNT(id) as targets_queued,
+                        SUM(cost_per_credit) as total_spend,
+                        SUM(emails_found) as emails_found,
+                        COUNT(CASE WHEN email_status IN ('Sent Email', 'Got Reply', 'Closed Enquiry') THEN 1 END) as emails_sent,
+                        COUNT(CASE WHEN email_status = 'Got Reply' THEN 1 END) as replies_received,
+                        COUNT(CASE WHEN email_status = 'Closed Enquiry' THEN 1 END) as deals_closed
+                    FROM lead_targets
+                    WHERE added_date >= CURRENT_DATE - INTERVAL '1 month'
+                    GROUP BY gtm_source, TO_CHAR(added_date, 'YYYY-MM')
+                    ORDER BY month DESC, gtm_source ASC
+                """)
+                data = cur.fetchall()
+                for d in data:
+                    d['total_spend'] = float(d['total_spend'] or 0.0)
+                return data
     # --- SALES ANALYTICS & KPIs end ---
-    # --- SYSTEM NOTIFICATIONS start ---
+    # --- SYSTEM LOGS start ---
     def create_system_notification(self, user_email: str, title: str, message: str, notif_type: str):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
@@ -1347,7 +1368,20 @@ class PostgresRepository:
                     VALUES (%s, %s, %s, %s)
                 """, (user_email, title, message, notif_type))
                 conn.commit()
-    # --- SYSTEM NOTIFICATIONS end ---
+    
+    def get_system_errors(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT route_path, error_message, created_at 
+                    FROM system_error_logs 
+                    ORDER BY created_at DESC LIMIT 50
+                """)
+                data = cur.fetchall()
+                for d in data: d['created_at'] = d['created_at'].isoformat()
+                return data
+            
+    # --- SYSTEM LOGS end ---
     # --- GLOBAL PRODUCTION PULSE start ---
     def get_global_production_pulse(self):
         with self._get_connection() as conn:

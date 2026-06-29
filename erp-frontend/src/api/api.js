@@ -677,7 +677,17 @@ const API = {
 
     return r.json();
   },
-  
+  async fetchGtmAnalytics(token) {
+    const r = await fetch("/api/v1/analytics/gtm-roi", { headers: this.headers(token) });
+    if (!r.ok) throw new Error("Failed to fetch GTM Analytics");
+    return r.json();
+  },
+
+  async fetchSystemHealth(token) {
+    const r = await fetch("/api/v1/analytics/system-health", { headers: this.headers(token) });
+    if (!r.ok) throw new Error("Failed to fetch System Health");
+    return r.json();
+  },
 };
 
 export default API;

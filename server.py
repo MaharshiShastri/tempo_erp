@@ -10,6 +10,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from database.repository import EDBR
+import traceback
 
 from routers.auth_router import router as auth_router
 from routers.orders_router import router as orders_router
@@ -64,6 +66,30 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
     return JSONResponse(status_code=422,content={"detail": exc.errors()})
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    route_path = request.url.path
+    error_message = str(exc)
+    stack_trace = traceback.format_exc()
+    
+    # Do not log standard 401/403/404 HTTPExceptions as system crashes
+    if not hasattr(exc, "status_code") or exc.status_code >= 500:
+        try:
+            with EDBR._get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO system_error_logs (route_path, error_message, stack_trace)
+                        VALUES (%s, %s, %s)
+                    """, (route_path, error_message, stack_trace))
+                    conn.commit()
+        except Exception as db_e:
+            print(f"CRITICAL: Failed to log error to DB. {db_e}")
+
+    # Return a safe, generic error to the frontend
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error. The engineering team has been notified."}
+    )
 app.include_router(auth_router)
 app.include_router(orders_router)
 app.include_router(billing_router)

@@ -32,3 +32,11 @@ def get_rnd_kpis(user: dict = Depends(verify_bearer_token)):
         return EDBR.get_rnd_kpis()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/gtm-roi", tags=["Admin Only"])
+def get_gtm_roi(user: dict = Depends(verify_bearer_token)):
+    return EDBR.get_gtm_analytics()
+
+@router.get("/system-health", tags=["Admin Only"])
+def get_system_health(user: dict = Depends(verify_bearer_token)):
+    return EDBR.get_system_errors()
