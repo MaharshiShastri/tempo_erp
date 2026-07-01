@@ -14,3 +14,8 @@ class TaskResponse(BaseModel):
     direction: str
     is_incomplete: bool  # True = Incomplete (ON), False = Completed (OFF)
     created_at: str
+
+class TaskUpdatePayload(BaseModel):
+    title: str
+    details: str
+    deadline: Optional[str] = None

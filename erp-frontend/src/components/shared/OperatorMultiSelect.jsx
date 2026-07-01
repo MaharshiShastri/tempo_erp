@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-export default function OperatorMultiSelect({ users, selectedEmails, onChange }) {
-    const [search, setSearch] = React.useState('');
-    const [isOpen, setIsOpen] = React.useState(false);
+export default function OperatorMultiSelect({ users, selectedEmails, onChange, }) {
+    const [search, setSearch] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
 
     // Prioritize StartsWith, then Contains
     const filteredUsers = users.filter(u => {

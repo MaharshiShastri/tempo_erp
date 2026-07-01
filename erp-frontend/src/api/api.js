@@ -688,6 +688,36 @@ const API = {
     if (!r.ok) throw new Error("Failed to fetch System Health");
     return r.json();
   },
+  
+  async fetchProductionKPIs(token) {
+    const r = await fetch("/api/v1/analytics/production", { headers: this.headers(token) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async updateTask(taskId, payload, token) {
+    const r = await fetch(`/api/v1/tasks/${taskId}`, { method: "PUT", headers: this.headers(token), body: JSON.stringify(payload) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async deleteTask(taskId, token) {
+    const r = await fetch(`/api/v1/tasks/${taskId}`, { method: "DELETE", headers: this.headers(token) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async addManualActivityLog(orderId, payload, token) {
+    const r = await fetch(`/api/v1/dashboard/logs`, { method: "POST", headers: this.headers(token), body: JSON.stringify(payload) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  async deleteActivityLog(logId, token) {
+    const r = await fetch(`/api/v1/logs/${logId}`, { method: "DELETE", headers: this.headers(token) });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
 };
 
 export default API;

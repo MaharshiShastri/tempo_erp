@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
-
+from schemas.task_schema import TaskUpdatePayload
 router = APIRouter(prefix="/api/v1/tasks", tags=["Task Manager Subsystem"])
 
 UPLOAD_DIR = Path("uploaded_task_attachments")
@@ -71,3 +71,18 @@ def toggle_task(task_id: int, user_profile: dict = Depends(verify_bearer_token))
         return EDBR.toggle_task_status(task_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+@router.put("/{task_id}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+def edit_task(task_id: int, payload: TaskUpdatePayload, user: dict = Depends(verify_bearer_token)):
+    try:
+        return EDBR.update_task(task_id, payload.title, payload.details, payload.deadline, user["email"], user["role"])
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@router.delete("/{task_id}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+def remove_task(task_id: int, user: dict = Depends(verify_bearer_token)):
+    try:
+        EDBR.delete_task(task_id, user["email"], user["role"])
+        return {"status": "success"}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))

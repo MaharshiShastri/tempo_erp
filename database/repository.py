@@ -15,24 +15,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 logger.info(f"DB URI: {DB_DSN}")
 
-"""CREATE TABLE client_companies (
-    id VARCHAR(20) PRIMARY KEY,
-
-    name VARCHAR(255) NOT NULL UNIQUE,
-
-    address_line_1 VARCHAR(255) NOT NULL,
-    city VARCHAR(100) NOT NULL,
-    state VARCHAR(100) NOT NULL,
-    pincode VARCHAR(10) NOT NULL,
-
-    contact_name VARCHAR(255) NOT NULL,
-    contact_role VARCHAR(100) NOT NULL,
-    contact_phone VARCHAR(20) NOT NULL,
-
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-"""
 class PostgresRepository:
     def _get_connection(self):
         return psycopg2.connect(DB_DSN, cursor_factory=RealDictCursor)
@@ -262,6 +244,41 @@ class PostgresRepository:
                 new_task['created_at'] = new_task['created_at'].isoformat()
                 new_task['deadline'] = new_task['deadline'].isoformat() if new_task.get('deadline') else None
                 return new_task
+    def update_task(self, task_id: int, title: str, details: str, deadline: str, user_email: str, user_role: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Admins can edit anything, otherwise only the assigner can edit
+                if user_role in ['Admin', 'Chief Full Stack Developer']:
+                    cur.execute("""
+                        UPDATE tasks SET title=%s, details=%s, deadline=%s 
+                        WHERE id=%s RETURNING *
+                    """, (title, details, deadline, task_id))
+                else:
+                    cur.execute("""
+                        UPDATE tasks SET title=%s, details=%s, deadline=%s 
+                        WHERE id=%s AND assigned_by=%s RETURNING *
+                    """, (title, details, deadline, task_id, user_email))
+                
+                updated = cur.fetchone()
+                if not updated:
+                    raise ValueError("Task not found or unauthorized to edit.")
+                conn.commit()
+                return updated
+            
+    def delete_task(self, task_id: int, user_email: str, user_role: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                if user_role in ['Admin', 'Chief Full Stack Developer']:
+                    cur.execute("DELETE FROM tasks WHERE id=%s RETURNING id", (task_id,))
+                else:
+                    cur.execute("DELETE FROM tasks WHERE id=%s AND assigned_by=%s RETURNING id", (task_id, user_email))
+                
+                deleted = cur.fetchone()
+                if not deleted:
+                    raise ValueError("Task not found or unauthorized to delete.")
+                conn.commit()
+                return deleted
+            
 
     def toggle_task_status(self, task_id: int) -> dict:
         with self._get_connection() as conn:
@@ -720,7 +737,26 @@ class PostgresRepository:
                 for log in logs:
                     log['created_at'] = log['created_at'].isoformat() if log['created_at'] else None
                 return logs
+    def add_manual_activity_log(self, order_id: str, message: str, operator_email: str, operator_name: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO activity_logs (order_acceptance_id, log_type, message, operator_email, operator_name)
+                    VALUES (%s, 'MANUAL_ENTRY', %s, %s, %s) RETURNING *
+                """, (order_id, message, operator_email, operator_name))
+                conn.commit()
+                return cur.fetchone()
 
+    def delete_activity_log(self, log_id: int, user_role: str):
+        # Strict restriction: Only Admins can delete audit logs
+        if user_role not in ['Admin', 'Chief Full Stack Developer']:
+            raise ValueError("Only System Administrators can alter the audit trail.")
+            
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM activity_logs WHERE log_id=%s RETURNING log_id", (log_id,))
+                conn.commit()
+                return True
     def create_activity_log(self, entity_type: str, entity_id: str, operator_email: str, log_type: str, message: str, metadata: dict = None):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
@@ -1350,7 +1386,7 @@ class PostgresRepository:
                         COUNT(CASE WHEN email_status = 'Got Reply' THEN 1 END) as replies_received,
                         COUNT(CASE WHEN email_status = 'Closed Enquiry' THEN 1 END) as deals_closed
                     FROM lead_targets
-                    WHERE added_date >= CURRENT_DATE - INTERVAL '1 month'
+                    WHERE added_date >= CURRENT_DATE - INTERVAL '1 month' AND status = 'Completed'
                     GROUP BY gtm_source, TO_CHAR(added_date, 'YYYY-MM')
                     ORDER BY month DESC, gtm_source ASC
                 """)
@@ -1358,6 +1394,20 @@ class PostgresRepository:
                 for d in data:
                     d['total_spend'] = float(d['total_spend'] or 0.0)
                 return data
+    def get_production_analytics(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # Groups orders by their current shop floor stage
+                cur.execute("""
+                    SELECT 
+                        COALESCE(production_stage, 'PO_SUBMITTED') as stage, 
+                        COUNT(order_acceptance_id) as count
+                    FROM order_headers
+                    GROUP BY production_stage
+                    ORDER BY count DESC
+                """)
+                return cur.fetchall()
+            
     # --- SALES ANALYTICS & KPIs end ---
     # --- SYSTEM LOGS start ---
     def create_system_notification(self, user_email: str, title: str, message: str, notif_type: str):

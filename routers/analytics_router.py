@@ -40,3 +40,12 @@ def get_gtm_roi(user: dict = Depends(verify_bearer_token)):
 @router.get("/system-health", tags=["Admin Only"])
 def get_system_health(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_system_errors()
+
+@router.get("/production", tags=["Admin Only"])
+def get_production_kpis(user: dict = Depends(verify_bearer_token)):
+    if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:
+        raise HTTPException(status_code=403, detail="Unauthorized access to KPIs.")
+    try:
+        return EDBR.get_production_analytics()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
