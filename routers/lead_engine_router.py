@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
-from schemas.lead_generator_schema import TargetPayload, EmailGenPayload
+from schemas.lead_generator_schema import TargetPayload, EmailGenPayload, MappedContact, ApproveStagingPayload
 from fastapi import UploadFile, File
 import pandas as pd
 import io
@@ -105,3 +105,19 @@ def generate_cold_email(payload: EmailGenPayload, user: dict = Depends(verify_be
     
     else:
         return email_data
+    
+@router.post("/targets/{target_id}/approve-staging", dependencies=[Depends(check_department("Admin"))])
+def approve_snovio_staging(target_id: int, payload: ApproveStagingPayload, user: dict = Depends(verify_bearer_token)):
+    with EDBR._get_connection() as conn:
+        with conn.cursor() as cur:
+            # Insert approved contacts
+            for c in payload.contacts:
+                cur.execute("""
+                    INSERT INTO lead_contacts (target_id, full_name, designation, email, is_priority)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (target_id, c.full_name, c.designation, c.email, c.is_priority))
+            
+            # Update target status to Completed
+            cur.execute("UPDATE lead_targets SET status = 'Completed', emails_found = %s WHERE id = %s", (len(payload.contacts), target_id))
+            conn.commit()
+    return {"status": "success"}

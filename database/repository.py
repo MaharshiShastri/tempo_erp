@@ -238,7 +238,7 @@ class PostgresRepository:
                 cur.execute("""
                     INSERT INTO tasks (title, details, direction, is_incomplete, assigned_by, assigned_to, attachment_url, deadline)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', []), task_dict.get('attachment_path'), task_dict.get('deadline')))
+                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', []), task_dict.get('attachment_url'), task_dict.get('deadline')))
                 conn.commit()
                 new_task = cur.fetchone()
                 new_task['created_at'] = new_task['created_at'].isoformat()
@@ -291,6 +291,24 @@ class PostgresRepository:
                 updated['deadline'] = updated['deadline'].isoformat() if updated.get('deadline') else None
                 return updated
     
+    def get_task_by_id(self, task_id: int) -> dict:
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT * FROM tasks WHERE id = %s
+                """, (task_id,))
+                task = cur.fetchone()
+                if not task:
+                    return None
+
+                task["created_at"] = (task["created_at"].isoformat() if task.get("created_at") else None)
+
+                task["deadline"] = (task["deadline"].isoformat() if task.get("deadline") else None)
+
+                task["completed_at"] = (task["completed_at"].isoformat() if task.get("completed_at") else None)
+
+                return task
+
     def create_dispatch_record(self, record: dict, operator_email: str):
         with self._get_connection() as conn:
             with conn.cursor() as cur:

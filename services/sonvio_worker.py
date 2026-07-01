@@ -3,12 +3,13 @@ import json
 import requests
 import redis
 from database.repository import EDBR
+import time
 
 # Initialize Redis
-redis_cache = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_cache = redis.Redis(host="redis", port=6379, decode_responses=True)
 
-SNOVIO_CLIENT_ID = os.getenv("SNOVIO_CLIENT_ID", "your_client_id")
-SNOVIO_CLIENT_SECRET = os.getenv("SNOVIO_CLIENT_SECRET", "your_client_secret")
+SNOVIO_CLIENT_ID = os.getenv("SNOVIO_CLIENT_ID", "")
+SNOVIO_CLIENT_SECRET = os.getenv("SNOVIO_CLIENT_SECRET", "")
 
 def get_snovio_token():
     """Generates a temporary OAuth token for Snov.io"""
@@ -30,60 +31,50 @@ def get_snovio_token():
         return token
     return None
 
-def process_target_domain(target_id: int, domain: str, gtm_source: str = "Snov.io", cost: float = 0.015):
-    """Fetches high-value roles from Snov.io with Redis Caching"""
-    cache_key = f"{gtm_source.lower()}_domain:{domain}"
-    
-    # 1. Check Redis Cache (Don't waste credits on duplicate lookups!)
-    cached_data = redis_cache.get(cache_key)
-    
-    if cached_data:
-        emails_data = json.loads(cached_data)
-    else:
-        # 2. Call Snov.io API Domain Search V2
-        token = get_snovio_token()
-        url = "https://api.snov.io/v2/domain-search"
-        
-        # We strictly target the exact roles you requested
-        params = {
-            "domain": domain,
-            "type": "personal",
-            "positions[]": ["Purchase", "Quality Analyst", "Quality Control", "Product Manager"],
-            "limit": 10
-        }
-        
-        headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(url, headers=headers, params=params)
-        
-        if response.status_code == 200:
-            emails_data = response.json().get("emails", [])
-            # 3. Cache the results for 30 days to save money
-            redis_cache.setex(cache_key, 2592000, json.dumps(emails_data))
-        else:
-            emails_data = []
+headers = {"Authorization": f"Bearer {get_snovio_token()}"}
 
-    # 4. Save to PostgreSQL Database
-    emails_found_count = len(emails_data)
+def poll_snovio_task(result_url, max_retries=15):
+    for _ in range(max_retries):
+        res = requests.get(result_url, headers=headers)
+        if res.status_code == 200 and res.json().get("status") == "completed":
+            return res.json()
+        time.sleep(3)
+    return None
+
+def process_target_domain(domain: str):
+    """Fetches both Prospects and raw Domain Emails."""
+    data_payload = {"prospects": [], "emails": []}
+    
+    # 1. Fetch Prospects (Names + Titles)
+    prospect_params = {"domain": domain, "type": "personal", "limit": 10}
+    p_res = requests.post("https://api.snov.io/v2/domain-search/prospects/start", headers=headers, params=prospect_params)
+    if p_res.status_code == 202:
+        p_data = poll_snovio_task(p_res.json()["links"]["result"])
+        if p_data: data_payload["prospects"] = p_data.get("data", [])
+
+    # 2. Fetch Raw Domain Emails
+    e_res = requests.post("https://api.snov.io/v2/domain-search/domain-emails/start", headers=headers, params={"domain": domain})
+    if e_res.status_code == 202:
+        e_data = poll_snovio_task(e_res.json()["links"]["result"])
+        if e_data: data_payload["emails"] = [e["email"] for e in e_data.get("data", [])]
+
+    return data_payload
+
+def run_automated_job():
+    """Main loop: Only fetches Pending targets."""
     with EDBR._get_connection() as conn:
         with conn.cursor() as cur:
-            # Mark target completed, update cost and yield
-            cur.execute("""
-                UPDATE lead_targets 
-                SET status = 'Completed', emails_found = %s, gtm_source = %s, cost_per_credit = %s
-                WHERE id = %s
-            """, (emails_found_count, gtm_source, cost, target_id))
-            
-            # Insert the actual contacts
-            for emp in emails_data:
-                full_name = f"{emp.get('firstName', '')} {emp.get('lastName', '')}".strip()
-                designation = emp.get('position', 'Unknown')
-                email = emp.get('email', '')
-                
-                # Flag priority based on keyword
-                is_priority = any(keyword in designation.lower() for keyword in ["purchase", "quality", "product"])
-                
+            cur.execute("SELECT id, domain FROM lead_targets WHERE status = 'Pending'")
+            pending_targets = cur.fetchall()
+
+    for target in pending_targets:
+        raw_snovio_json = process_target_domain(target["domain"])
+        
+        with EDBR._get_connection() as conn:
+            with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO lead_contacts (target_id, full_name, designation, email, is_priority)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (target_id, full_name, designation, email, is_priority))
-            conn.commit()
+                    UPDATE lead_targets 
+                    SET status = 'Awaiting Review', snovio_raw_data = %s
+                    WHERE id = %s
+                """, (json.dumps(raw_snovio_json), target["id"]))
+                conn.commit()

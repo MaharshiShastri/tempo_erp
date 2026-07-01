@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import API from "../api/api";
 import { FiExternalLink } from "react-icons/fi";
 
@@ -19,6 +19,8 @@ export default function DispatchPlannerView({ state }) {
     const [partnerDistances, setPartnerDistances] = useState({});
     const [partners, setPartners] = useState([]);
     const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
+
+    const [truckDim, setTruckDim] = useState({ width: 90, length: 240 });
 
     useEffect(() => {
         const loadPartners = async () => {
@@ -43,6 +45,42 @@ export default function DispatchPlannerView({ state }) {
         const updated = [...products];
         updated[index][field] = value;
         setProducts(updated);
+    };
+    const IndianCurrencyInput = ({ value, onChange, className }) => {
+        const [displayValue, setDisplayValue] = useState("");
+
+        // On mount or prop change, format the raw number to Indian style
+        useEffect(() => {
+            if (value === 0 || value === "" || value === null) {
+                setDisplayValue("");
+                return;
+            }
+            const formatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
+            setDisplayValue(formatter.format(value));
+        }, [value]);
+
+        const handleBlur = (e) => {
+            const rawNum = parseFloat(e.target.value.replace(/,/g, '')) || 0;
+            const formatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
+            setDisplayValue(formatter.format(rawNum));
+            onChange(rawNum); // Send raw number to parent state
+        };
+
+        const handleChange = (e) => {
+            // Allow user to type freely (stripping letters)
+            setDisplayValue(e.target.value.replace(/[^0-9.]/g, ''));
+        };
+
+        return (
+            <input 
+                type="text" 
+                className={className} 
+                value={displayValue} 
+                onChange={handleChange} 
+                onBlur={handleBlur} 
+                placeholder="e.g., 1,50,000"
+            />
+        );
     };
 
     const addProduct = () => {
@@ -108,6 +146,41 @@ export default function DispatchPlannerView({ state }) {
         }
     };
 
+    const packedBoxes = useMemo(() => {
+        const boxes = [];
+        let currentX = 0;
+        let currentY = 0;
+        let rowMaxHeight = 0;
+        
+        // Scale for rendering (Assuming 1 inch = 2 pixels for the UI container)
+        const scale = 2; 
+        const containerWidth = truckDim.length * scale; 
+        const containerHeight = truckDim.width * scale;
+
+        products.forEach((p, i) => {
+            const w = (Number(p.width) || 0) * scale;
+            const h = (Number(p.depth) || 0) * scale; // Using depth as the 2D footprint length
+
+            if (w === 0 || h === 0) return;
+
+            // Next-fit shelf algorithm
+            if (currentX + w > containerWidth) {
+                currentX = 0;
+                currentY += rowMaxHeight;
+                rowMaxHeight = 0;
+            }
+
+            const fits = (currentY + h) <= containerHeight;
+
+            boxes.push({ id: i, x: currentX, y: currentY, w, h, fits });
+
+            currentX += w;
+            rowMaxHeight = Math.max(rowMaxHeight, h);
+        });
+
+        return { boxes, containerWidth, containerHeight, scale };
+    }, [products, truckDim]);
+
     return (
         <div className="frappe-card">  
             <div className="system-header">
@@ -170,7 +243,7 @@ export default function DispatchPlannerView({ state }) {
                 <div className="form-grid-layout" style={{gridTemplateColumns: "repeat(3, 1fr)", marginBottom: '25px'}}>
                     <div>
                         <label className="input-label">Total Invoice Value (₹)</label>
-                        <input type="number" min="0" required className="form-input" value={dim.invoice_value} onChange={(e) => setDim({ ...dim, invoice_value: +e.target.value })} />
+                        <IndianCurrencyInput className="form-input" value={dim.invoice_value === 0 ? '' : dim.invoice_value} onChange={(raw) => setDim({ ...dim, invoice_value: raw })} />
                     </div>
                     <div>
                         <label className="input-label">Destination City <strong>(CITY ONLY!)</strong></label>
@@ -312,6 +385,41 @@ export default function DispatchPlannerView({ state }) {
                         <p style={{ margin: "15px 0" }}>{modalAlert.message}</p>
                         <button className="btn btn-secondary" onClick={() => setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
                     </div>
+                </div>
+            )}
+            {state.user.role === 'Dispatch Engineer' && (
+                <div style={{ flex: 1, background: "var(--bg-surface)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-light)", display: 'flex', flexDirection: 'column' }}>
+                    <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> 2D Cargo Blueprint (Top-Down)</h4>
+                    
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Length (in)</label><input type="number" className="form-input" value={truckDim.length} onChange={e => setTruckDim({...truckDim, length: +e.target.value})} /></div>
+                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Width (in)</label><input type="number" className="form-input" value={truckDim.width} onChange={e => setTruckDim({...truckDim, width: +e.target.value})} /></div>
+                    </div>
+
+                    {/* Canvas Area */}
+                    <div style={{ position: 'relative', width: '100%', height: '300px', overflow: 'auto', border: '2px dashed var(--border-light)', background: '#fff' }}>
+                        {/* The Truck Container */}
+                        <div style={{ position: 'absolute', top: 10, left: 10, width: packedBoxes.containerWidth, height: packedBoxes.containerHeight, border: '3px solid var(--text-muted)', background: 'rgba(0,0,0,0.02)' }}>
+                            
+                            {/* Render Boxes */}
+                            {packedBoxes.boxes.map(box => (
+                                <div key={box.id} style={{
+                                    position: 'absolute',
+                                    left: box.x,
+                                    top: box.y,
+                                    width: box.w,
+                                    height: box.h,
+                                    background: box.fits ? 'rgba(36, 144, 239, 0.4)' : 'rgba(255, 99, 132, 0.4)',
+                                    border: `1px solid ${box.fits ? 'var(--brand-accent)' : 'var(--brand-danger)'}`,
+                                    display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '10px', fontWeight: 'bold', color: '#333',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    {box.id + 1}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {packedBoxes.boxes.some(b => !b.fits) && <div style={{ color: 'var(--brand-danger)', fontSize: '12px', marginTop: '10px', fontWeight: 'bold' }}>⚠️ Warning: Some packages exceed truck footprint dimensions.</div>}
                 </div>
             )}
         </div>

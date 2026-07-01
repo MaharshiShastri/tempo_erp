@@ -85,6 +85,7 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                                 <div style={{ display: 'flex', gap: '5px' }}>
                                     <button className="btn-text" onClick={(e) => { e.stopPropagation(); setIsEditing(true); setExpandedTaskId(task.id); }} style={{ padding: '4px' }}><FiEdit2 /></button>
                                     <button className="btn-text-danger" onClick={handleDelete} style={{ padding: '4px' }}><FiTrash2 /></button>
+                                    <button className="btn-text" title="Export to PDF" onClick={(e) => { e.stopPropagation();  API.downloadPdf(task.id, state.user.access_token); }} style={{ padding: '4px', color: 'var(--brand-accent)' }}>📄 Download PDF</button>
                                 </div>
                             )}
                             <label onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', background: 'var(--bg-main)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>

@@ -56,7 +56,21 @@ export default function FaqWorkspaceView({ state }) {
                     Sales inquiries and technical product resolutions. Data fuels future AI recommendations.
                 </p>
             </div>
-
+            {isRnD && (
+                <div style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "8px", marginBottom: "30px", border: "2px dashed var(--brand-accent)", textAlign: "center" }}>
+                    <h4 style={{ margin: "0 0 10px 0" }}>Batch Import General FAQs</h4>
+                    <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "15px" }}>Drag and drop a .docx file containing alternating Q & A formats.</p>
+                    <input type="file" accept=".docx" onChange={async (e) => {if(!e.target.files[0]) return; const formData = new FormData(); formData.append("file", e.target.files[0]);
+                    try {
+                                await API.uploadFaqDoc(formData, state.user.access_token);
+                                state.addToast("FAQ Document parsed and embedded successfully.", "success");
+                                loadFaqs();
+                            } catch(err) { state.showErrorModal("Upload Failed", err.message); }
+                        }}
+                    />
+                </div>
+            )}
+            
             {/* Sales Input Area */}
             <form onSubmit={handleAskQuestion} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "30px", border: "1px solid var(--border-light)" }}>
                 <h4 style={{ margin: "0 0 10px 0", fontSize: "14px" }}>Ask a Technical Question</h4>

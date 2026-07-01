@@ -718,6 +718,44 @@ const API = {
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
+
+  async uploadFaqDoc(formData, token){
+    const r = await fetch('api/v1/faq/upload-doc', {
+      method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+    });
+
+    if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.detail || "FAQ document upload failed.");
+    }
+
+    return r.json();
+    
+  },
+  async downloadPdf(taskId, token){
+    const r = await fetch(`/api/v1/tasks/${taskId}/export-pdf`, {
+        headers: {Authorization: `Bearer ${token}`,}});
+    if (!r.ok) {
+        console.error(await r.text());
+        return;
+    }
+
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `task_${taskId}_export.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    window.URL.revokeObjectURL(url);
+  }
 };
 
 export default API;

@@ -21,8 +21,8 @@ export default function SalesAnalyticsView({ state }) {
     const [isExporting, setIsExporting] = useState(false);
     
     // Admin Variable: Set the dynamic cost of API credits
-    const [creditCost, setCreditCost] = useState(0.015);
-
+    const [creditCost, setCreditCost] = useState(0.0);
+    
     const dashboardRef = useRef(null);
 
     useEffect(() => {
@@ -224,6 +224,7 @@ export default function SalesAnalyticsView({ state }) {
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.targets_queued}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: 'var(--brand-success)' }}>{kpi.total_crm_leads}</td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.dispatches_logged}</td>
+                                        {/*<td style={{ padding: '12px', textAlign: 'center' }}><input type="number"></td>*/}
                                     </tr>
                                 ))}
                             </tbody>
@@ -236,7 +237,7 @@ export default function SalesAnalyticsView({ state }) {
                     <div className="print-section">
                         {/* Dynamic Cost Calculator */}
                         <div className="no-print" style={{ background: '#fff3cd', border: '1px solid #ffeeba', padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <div style={{ fontWeight: 'bold', color: '#856404' }}>Admin: Set API Credit Cost ($):</div>
+                            <div style={{ fontWeight: 'bold', color: '#856404' }}>Admin: Set API Credit Cost (₹):</div>
                             <input type="number" step="0.001" min="0" value={creditCost} onChange={e => setCreditCost(parseFloat(e.target.value) || 0)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }} />
                         </div>
 
@@ -259,7 +260,7 @@ export default function SalesAnalyticsView({ state }) {
                                                 <td style={{ padding: '10px', fontWeight: 'bold' }}>{kpi.name}</td>
                                                 <td style={{ padding: '10px', textAlign: 'center' }}>{kpi.targets_queued}</td>
                                                 <td style={{ padding: '10px', textAlign: 'right', color: repCost > 10 ? 'var(--brand-danger)' : 'var(--text-primary)' }}>
-                                                    ${repCost}
+                                                    ₹{repCost}
                                                 </td>
                                             </tr>
                                         );

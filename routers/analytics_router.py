@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from database.repository import EDBR
 from security import verify_bearer_token
+from schemas.analytics_schema import SetTargetPayload
+from .dependencies import check_department
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics & KPIs"])
 
@@ -49,3 +51,11 @@ def get_production_kpis(user: dict = Depends(verify_bearer_token)):
         return EDBR.get_production_analytics()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.patch("/admin/users/{email}/target", dependencies=[Depends(check_department("Admin"))])
+def update_user_target(email: str, payload: SetTargetPayload, user: dict = Depends(verify_bearer_token)):
+    with EDBR._get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET monthly_lead_target = %s WHERE email = %s", (payload.target, email))
+            conn.commit()
+    return {"status": "success"}

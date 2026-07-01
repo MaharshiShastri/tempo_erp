@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
 import chromadb
 from schemas.faq_schema import AnswerPayload, AskPayload
+import docx
+import io
 
 # Initialize local Vector Database for future RAG / LLM Integration
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
@@ -59,3 +61,36 @@ def answer_question(faq_id: int, payload: AnswerPayload, user: dict = Depends(ve
         return updated_faq
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.post("/upload-doc", dependencies=[Depends(check_department("R&D Engineer"))])
+async def upload_faq_document(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
+    if not file.filename.endswith('.docx'):
+        raise HTTPException(status_code=400, detail="Must be a .docx file.")
+    
+    contents = await file.read()
+    doc = docx.Document(io.BytesIO(contents))
+    
+    # Simple parser: Assumes alternating Q and A paragraphs
+    questions_added = 0
+    current_q = None
+    
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text.startswith("Q") or text.endswith("?"):
+            current_q = text
+        elif text.startswith("A:") and current_q:
+            answer = text.replace("A:", "").strip()
+            # Insert into DB and Chroma (using your existing logic)
+            updated_faq = EDBR.create_faq_query(current_q, asked_by="General FAQ")
+            EDBR.answer_faq_query(updated_faq['id'], answer, user["email"])
+            
+            # Add to ChromaDB
+            faq_collection.add(
+                documents=[f"Question: {current_q}\nAnswer: {answer}"],
+                metadatas=[{"asked_by": "General FAQ", "answered_by": user["email"]}],
+                ids=[f"faq_id_{updated_faq['id']}"]
+            )
+            current_q = None
+            questions_added += 1
+            
+    return {"status": "success", "added": questions_added}

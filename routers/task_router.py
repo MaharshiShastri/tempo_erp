@@ -4,11 +4,16 @@ import os
 from pathlib import Path
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
 from schemas.task_schema import TaskUpdatePayload
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from io import BytesIO
+from zipfile import ZipFile, ZIP_DEFLATED
+
 router = APIRouter(prefix="/api/v1/tasks", tags=["Task Manager Subsystem"])
 
 UPLOAD_DIR = Path("uploaded_task_attachments")
@@ -55,7 +60,7 @@ async def create_new_task(title: str = Form(...), details: str = Form(...), dire
         "details": details,
         "direction": direction,
         "assigned_to": assigned_to,
-        "attachment_path": saved_file_path,
+        "attachment_url": saved_file_path,
         "deadline": deadline
     }
 
@@ -86,3 +91,84 @@ def remove_task(task_id: int, user: dict = Depends(verify_bearer_token)):
         return {"status": "success"}
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    
+@router.get("/{task_id}/export-pdf", dependencies=[Depends(check_department("Shop Floor Administrator"))])
+def export_task(task_id: int, user: dict = Depends(verify_bearer_token)):
+    task = EDBR.get_task_by_id(task_id)
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # -----------------------------
+    # Generate PDF in memory
+    # -----------------------------
+    pdf_buffer = BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=letter)
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, 750, f"Task Workflow Document: {task['title']}")
+
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 720, f"Assigned By: {task['assigned_by']}")
+    c.drawString(50, 700, f"Assigned To: {', '.join(task['assigned_to'])}")
+    c.drawString(
+        50,
+        680,
+        f"Status: {'Pending' if task['is_incomplete'] else 'Completed'}"
+    )
+
+    c.drawString(50, 640, "Task Details:")
+
+    text = c.beginText(50, 620)
+    text.setFont("Helvetica", 10)
+
+    for line in task["details"].splitlines():
+        text.textLine(line)
+
+    c.drawText(text)
+
+    if task.get("attachment_url"):
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawString(
+            50,
+            120,
+            f"Original attachment included in this ZIP: {task['attachment_url']}"
+        )
+
+    c.save()
+    pdf_buffer.seek(0)
+
+    # -----------------------------
+    # Build ZIP in memory
+    # -----------------------------
+    zip_buffer = BytesIO()
+
+    with ZipFile(zip_buffer, "w", ZIP_DEFLATED) as zip_file:
+
+        # Add generated PDF
+        zip_file.writestr(
+            f"task_{task_id}_export.pdf",
+            pdf_buffer.getvalue()
+        )
+
+        # Add original attachment if present
+        if task.get("attachment_url"):
+
+            attachment_file = Path(task["attachment_url"])
+
+            if attachment_file.exists():
+                zip_file.write(
+                    attachment_file,
+                    arcname=attachment_file.name
+                )
+
+    zip_buffer.seek(0)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="task_{task_id}_export.zip"'
+        }
+    )

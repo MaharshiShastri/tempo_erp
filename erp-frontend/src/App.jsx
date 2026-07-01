@@ -30,6 +30,7 @@ import PrintInvoiceTemplate from "./print/PrintInvoiceTemplate";
 import PrintOrderTemplate from "./print/PrintOrderTemplate";
 import ErrorModal from "./components/shared/ErrorModal";
 import GlobalProductionPulseView from "./views/GlobalProductionPulseView";
+import PersonalSalesAnalyticsView from "./views/PersonalSalesAnalyticsView";
 
 function App() {
     const state = useERPState();
@@ -226,6 +227,13 @@ function App() {
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+E</span>
                                         </a>
                                     )}
+                                    {isSales && (
+                                        <a href="#lead-generation" className={`menu-item ${state.activeTab === 'target' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('target')}}>
+                                            <span>🏭</span>
+                                            {!sidebarCollapsed && <span>Personal Target</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+E</span>
+                                        </a>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -385,6 +393,7 @@ function App() {
                     {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
                     {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
+                    {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
                 </div>
             </div>
 
