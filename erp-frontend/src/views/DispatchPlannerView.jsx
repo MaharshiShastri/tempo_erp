@@ -387,7 +387,8 @@ export default function DispatchPlannerView({ state }) {
                     </div>
                 </div>
             )}
-            {state.user.role === 'Dispatch Engineer' && (
+
+            {state.user.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' && (
                 <div style={{ flex: 1, background: "var(--bg-surface)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-light)", display: 'flex', flexDirection: 'column' }}>
                     <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> 2D Cargo Blueprint (Top-Down)</h4>
                     
