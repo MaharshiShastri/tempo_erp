@@ -9,8 +9,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
         const fetchPersonalData = async () => {
             try {
                 // Fetch the global array, but filter for the logged-in user
-                const data = await API.fetchSalesKPIs(state.user.access_token);
-                const me = data.find(k => k.email === state.user.email);
+                const me = await API.getMyTarget(state.user.access_token);
                 setMyData(me);
             } catch (err) { state.showErrorModal("Error", err.message); }
         };

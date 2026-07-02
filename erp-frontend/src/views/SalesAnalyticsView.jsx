@@ -22,6 +22,7 @@ export default function SalesAnalyticsView({ state }) {
     
     // Admin Variable: Set the dynamic cost of API credits
     const [creditCost, setCreditCost] = useState(0.0);
+    const [quarterlyTargets, setQuarterlyTargets] = useState({});
     
     const dashboardRef = useRef(null);
 
@@ -89,6 +90,22 @@ export default function SalesAnalyticsView({ state }) {
     };
 
     if (isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Command Center Data...</div>;
+    const handleUpdateTarget = async (email) => {
+        const targetValue = quarterlyTargets[email];
+        if (!targetValue || isNaN(targetValue)) {
+            state.showErrorModal("Validation Error", "Please enter a valid target amount.");
+            return;
+        }
+
+        try {
+            // Note: Make sure API.updateQuarterlyTarget is defined in your api.js
+            await API.updateQuarterlyTarget(state.user.access_token, email, parseFloat(targetValue));
+            state.setAlertMessage(`✅ QTR Target set to ₹${targetValue} for ${email}`);
+            state.setIsAlertOpen(true);
+        } catch (error) {
+            state.showErrorModal("Update Failed", error.message);
+        }
+    };
 
     // --- AGGREGATES ---
     const totalQueued = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.targets_queued || 0), 0);
@@ -211,20 +228,25 @@ export default function SalesAnalyticsView({ state }) {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                             <thead>
                                 <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
+                                    <th style={{padding: '12px'}}>Serial number</th>
                                     <th style={{ padding: '12px' }}>Executive Name</th>
                                     <th style={{ padding: '12px', textAlign: 'center' }}>Targets Queued</th>
                                     <th style={{ padding: '12px', textAlign: 'center' }}>Active CRM Deals</th>
                                     <th style={{ padding: '12px', textAlign: 'center' }}>Dispatches</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>QTR Target (₹)</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {salesKpis.map((kpi, idx) => (
                                     <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                        <td style={{padding: '12px'}}>{idx}</td>
                                         <td style={{ padding: '12px' }}><strong>{kpi.name}</strong></td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.targets_queued}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: 'var(--brand-success)' }}>{kpi.total_crm_leads}</td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.dispatches_logged}</td>
-                                        {/*<td style={{ padding: '12px', textAlign: 'center' }}><input type="number"></td>*/}
+                                        <td style={{ padding: '12px', textAlign: 'center' }}><input type="number" min="0" placeholder="Total QTR Value" defaultValue={kpi.quarterly_target || ""} onChange={(e) => setQuarterlyTargets(prev => ({ ...prev, [kpi.email]: e.target.value }))} style={{  padding: '6px',  borderRadius: '4px',  border: '1px solid var(--border-light)',  width: '120px' }}/></td>
+                                        <td style={{ padding: '12px', textAlign: 'center' }}><button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}onClick={() => handleUpdateTarget(kpi.email)}>Save</button></td>
                                     </tr>
                                 ))}
                             </tbody>

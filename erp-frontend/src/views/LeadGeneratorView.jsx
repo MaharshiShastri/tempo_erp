@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API from "../api/api";
-import { FiMail, FiRefreshCw, FiSend, FiPaperclip } from "react-icons/fi";
+import { FiMail, FiRefreshCw, FiSend, FiPaperclip, FiFilter, FiCheck, FiPlus, FiTrash2, FiUserCheck } from "react-icons/fi";
 
 export default function LeadGeneratorView({ state }) {
     const [companyName, setCompanyName] = useState("");
@@ -9,10 +9,14 @@ export default function LeadGeneratorView({ state }) {
     const [expandedTargetId, setExpandedTargetId] = useState(null);
     const [contactsCache, setContactsCache] = useState({});
     
-    // UI States
+    // Staging Review State
+    const [stagedContacts, setStagedContacts] = useState([]);
+
+    // UI & Filter States
     const [isLoading, setIsLoading] = useState(false);
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [statusFilter, setStatusFilter] = useState("all");
     
     // Editing States
     const [editingTargetId, setEditingTargetId] = useState(null);
@@ -86,14 +90,70 @@ export default function LeadGeneratorView({ state }) {
     };
 
     const handleAccordionToggle = async (target) => {
-        if (editingTargetId === target.id) return; // Prevent toggle while editing
-        if (expandedTargetId === target.id) { setExpandedTargetId(null); return; }
+        if (editingTargetId === target.id) return;
+        if (expandedTargetId === target.id) { 
+            setExpandedTargetId(null); 
+            setStagedContacts([]);
+            return; 
+        }
         setExpandedTargetId(target.id);
+        
         if (target.status === 'Completed' && !contactsCache[target.id]) {
             try {
                 const contacts = await API.fetchLeadContacts(target.id, state.user.access_token);
                 setContactsCache(prev => ({ ...prev, [target.id]: contacts }));
             } catch (err) { console.error("Failed to load contacts:", err); }
+        } else if (target.status === 'Awaiting Review') {
+            // Load and safely parse current mapped contacts into state for manual editing
+            const rawData = target.snovio_raw_data || {};
+            const initialContacts = rawData.mapped_contacts || [];
+            setStagedContacts(initialContacts);
+        }
+    };
+
+    // --- Staging Workspace Handlers ---
+    const updateStagedContactField = (index, field, value) => {
+        const updated = [...stagedContacts];
+        updated[index][field] = value;
+        setStagedContacts(updated);
+    };
+
+    const addStagedContactRow = () => {
+        setStagedContacts(prev => [
+            ...prev,
+            { full_name: "", designation: "", email: "", is_priority: false }
+        ]);
+    };
+
+    const removeStagedContactRow = (index) => {
+        setStagedContacts(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleApproveStaging = async (targetId) => {
+        // Validate at least one contact is fully mapped
+        const validContacts = stagedContacts.filter(c => c.full_name.trim() && c.email.trim());
+        if (validContacts.length === 0) {
+            state.showErrorModal("Mapping Validation", "Please map at least one contact with a name and email before approving.");
+            return;
+        }
+
+        try {
+            // Re-uses your API path to commit the approved payload
+            await fetch(`/api/v1/lead-engine/targets/${targetId}/approve-staging`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${state.user.access_token}`
+                },
+                body: JSON.stringify({ contacts: validContacts })
+            });
+            state.setAlertMessage("🏆 Lead contacts verified and stored in database.");
+            state.setIsAlertOpen(true);
+            setExpandedTargetId(null);
+            setStagedContacts([]);
+            await loadTargets();
+        } catch (err) {
+            state.showErrorModal("Approval Error", err.message);
         }
     };
 
@@ -126,8 +186,7 @@ export default function LeadGeneratorView({ state }) {
         }
         else if(state.user.role === 'Chief Full Stack Developer' || state.user.role === 'Admin'){
             e.stopPropagation();
-            if (!window.confirm(`As an Admin, please know that this is a paid data and you are permanently deleting this company record,
-                so please be sure to delete this data. Are you sure you want to remove this target from the pipeline?`)) return;
+            if (!window.confirm(`As an Admin, please know that this is paid data and you are permanently deleting this company record. Are you sure you want to proceed?`)) return;
             try {
                 await API.deleteLeadTarget(targetId, state.user.access_token);
                 await loadTargets();
@@ -168,7 +227,7 @@ export default function LeadGeneratorView({ state }) {
             return;
         }
 
-        const product = state.itemsMaster.find(i => i.item_code === selectedProductCode);
+        const product = state.itemsMaster?.find(i => i.item_code === selectedProductCode);
         
         setIsGenerating(true);
         try {
@@ -197,7 +256,6 @@ export default function LeadGeneratorView({ state }) {
     const handleSendYahoo = () => {
         if (!draftSubject || !draftBody) return;
 
-        // Construct Yahoo Compose URL
         const encodedSubject = encodeURIComponent(draftSubject);
         const encodedBody = encodeURIComponent(draftBody);
         const yahooUrl = `https://compose.mail.yahoo.com/?to=${emailModal.contact.email}&subj=${encodedSubject}&body=${encodedBody}`;
@@ -221,9 +279,15 @@ export default function LeadGeneratorView({ state }) {
         } catch (err) { state.showErrorModal("Simulation Failed", err.message); }
     };
 
+    // Filter pipeline list dynamically by state selection
+    const filteredTargets = targets.filter(target => {
+        if (statusFilter === "all") return true;
+        return target.status === statusFilter;
+    });
+
     return (
         <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 25 }}>
-        {emailModal.isOpen && (
+            {emailModal.isOpen && (
                 <div className="modal-overlay" onClick={closeEmailModal}>
                     <div className="modal-box" style={{ maxWidth: '800px', width: '90%', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
                         
@@ -355,25 +419,38 @@ export default function LeadGeneratorView({ state }) {
             </form>
 
             <div>
-                <h4 style={{ margin: "0 0 15px 0", borderBottom: "1px solid var(--border-light)", paddingBottom: "10px" }}>Scraping Pipeline</h4>
-                {targets.length === 0 ? (
+                {/* PIPELINE FILTER COMPONENT */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "15px", borderBottom: "1px solid var(--border-light)", paddingBottom: "10px" }}>
+                    <h4 style={{ margin: 0 }}>Scraping Pipeline</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FiFilter style={{ color: 'var(--text-muted)' }} />
+                        <select className="form-select-native" style={{ fontSize: '12px', padding: '4px 8px' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                            <option value="all">🔍 Show All Statuses</option>
+                            <option value="Pending">⏳ Pending Sync</option>
+                            <option value="Awaiting Review">✍️ Awaiting Review</option>
+                            <option value="Completed">✅ Completed</option>
+                            <option value="Failed">❌ Failed</option>
+                        </select>
+                    </div>
+                </div>
+
+                {filteredTargets.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px dashed var(--border-light)' }}>
-                        No targets currently in the pipeline.
+                        No targets match the selected status filter.
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {targets.map(target => {
+                        {filteredTargets.map(target => {
                             const isExpanded = expandedTargetId === target.id;
                             const isEditing = editingTargetId === target.id;
                             const contacts = contactsCache[target.id] || [];
+                            const rawEmails = target.snovio_raw_data?.raw_emails || [];
 
                             return (
                                 <div key={target.id} style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
                                     
                                     {/* Accordion Header */}
                                     <div onClick={() => handleAccordionToggle(target)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', cursor: isEditing ? 'default' : 'pointer', background: isExpanded ? 'var(--bg-main)' : 'transparent' }}>
-                                        
-                                        {/* Left Side: Info or Edit Inputs */}
                                         <div style={{ flexGrow: 1, marginRight: '20px' }}>
                                             {isEditing ? (
                                                 <div style={{ display: 'flex', gap: '10px' }} onClick={e => e.stopPropagation()}>
@@ -384,46 +461,97 @@ export default function LeadGeneratorView({ state }) {
                                                 <>
                                                     <strong style={{ fontSize: '15px', color: 'var(--brand-accent)' }}>{target.company_name}</strong>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                        {target.domain} | Queued: {target.created_at.split('T')[0]} | By: {target.requested_by.split('@')[0]}
+                                                        {target.domain} | Queued: {target.created_at?.split('T')[0]} | By: {target.requested_by?.split('@')[0]}
                                                     </div>
                                                 </>
                                             )}
                                         </div>
                                         
-                                        {state.user.role === state.user.role === 'Chief Full Stack Developer' || state.user.role === 'Admin' && (
-                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>{state.user.email == target.requested_by ? state.user.name : target.requested_by.split('@')[0]}</span>
-                                        )}
-
-                                        {/* Right Side: Actions */}
+                                        {/* Right Side Status & Controls */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                            {isEditing ? (
-                                                <>
-                                                    <button onClick={(e) => saveEdit(e, target.id)} className="btn btn-success" style={{ padding: '4px 8px', fontSize: '11px' }}>Save</button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setEditingTargetId(null); }} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }}>Cancel</button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold', background: target.status === 'Completed' ? '#eaffea' : 'var(--bg-main)', color: target.status === 'Completed' ? 'var(--brand-success)' : 'var(--text-muted)', border: `1px solid ${target.status === 'Completed' ? 'var(--brand-success)' : 'var(--border-light)'}`}}>
-                                                        {target.status === 'Completed' ? '✅ Harvested' : '⏳ Pending Night Sync'}
-                                                    </span>
-                                                    
-                                                    {/* CRUD Actions */}
-                                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                                        <button onClick={(e) => startEditing(e, target)} className="btn-text" style={{ fontSize: '12px', padding: 0 }}>✏️</button>
-                                                        <button onClick={(e) => handleDelete(e, target.id)} className="btn-text-danger" style={{ fontSize: '12px', padding: 0 }}>🗑️</button>
-                                                    </div>
+                                            <span style={{ 
+                                                fontSize: '11px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold', 
+                                                background: target.status === 'Completed' ? '#eaffea' : (target.status === 'Awaiting Review' ? '#fff8f0' : 'var(--bg-main)'), 
+                                                color: target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#e67e22' : 'var(--text-muted)'),
+                                                border: `1px solid ${target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#ffebcc' : 'var(--border-light)')}`
+                                            }}>
+                                                {target.status === 'Completed' ? '✅ Completed' : (target.status === 'Awaiting Review' ? '✍️ Awaiting Review' : '⏳ Pending')}
+                                            </span>
+                                            
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button onClick={(e) => startEditing(e, target)} className="btn-text" style={{ fontSize: '12px', padding: 0 }}>✏️</button>
+                                                <button onClick={(e) => handleDelete(e, target.id)} className="btn-text-danger" style={{ fontSize: '12px', padding: 0 }}>🗑️</button>
+                                            </div>
 
-                                                    {target.status === 'Pending' && (
-                                                        <button onClick={(e) => handleMockSync(e, target.id)} className="btn-text" style={{ fontSize: '11px' }}>[Force Sync]</button>
-                                                    )}
-                                                    
-                                                    <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>▼</span>
-                                                </>
+                                            {target.status === 'Pending' && (
+                                                <button onClick={(e) => handleMockSync(e, target.id)} className="btn-text" style={{ fontSize: '11px' }}>[Force Sync]</button>
                                             )}
+                                            
+                                            <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>▼</span>
                                         </div>
                                     </div>
 
-                                    {/* Accordion Body */}
+                                    {/* AWAITING MANUAL REVIEW WORKSPACE */}
+                                    {isExpanded && target.status === 'Awaiting Review' && (
+                                        <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)', background: '#fffcf5' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                                <h4 style={{ margin: 0, color: '#b25900' }}>Review & Map Harvested Leads</h4>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button className="btn btn-secondary" onClick={addStagedContactRow}>+ Add Contact Row</button>
+                                                    <button className="btn btn-success" onClick={() => handleApproveStaging(target.id)}><FiUserCheck /> Approve & Import</button>
+                                                </div>
+                                            </div>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                                <thead>
+                                                    <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
+                                                        <th style={{ padding: '8px' }}>Name</th>
+                                                        <th style={{ padding: '8px' }}>Designation</th>
+                                                        <th style={{ padding: '8px' }}>Matched Email (Dropdown / Custom Override)</th>
+                                                        <th style={{ padding: '8px', textAlign: 'center' }}>Priority</th>
+                                                        <th style={{ padding: '8px', textAlign: 'center' }}>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {stagedContacts.map((c, idx) => (
+                                                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                                            <td style={{ padding: '8px' }}>
+                                                                <input type="text" className="form-input" style={{ padding: '4px', fontSize: '13px' }} value={c.full_name} onChange={e => updateStagedContactField(idx, 'full_name', e.target.value)} />
+                                                            </td>
+                                                            <td style={{ padding: '8px' }}>
+                                                                <input type="text" className="form-input" style={{ padding: '4px', fontSize: '13px' }} value={c.designation} onChange={e => updateStagedContactField(idx, 'designation', e.target.value)} />
+                                                            </td>
+                                                            <td style={{ padding: '8px' }}>
+                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                    <select className="form-select-native" style={{ fontSize: '12px', padding: '4px' }} value={c.email || ""} onChange={e => updateStagedContactField(idx, 'email', e.target.value)}>
+                                                                        <option value="">-- No Email --</option>
+                                                                        {rawEmails.map((email, i) => (
+                                                                            <option key={i} value={email}>{email}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <input type="text" className="form-input" placeholder="Or type manually..." style={{ padding: '4px', fontSize: '12px' }} value={c.email} onChange={e => updateStagedContactField(idx, 'email', e.target.value)} />
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                                                                <input type="checkbox" checked={c.is_priority} onChange={e => updateStagedContactField(idx, 'is_priority', e.target.checked)} />
+                                                            </td>
+                                                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                                                                <button className="btn-text-danger" onClick={() => removeStagedContactRow(idx)}><FiTrash2 /></button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {stagedContacts.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                                                                No contacts loaded. Use "Add Contact Row" to populate details manually.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* COMPLETED VIEW */}
                                     {isExpanded && target.status === 'Completed' && (
                                         <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)' }}>
                                             {contacts.length === 0 ? (
@@ -435,6 +563,7 @@ export default function LeadGeneratorView({ state }) {
                                                             <th style={{ padding: '8px' }}>Executive Name</th>
                                                             <th style={{ padding: '8px' }}>Designation</th>
                                                             <th style={{ padding: '8px' }}>Contact Email</th>
+                                                            <th style={{ padding: '8px', textAlign: 'right' }}>Actions</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -449,12 +578,6 @@ export default function LeadGeneratorView({ state }) {
                                                                 <td style={{ padding: '10px' }}>{c.designation}</td>
                                                                 <td style={{ padding: '10px', color: 'var(--brand-accent)' }}>{c.email}</td>
                                                                 <td style={{ padding: '10px', textAlign: 'right' }}><button className="btn btn-secondary" onClick={() => openEmailModal(c, target)} style={{ fontSize: '11px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FiMail /> Draft Email</button></td>
-                                                                <div style={{ display: 'flex', background: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '6px', overflow: 'hidden', marginRight: '10px' }}>
-                                                                   <button className={`btn ${c.email_status === 'Sent Email' ? 'btn-primary' : 'btn-text'}`} style={{ padding: '4px 8px', fontSize: '10px', borderRadius: 0, borderRight: '1px solid var(--border-light)' }}onClick={() => updateContactStatus(c.id, 'Sent Email')}>Sent</button>
-                                                                   <button className={`btn ${c.email_status === 'Got Reply' ? 'btn-secondary' : 'btn-text'}`} style={{ padding: '4px 8px', fontSize: '10px', borderRadius: 0, borderRight: '1px solid var(--border-light)', background: c.email_status === 'Got Reply' ? '#fff8f0' : 'transparent', color: c.email_status === 'Got Reply' ? '#e67e22' : 'var(--text-muted)' }} onClick={() => updateContactStatus(c.id, 'Got Reply')}>Replied</button>
-                                                                   <button className={`btn ${c.email_status === 'Closed Enquiry' ? 'btn-success' : 'btn-text'}`} style={{ padding: '4px 8px', fontSize: '10px', borderRadius: 0 }}onClick={() => updateContactStatus(c.id, 'Closed Enquiry')}>Closed</button>
-                                                                </div>
-                                                                
                                                             </tr>
                                                         ))}
                                                     </tbody>
@@ -462,6 +585,8 @@ export default function LeadGeneratorView({ state }) {
                                             )}
                                         </div>
                                     )}
+
+                                    {/* PENDING VIEW */}
                                     {isExpanded && target.status === 'Pending' && (
                                         <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>
                                             The scraper engine will search for contacts matching this domain during the overnight batch process. Check back tomorrow morning.

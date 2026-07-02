@@ -755,7 +755,40 @@ const API = {
     a.remove();
 
     window.URL.revokeObjectURL(url);
-  }
+  },
+  async approveSnovioStaging(targetId, payload, token) {
+    const r = await fetch(`/api/v1/lead-engine/targets/${targetId}/approve-staging`, {
+        method: "POST", headers: this.headers(token), body: JSON.stringify(payload)
+    });
+    if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
+    return r.json();
+  },
+
+  updateQuarterlyTarget: async (token, email, targetValue) => {
+        const response = await fetch(`/api/v1/analytics/admin/users/${email}/target`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ target: targetValue })
+        });
+        if (!response.ok) throw new Error("Failed to update target");
+        return response.json();
+  },
+  getMyTarget: async (token) => {
+    const response = await fetch("/api/v1/bills/target", {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to fetch target");
+    }
+
+    return response.json();
+},
 };
 
 export default API;

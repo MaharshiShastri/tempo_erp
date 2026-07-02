@@ -16,3 +16,14 @@ def create_bill(payload: BillHeaderCreate, user_profile: dict = Depends(verify_b
         return EDBR.create_bill(payload.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.get("/target", dependencies=[Depends(check_department("Sales Representative"))])
+def get_target(user_profile: dict = Depends(verify_bearer_token)):
+    with EDBR._get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT quarterly_order_value_target FROM users WHERE email = %s", (user_profile.get('email'),))
+            return cur.fetchone()
+    
+    return {
+        "target": row[0] if row else 0
+    }

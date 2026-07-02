@@ -3,3 +3,6 @@ __pycache__/
 .env
 .vscode/
 *.cpython3-11.*
+*.log
+worker_logs.json
+pyvenv.cfg

@@ -56,6 +56,10 @@ def get_production_kpis(user: dict = Depends(verify_bearer_token)):
 def update_user_target(email: str, payload: SetTargetPayload, user: dict = Depends(verify_bearer_token)):
     with EDBR._get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE users SET monthly_lead_target = %s WHERE email = %s", (payload.target, email))
+            # Updated column to reflect quarterly total order value
+            cur.execute(
+                "UPDATE users SET quarterly_order_value_target = %s WHERE email = %s", 
+                (payload.target, email)
+            )
             conn.commit()
-    return {"status": "success"}
+    return {"status": "success", "message": f"Quarterly target updated for {email}"}

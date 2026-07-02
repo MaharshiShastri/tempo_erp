@@ -18,4 +18,4 @@ class TaskResponse(BaseModel):
 class TaskUpdatePayload(BaseModel):
     title: str
     details: str
-    deadline: Optional[str] = None
+    deadline: Optional[datetime] = None

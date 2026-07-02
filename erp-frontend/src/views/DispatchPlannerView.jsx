@@ -326,8 +326,44 @@ export default function DispatchPlannerView({ state }) {
                     </>
                 )}
                 <button className="btn btn-primary" type="submit" style={{ marginTop: 20 }}>Evaluate Dispatch Options</button>
-            </form>
+                
+                {state.user.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' && (
+                <div style={{ flex: 1, background: "var(--bg-surface)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-light)", display: 'flex', flexDirection: 'column' }}>
+                    <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> 2D Cargo Blueprint (Top-Down)</h4>
+                    
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Length (in)</label><input type="number" className="form-input" value={truckDim.length} onChange={e => setTruckDim({...truckDim, length: +e.target.value})} /></div>
+                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Width (in)</label><input type="number" className="form-input" value={truckDim.width} onChange={e => setTruckDim({...truckDim, width: +e.target.value})} /></div>
+                    </div>
 
+                    {/* Canvas Area */}
+                    <div style={{ position: 'relative', width: '100%', height: '300px', overflow: 'auto', border: '2px dashed var(--border-light)', background: '#fff' }}>
+                        {/* The Truck Container */}
+                        <div style={{ position: 'absolute', top: 10, left: 10, width: packedBoxes.containerWidth, height: packedBoxes.containerHeight, border: '3px solid var(--text-muted)', background: 'rgba(0,0,0,0.02)' }}>
+                            
+                            {/* Render Boxes */}
+                            {packedBoxes.boxes.map(box => (
+                                <div key={box.id} style={{
+                                    position: 'absolute',
+                                    left: box.x,
+                                    top: box.y,
+                                    width: box.w,
+                                    height: box.h,
+                                    background: box.fits ? 'rgba(36, 144, 239, 0.4)' : 'rgba(255, 99, 132, 0.4)',
+                                    border: `1px solid ${box.fits ? 'var(--brand-accent)' : 'var(--brand-danger)'}`,
+                                    display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '10px', fontWeight: 'bold', color: '#333',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    {box.id + 1}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {packedBoxes.boxes.some(b => !b.fits) && <div style={{ color: 'var(--brand-danger)', fontSize: '12px', marginTop: '10px', fontWeight: 'bold' }}>⚠️ Warning: Some packages exceed truck footprint dimensions.</div>}
+                </div>
+            )}
+            </form>
+            
             {resultsData?.options?.length > 0 && (
                 <div>
                      <h4>Total Options: {resultsData.options.length}</h4>
@@ -388,41 +424,7 @@ export default function DispatchPlannerView({ state }) {
                 </div>
             )}
 
-            {state.user.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' && (
-                <div style={{ flex: 1, background: "var(--bg-surface)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-light)", display: 'flex', flexDirection: 'column' }}>
-                    <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> 2D Cargo Blueprint (Top-Down)</h4>
-                    
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Length (in)</label><input type="number" className="form-input" value={truckDim.length} onChange={e => setTruckDim({...truckDim, length: +e.target.value})} /></div>
-                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Width (in)</label><input type="number" className="form-input" value={truckDim.width} onChange={e => setTruckDim({...truckDim, width: +e.target.value})} /></div>
-                    </div>
-
-                    {/* Canvas Area */}
-                    <div style={{ position: 'relative', width: '100%', height: '300px', overflow: 'auto', border: '2px dashed var(--border-light)', background: '#fff' }}>
-                        {/* The Truck Container */}
-                        <div style={{ position: 'absolute', top: 10, left: 10, width: packedBoxes.containerWidth, height: packedBoxes.containerHeight, border: '3px solid var(--text-muted)', background: 'rgba(0,0,0,0.02)' }}>
-                            
-                            {/* Render Boxes */}
-                            {packedBoxes.boxes.map(box => (
-                                <div key={box.id} style={{
-                                    position: 'absolute',
-                                    left: box.x,
-                                    top: box.y,
-                                    width: box.w,
-                                    height: box.h,
-                                    background: box.fits ? 'rgba(36, 144, 239, 0.4)' : 'rgba(255, 99, 132, 0.4)',
-                                    border: `1px solid ${box.fits ? 'var(--brand-accent)' : 'var(--brand-danger)'}`,
-                                    display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '10px', fontWeight: 'bold', color: '#333',
-                                    transition: 'all 0.3s ease'
-                                }}>
-                                    {box.id + 1}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {packedBoxes.boxes.some(b => !b.fits) && <div style={{ color: 'var(--brand-danger)', fontSize: '12px', marginTop: '10px', fontWeight: 'bold' }}>⚠️ Warning: Some packages exceed truck footprint dimensions.</div>}
-                </div>
-            )}
+            
         </div>
     );
 }

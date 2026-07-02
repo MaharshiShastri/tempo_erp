@@ -9,7 +9,7 @@ import os
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -246,6 +246,7 @@ class PostgresRepository:
                 return new_task
     def update_task(self, task_id: int, title: str, details: str, deadline: str, user_email: str, user_role: str):
         with self._get_connection() as conn:
+            deadline = deadline or None
             with conn.cursor() as cur:
                 # Admins can edit anything, otherwise only the assigner can edit
                 if user_role in ['Admin', 'Chief Full Stack Developer']:
@@ -1335,7 +1336,7 @@ class PostgresRepository:
                         u.name,
                         u.role,
                         (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactive') as targets_queued,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Completed') as targets_harvested,
+                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND (status = 'Completed' OR status='Awaiting Review')) as targets_harvested,
                         (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactive') as targets_inactive,
                         (SELECT COUNT(*) FROM crm_leads WHERE assigned_to = u.email) as total_crm_leads,
                         (SELECT COUNT(*) FROM faq_queries WHERE asked_by = u.email) as faqs_asked,
