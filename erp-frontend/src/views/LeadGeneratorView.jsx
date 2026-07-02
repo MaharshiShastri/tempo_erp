@@ -568,7 +568,7 @@ export default function LeadGeneratorView({ state }) {
                                                     </thead>
                                                     <tbody>
                                                         {contacts.map((c, idx) => (
-                                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)', background: '#DDFF00'}}>
+                                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)'}}>
                                                                 <td style={{ padding: '10px' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                         <strong>{c.full_name}</strong>
