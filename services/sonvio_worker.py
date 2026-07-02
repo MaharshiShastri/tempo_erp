@@ -7,6 +7,9 @@ from database.repository import EDBR
 from groq import Groq
 import logging
 from datetime import datetime
+import tldextract
+from urllib.parse import urlparse
+import re
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("leadgen")
@@ -149,8 +152,32 @@ def ai_map_emails_to_prospects(prospects, emails):
         logger.error(f"Groq mapping error: {e}")
         return []
 
+def clean_domain(domain: str) -> str:
+    if not domain:
+        return ""
+
+    domain = domain.strip().lower()
+
+    if "@" in domain:
+        domain = domain.split("@")[-1]
+
+    if not re.match(r"^https?://", domain):
+        domain = "https://" + domain
+
+    host = urlparse(domain).netloc or urlparse(domain).path
+    host = host.split("@")[-1].split(":")[0]
+
+    extracted = tldextract.extract(host)
+
+    if extracted.domain and extracted.suffix:
+        return f"{extracted.domain}.{extracted.suffix}"
+
+    return host.replace("www.", "")
+
+
 def process_target_domain(domain: str):
     try:
+        domain = clean_domain(domain)
         logger.info(f"Processing domain: {domain}")
         prospects_raw_response = None
         emails_raw_response = None
