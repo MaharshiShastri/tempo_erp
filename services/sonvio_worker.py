@@ -10,6 +10,7 @@ from datetime import datetime
 import tldextract
 from urllib.parse import urlparse
 import re
+import pprint
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("leadgen")
@@ -145,7 +146,21 @@ def ai_map_emails_to_prospects(prospects, emails):
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
+        logger.info("=" * 80)
+        logger.info("[STEP 3] SENDING TO GROQ")
+        logger.info(prompt)
+        logger.info("=" * 80)
+        time.sleep(5)
+
         result = json.loads(completion.choices[0].message.content)
+        logger.info("=" * 80)
+        logger.info("[STEP 5] PARSED GROQ JSON")
+
+        pprint.pprint(result)
+
+        logger.info("=" * 80)
+        time.sleep(5)
+
         logger.info("Groq mapping successful")
         return result.get("mappings", result.get("data", []))
     except Exception as e:
@@ -193,9 +208,25 @@ def process_target_domain(domain: str):
         )
         if p_res and p_res.status_code == 202:
             p_data = poll_snovio_task(p_res.json()["links"]["result"])
+            logger.info("=" * 80)
+            logger.info("[DEBUG] RAW PROSPECT RESPONSE FROM SNOV.IO")
+            pprint.pprint(p_data)
+            logger.info("=" * 80)
+            time.sleep(5)
+
             if p_data:
                 prospects_raw_response = p_data
                 prospects = p_data.get("data", [])
+                logger.info("=" * 80)
+                logger.info(f"[STEP 1] PROSPECTS FOUND: {len(prospects)}")
+
+                if prospects:
+                    pprint.pprint(prospects)
+                else:
+                    logger.warning("No prospects returned from Snov.io.")
+
+                logger.info("=" * 80)
+                time.sleep(5)
 
         # ---- EMAILS ----
         e_res = safe_request(
@@ -204,16 +235,41 @@ def process_target_domain(domain: str):
             headers=get_headers(),
             params={"domain": domain}
         )
+        
         if e_res and e_res.status_code == 202:
             e_data = poll_snovio_task(e_res.json()["links"]["result"])
             if e_data:
                 emails_raw_response = e_data
                 emails = [e["email"] for e in e_data.get("data", [])]
+                logger.info("=" * 80)
+                logger.info("[DEBUG] RAW EMAIL RESPONSE FROM SNOV.IO")
+                pprint.pprint(e_data)
+                logger.info("=" * 80)
+                time.sleep(5)
+                
+                logger.info("=" * 80)
+                logger.info(f"[STEP 2] DOMAIN EMAILS FOUND: {len(emails)}")
+
+                if emails:
+                    pprint.pprint(emails)
+                else:
+                    logger.warning("No domain emails returned from Snov.io.")
+
+                logger.info("=" * 80)
+                time.sleep(5)
 
         raw_file_path = save_raw_snovio(domain, prospects_raw_response, emails_raw_response)
 
         # ---- DATA ENRICHMENT CONSOLIDATION ----
         mapped_data = ai_map_emails_to_prospects(prospects, emails)
+
+        logger.info("=" * 80)
+        logger.info(f"[STEP 6] FINAL MAPPED CONTACTS ({len(mapped_data)})")
+
+        pprint.pprint(mapped_data)
+
+        logger.info("=" * 80)
+        time.sleep(5)
 
         # Self-healing logic: If mapping output is completely empty but we have raw emails, create placeholders
         if not mapped_data and emails:
@@ -258,6 +314,7 @@ def run_automated_job():
     logger.info("===== START AUTOMATED JOB =====")
     with EDBR._get_connection() as conn:
         with conn.cursor() as cur:
+            
             cur.execute("""
                 SELECT id, domain, requested_by
                 FROM (
@@ -282,6 +339,13 @@ def run_automated_job():
 
             with EDBR._get_connection() as conn:
                 with conn.cursor() as cur:
+                    
+                    logger.info("=" * 80)
+                    logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
+                    logger.info(f"Target ID {target['id']} committed successfully.")
+                    logger.info("=" * 80)
+                    time.sleep(5)
+
                     cur.execute("""
                         UPDATE lead_targets
                         SET status = 'Awaiting Review',
@@ -289,6 +353,13 @@ def run_automated_job():
                         WHERE id = %s
                     """, (json.dumps(staging_data), target["id"]))
                     conn.commit()
+
+                    logger.info("=" * 80)
+                    logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
+                    logger.info(f"Target ID {target['id']} committed successfully.")
+                    logger.info("=" * 80)
+                    time.sleep(5)
+
             logger.info(f"SUCCESS target {target['id']}")
         except Exception as e:
             logger.error(f"FAILED target {target['id']} | {e}")

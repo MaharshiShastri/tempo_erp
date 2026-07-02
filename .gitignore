@@ -6,3 +6,4 @@ __pycache__/
 *.log
 worker_logs.json
 pyvenv.cfg
+data/
