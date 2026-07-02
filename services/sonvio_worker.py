@@ -150,7 +150,7 @@ def ai_map_emails_to_prospects(prospects, emails):
         logger.info("[STEP 3] SENDING TO GROQ")
         logger.info(prompt)
         logger.info("=" * 80)
-        time.sleep(5)
+        time.sleep(3)
 
         result = json.loads(completion.choices[0].message.content)
         logger.info("=" * 80)
@@ -159,7 +159,7 @@ def ai_map_emails_to_prospects(prospects, emails):
         pprint.pprint(result)
 
         logger.info("=" * 80)
-        time.sleep(5)
+        time.sleep(3)
 
         logger.info("Groq mapping successful")
         return result.get("mappings", result.get("data", []))
@@ -212,7 +212,7 @@ def process_target_domain(domain: str):
             logger.info("[DEBUG] RAW PROSPECT RESPONSE FROM SNOV.IO")
             pprint.pprint(p_data)
             logger.info("=" * 80)
-            time.sleep(5)
+            time.sleep(3)
 
             if p_data:
                 prospects_raw_response = p_data
@@ -226,7 +226,7 @@ def process_target_domain(domain: str):
                     logger.warning("No prospects returned from Snov.io.")
 
                 logger.info("=" * 80)
-                time.sleep(5)
+                time.sleep(3)
 
         # ---- EMAILS ----
         e_res = safe_request(
@@ -245,7 +245,7 @@ def process_target_domain(domain: str):
                 logger.info("[DEBUG] RAW EMAIL RESPONSE FROM SNOV.IO")
                 pprint.pprint(e_data)
                 logger.info("=" * 80)
-                time.sleep(5)
+                time.sleep(3)
                 
                 logger.info("=" * 80)
                 logger.info(f"[STEP 2] DOMAIN EMAILS FOUND: {len(emails)}")
@@ -256,7 +256,7 @@ def process_target_domain(domain: str):
                     logger.warning("No domain emails returned from Snov.io.")
 
                 logger.info("=" * 80)
-                time.sleep(5)
+                time.sleep(3)
 
         raw_file_path = save_raw_snovio(domain, prospects_raw_response, emails_raw_response)
 
@@ -269,7 +269,7 @@ def process_target_domain(domain: str):
         pprint.pprint(mapped_data)
 
         logger.info("=" * 80)
-        time.sleep(5)
+        time.sleep(3)
 
         # Self-healing logic: If mapping output is completely empty but we have raw emails, create placeholders
         if not mapped_data and emails:
@@ -344,7 +344,7 @@ def run_automated_job():
                     logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
                     logger.info(f"Target ID {target['id']} committed successfully.")
                     logger.info("=" * 80)
-                    time.sleep(5)
+                    time.sleep(3)
 
                     cur.execute("""
                         UPDATE lead_targets
@@ -358,7 +358,7 @@ def run_automated_job():
                     logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
                     logger.info(f"Target ID {target['id']} committed successfully.")
                     logger.info("=" * 80)
-                    time.sleep(5)
+                    time.sleep(3)
 
             logger.info(f"SUCCESS target {target['id']}")
         except Exception as e:

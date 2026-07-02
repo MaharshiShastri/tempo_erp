@@ -21,6 +21,7 @@ export default function DispatchPlannerView({ state }) {
     const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
 
     const [truckDim, setTruckDim] = useState({ width: 90, length: 240 });
+    const canvasRef = useRef(null);
 
     useEffect(() => {
         const loadPartners = async () => {
@@ -72,14 +73,7 @@ export default function DispatchPlannerView({ state }) {
         };
 
         return (
-            <input 
-                type="text" 
-                className={className} 
-                value={displayValue} 
-                onChange={handleChange} 
-                onBlur={handleBlur} 
-                placeholder="e.g., 1,50,000"
-            />
+            <input type="text" className={className} value={displayValue} onChange={handleChange} onBlur={handleBlur} placeholder="e.g., 1,50,000"/>
         );
     };
 
@@ -152,34 +146,121 @@ export default function DispatchPlannerView({ state }) {
         let currentY = 0;
         let rowMaxHeight = 0;
         
-        // Scale for rendering (Assuming 1 inch = 2 pixels for the UI container)
-        const scale = 2; 
-        const containerWidth = truckDim.length * scale; 
-        const containerHeight = truckDim.width * scale;
+        const containerWidth = Number(truckDim.length) || 0; 
+        const containerHeight = Number(truckDim.width) || 0;
 
         products.forEach((p, i) => {
-            const w = (Number(p.width) || 0) * scale;
-            const h = (Number(p.depth) || 0) * scale; // Using depth as the 2D footprint length
+            let w = Number(p.width) || 0;
+            let h = Number(p.depth) || 0; // Depth is footprint on the floor
 
-            if (w === 0 || h === 0) return;
+            // Convert everything to inches internally for the math
+            if (unit === 'cm') { w /= 2.54; h /= 2.54; }
 
-            // Next-fit shelf algorithm
+            if (w <= 0 || h <= 0) return;
+
+            // Guillotine shelf packing logic
             if (currentX + w > containerWidth) {
                 currentX = 0;
                 currentY += rowMaxHeight;
                 rowMaxHeight = 0;
             }
 
-            const fits = (currentY + h) <= containerHeight;
-
+            const fits = (currentY + h) <= containerHeight && w <= containerWidth;
             boxes.push({ id: i, x: currentX, y: currentY, w, h, fits });
 
             currentX += w;
             rowMaxHeight = Math.max(rowMaxHeight, h);
         });
 
-        return { boxes, containerWidth, containerHeight, scale };
-    }, [products, truckDim]);
+        return { boxes, containerWidth, containerHeight };
+    }, [products, truckDim, unit]);
+    
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const parentRect = canvas.parentElement.getBoundingClientRect();
+        
+        // Handle High-DPI screens for crisp borders/text
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = parentRect.width * dpr;
+        canvas.height = parentRect.height * dpr;
+        ctx.scale(dpr, dpr);
+
+        const displayW = parentRect.width;
+        const displayH = parentRect.height;
+
+        // Clear previous frame
+        ctx.clearRect(0, 0, displayW, displayH);
+
+        const { boxes, containerWidth, containerHeight } = packedBoxes;
+        if (containerWidth <= 0 || containerHeight <= 0) return;
+
+        // Auto-Scale Logic: Calculate exact zoom needed to fit the truck inside the canvas with padding
+        const padding = 30;
+        const scale = Math.min(
+            (displayW - padding * 2) / containerWidth, 
+            (displayH - padding * 2) / containerHeight
+        );
+
+        const drawW = containerWidth * scale;
+        const drawH = containerHeight * scale;
+        
+        // Center the truck drawing perfectly in the canvas
+        const offsetX = (displayW - drawW) / 2;
+        const offsetY = (displayH - drawH) / 2;
+
+        // Draw Truck Chassis Outline
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(offsetX, offsetY, drawW, drawH);
+        
+        // Draw Truck Cabin Indicator
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(offsetX - 20, offsetY + (drawH/2) - 30, 20, 60);
+
+        // Draw Internal Floor
+        ctx.fillStyle = 'rgba(0,0,0,0.02)';
+        ctx.fillRect(offsetX, offsetY, drawW, drawH);
+
+        // Draw Truck Label
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Truck Capacity: ${truckDim.length}" x ${truckDim.width}"`, offsetX, offsetY - 8);
+
+        // Draw Cargo Boxes
+        boxes.forEach(box => {
+            const bx = offsetX + (box.x * scale);
+            const by = offsetY + (box.y * scale);
+            const bw = box.w * scale;
+            const bh = box.h * scale;
+
+            if (box.fits) {
+                ctx.fillStyle = 'rgba(36, 144, 239, 0.5)';
+                ctx.strokeStyle = '#1e7acb';
+            } else {
+                // If it overflows the truck, tint it red
+                ctx.fillStyle = 'rgba(255, 99, 132, 0.5)';
+                ctx.strokeStyle = '#d32f2f';
+            }
+            
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(bx, by, bw, bh);
+            ctx.strokeRect(bx, by, bw, bh);
+
+            // Draw Box Numbers if size permits
+            if (bw > 15 && bh > 15) {
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(box.id + 1, bx + bw / 2, by + bh / 2);
+            }
+        });
+
+    }, [packedBoxes]); // Re-draw whenever logical boxes or screen layout changes
 
     return (
         <div className="frappe-card">  
@@ -326,44 +407,31 @@ export default function DispatchPlannerView({ state }) {
                     </>
                 )}
                 <button className="btn btn-primary" type="submit" style={{ marginTop: 20 }}>Evaluate Dispatch Options</button>
-                
-                {state.user.role === 'Dispatch Engineer' || state.user.role === 'Chief Full Stack Developer'|| state.user.role === 'Admin' && (
-                <div style={{ flex: 1, background: "var(--bg-surface)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-light)", display: 'flex', flexDirection: 'column' }}>
-                    <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> 2D Cargo Blueprint (Top-Down)</h4>
-                    
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Length (in)</label><input type="number" className="form-input" value={truckDim.length} onChange={e => setTruckDim({...truckDim, length: +e.target.value})} /></div>
-                        <div><label className="input-label" style={{fontSize:'11px'}}>Truck Width (in)</label><input type="number" className="form-input" value={truckDim.width} onChange={e => setTruckDim({...truckDim, width: +e.target.value})} /></div>
-                    </div>
-
-                    {/* Canvas Area */}
-                    <div style={{ position: 'relative', width: '100%', height: '300px', overflow: 'auto', border: '2px dashed var(--border-light)', background: '#fff' }}>
-                        {/* The Truck Container */}
-                        <div style={{ position: 'absolute', top: 10, left: 10, width: packedBoxes.containerWidth, height: packedBoxes.containerHeight, border: '3px solid var(--text-muted)', background: 'rgba(0,0,0,0.02)' }}>
-                            
-                            {/* Render Boxes */}
-                            {packedBoxes.boxes.map(box => (
-                                <div key={box.id} style={{
-                                    position: 'absolute',
-                                    left: box.x,
-                                    top: box.y,
-                                    width: box.w,
-                                    height: box.h,
-                                    background: box.fits ? 'rgba(36, 144, 239, 0.4)' : 'rgba(255, 99, 132, 0.4)',
-                                    border: `1px solid ${box.fits ? 'var(--brand-accent)' : 'var(--brand-danger)'}`,
-                                    display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '10px', fontWeight: 'bold', color: '#333',
-                                    transition: 'all 0.3s ease'
-                                }}>
-                                    {box.id + 1}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {packedBoxes.boxes.some(b => !b.fits) && <div style={{ color: 'var(--brand-danger)', fontSize: '12px', marginTop: '10px', fontWeight: 'bold' }}>⚠️ Warning: Some packages exceed truck footprint dimensions.</div>}
-                </div>
-            )}
             </form>
-            
+            {["Dispatch Engineer", "Chief Full Stack Developer", "Admin"].includes(state.user.role) && (
+                    <div style={{ flex: 1, minWidth: '400px', background: "var(--bg-main)", borderRadius: "8px", border: "1px solid var(--border-light)", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ padding: '20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-light)' }}>
+                            <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> Dynamic Truck Spatial Visualizer</h4>
+                            <div style={{ display: 'flex', gap: '15px' }}>
+                                <div><label className="input-label">Truck Length (inches)</label><input type="number" className="form-input" value={truckDim.length || ''} onChange={e => setTruckDim({...truckDim, length: +e.target.value || 0})} /></div>
+                                <div><label className="input-label">Truck Width (inches)</label><input type="number" className="form-input" value={truckDim.width || ''} onChange={e => setTruckDim({...truckDim, width: +e.target.value || 0})} /></div>
+                            </div>
+                        </div>
+
+                        {/* Custom Auto-Scaling Canvas */}
+                        <div style={{ flex: 1, minHeight: '350px', background: '#e2e8f0', position: 'relative' }}>
+                            <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+                        </div>
+
+                        {packedBoxes.boxes.some(b => !b.fits) && (
+                            <div style={{ background: 'var(--brand-danger)', color: '#fff', padding: '10px 20px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+                                ⚠️ OVERFLOW ALERT: Cargo layout exceeds available footprint dimensions!
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {resultsData?.options?.length > 0 && (
                 <div>
                      <h4>Total Options: {resultsData.options.length}</h4>
@@ -423,8 +491,6 @@ export default function DispatchPlannerView({ state }) {
                     </div>
                 </div>
             )}
-
-            
         </div>
     );
 }
