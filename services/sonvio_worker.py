@@ -60,7 +60,7 @@ def ai_map_emails_to_prospects(prospects, emails):
         """
         
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
@@ -100,7 +100,9 @@ def run_automated_job():
     """Main loop: ONLY fetches Pending targets."""
     with EDBR._get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, domain FROM lead_targets WHERE status = 'Pending'")
+            cur.execute("SELECT id, domain, requested_by FROM(SELECT id," \
+            "domain, requested_by ROW_NUMBER() OVER (PARTITION BY requested_by ORDER BY created_at) AS rn " \
+            "FROM lead_targets WHERE status = 'Pending') t where rn <= 10 ORDER BY requested_by, rn;")
             pending_targets = cur.fetchall()
 
     for target in pending_targets:
