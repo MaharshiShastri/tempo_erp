@@ -13,6 +13,11 @@ SNOVIO_CLIENT_ID = os.getenv("SNOVIO_CLIENT_ID", "")
 SNOVIO_CLIENT_SECRET = os.getenv("SNOVIO_CLIENT_SECRET", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
+def get_headers():
+    return {
+        "Authorization": f"Bearer {get_snovio_token()}"
+    }
+
 def get_snovio_token():
     token = redis_cache.get("snovio_access_token")
     if token: return token
@@ -29,11 +34,10 @@ def get_snovio_token():
         return token
     return None
 
-headers = {"Authorization": f"Bearer {get_snovio_token()}"}
 
 def poll_snovio_task(result_url, max_retries=15):
     for _ in range(max_retries):
-        res = requests.get(result_url, headers=headers)
+        res = requests.get(result_url, headers=get_headers())
         if res.status_code == 200 and res.json().get("status") == "completed":
             return res.json()
         time.sleep(3)
@@ -73,13 +77,13 @@ def process_target_domain(domain: str):
     emails = []
     
     # 1. Fetch Prospects
-    p_res = requests.post("https://api.snov.io/v2/domain-search/prospects/start", headers=headers, params={"domain": domain, "type": "personal", "limit": 10})
+    p_res = requests.post("https://api.snov.io/v2/domain-search/prospects/start", headers=get_headers(), params={"domain": domain, "type": "personal", "limit": 10})
     if p_res.status_code == 202:
         p_data = poll_snovio_task(p_res.json()["links"]["result"])
         if p_data: prospects = p_data.get("data", [])
 
     # 2. Fetch Raw Domain Emails
-    e_res = requests.post("https://api.snov.io/v2/domain-search/domain-emails/start", headers=headers, params={"domain": domain})
+    e_res = requests.post("https://api.snov.io/v2/domain-search/domain-emails/start", headers=get_headers(), params={"domain": domain})
     if e_res.status_code == 202:
         e_data = poll_snovio_task(e_res.json()["links"]["result"])
         if e_data: emails = [e["email"] for e in e_data.get("data", [])]
