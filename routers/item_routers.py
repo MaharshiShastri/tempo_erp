@@ -11,6 +11,9 @@ router = APIRouter(prefix="/api/v1/master/items", tags=["Item Master Subsystem"]
 @router.get("/{item_code}")
 def list_items(item_code: str, user_profile: dict=Depends(verify_bearer_token)):
     return EDBR.get_item(item_code)
+@router.get("")
+def get_items(user_profile: dict=Depends(verify_bearer_token)):
+    return EDBR.get_all_items()
 
 @router.post("/create")
 def create_item(payload: ItemMasterCreate, user_profile: dict=Depends(verify_bearer_token)):

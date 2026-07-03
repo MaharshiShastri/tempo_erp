@@ -334,7 +334,16 @@ const API = {
 
     return r.json();
   },
-
+  async fetchItemMaster(token){
+    const r = await fetch('/api/v1/master/items/', {
+      headers: this.headers(token)
+    });
+    if (!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+    return r.json();
+  },
   async deleteItemMaster(itemCode, token) {
     const r = await fetch(
         `/api/v1/master/items/${itemCode}`,
@@ -472,6 +481,7 @@ const API = {
     }
     return r.json();
   },
+
   async getTestItem(itemCode, token) {
 
       const r = await fetch(

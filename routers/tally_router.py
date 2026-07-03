@@ -47,7 +47,7 @@ def build_tally_xml(action: str):
   <BODY>
     <EXPORTDATA>
       <REQUESTDESC>
-        <REPORTNAME>Balance Sheet</REPORTNAME>
+        <REPORTNAME>Day Book</REPORTNAME>
       </REQUESTDESC>
     </EXPORTDATA>
   </BODY>

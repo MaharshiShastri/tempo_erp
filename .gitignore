@@ -7,3 +7,5 @@ __pycache__/
 worker_logs.json
 pyvenv.cfg
 data/
+chroma_db/
+/*.sqlite3

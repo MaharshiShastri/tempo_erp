@@ -313,15 +313,16 @@ export default function useERPState() {
 
     const refreshDataHub = async () => {
         try {
-            const [ord, bl, comp, tsk, usersData, dispatchData] = await Promise.all([
+            const [ord, bl, comp, tsk, usersData, dispatchData, itemList] = await Promise.all([
                 API.fetchOrders(sessionToken),
                 API.fetchBills(sessionToken),
                 API.fetchCompaniesMaster(sessionToken),
                 API.fetchTasks(sessionToken),
                 fetch('/api/v1/auth/users', {headers: {'Authorization': `Bearer ${sessionToken}`}}).then(r => r.json()),
                 API.getPartners(sessionToken).then(r => r.data),
+                API.fetchItemMaster(sessionToken),
             ]);
-            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setTasks(tsk); setSystemUsers(usersData); setDispatch(dispatchData);
+            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setTasks(tsk); setSystemUsers(usersData); setDispatch(dispatchData); setItemsMaster(itemList);
         } catch (e) {
             setErrorMessage('Network transmission failure across Postgres nodes.');
         }
@@ -505,7 +506,7 @@ export default function useERPState() {
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
         tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
-        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications
+        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast,
     };
 }
 

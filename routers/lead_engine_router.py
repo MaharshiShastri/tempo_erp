@@ -79,7 +79,7 @@ def update_target(target_id: int, payload: TargetPayload, user: dict = Depends(v
 @router.delete("/targets/{target_id}", dependencies=[Depends(check_department("Admin"))])
 def delete_target(target_id: int, user: dict = Depends(verify_bearer_token)):
     try:
-        EDBR.delete_lead_target(target_id, user["email"], user["role"])
+        EDBR.delete_lead_target(target_id, user["role"])
         return {"status": "success", "message": "Target deleted."}
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))

@@ -240,7 +240,7 @@ export default function SalesAnalyticsView({ state }) {
                             <tbody>
                                 {salesKpis.map((kpi, idx) => (
                                     <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                        <td style={{padding: '12px'}}>{idx}</td>
+                                        <td style={{padding: '12px'}}>{idx+1}</td>
                                         <td style={{ padding: '12px' }}><strong>{kpi.name}</strong></td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.targets_queued}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: 'var(--brand-success)' }}>{kpi.total_crm_leads}</td>

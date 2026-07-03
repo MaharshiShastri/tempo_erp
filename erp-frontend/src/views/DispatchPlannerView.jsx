@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import API from "../api/api";
-import { FiExternalLink } from "react-icons/fi";
+import { FiExternalLink, FiTruck } from "react-icons/fi";
 
 export default function DispatchPlannerView({ state }) {
     // Extracted dimensions out of 'dim' into a multi-product array
@@ -430,7 +430,6 @@ export default function DispatchPlannerView({ state }) {
                         )}
                     </div>
                 )}
-            </div>
 
             {resultsData?.options?.length > 0 && (
                 <div>

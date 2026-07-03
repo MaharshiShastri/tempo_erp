@@ -621,7 +621,7 @@ class PostgresRepository:
                 cur.execute("""
                     SELECT *
                     FROM items_master
-                    WHERE is_active = TRUE
+                    WHERE is_active = TRUE AND item_code = %s
                     ORDER BY item_code ASC
                 """, (item_code,))
                 item = cur.fetchone()
@@ -640,7 +640,7 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO items_master (item_code, item_name, item_group, rate, unit_measure, additional_spec_text, hsn_code, revision_no)
-                    VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
                 """, (
                     item_data['item_code'].strip(), 
                     item_data['item_name'].strip(), 
@@ -737,6 +737,13 @@ class PostgresRepository:
                 """, (item_code,))
 
             return cur.fetchone()['exists']
+    
+    def get_all_items(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(""" SELECT * FROM items_master """)
+                return cur.fetchall()
+            
     # --- ITEM MASTERY end---
     
     # --- CONTEXTUAL ACCOUNTABILITY HUB (ACTIVITY LOGS) start---
