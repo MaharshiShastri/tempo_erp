@@ -500,13 +500,11 @@ const API = {
       return r.json();
   },
   // Add this inside the API object in api.js
-  async syncTallyData(action, token) {
+  async syncTallyData(payload, token) {
     const r = await fetch("/api/v1/tally/sync", {
         method: "POST",
-        headers: this.headers(token),
-        body: JSON.stringify({ 
-            action: action
-        }),
+        headers: {"Content-Type": "application/json","Authorization": `Bearer ${token}`},
+        body: JSON.stringify(payload),
     });
 
     if (!r.ok) {
@@ -798,7 +796,40 @@ const API = {
     }
 
     return response.json();
-},
+  },
+  async extractOrderOCR(file, token) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const r = await fetch("/api/v1/orders/ocr", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }, // Note: Do NOT set Content-Type; the browser handles boundaries for FormData
+      body: formData,
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || "Failed to process document.");
+    }
+    return r.json();
+  },
+
+  async uploadTallyXML(file, token) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const r = await fetch("/api/v1/tally/upload-xml", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }, // Browser handles multipart boundaries automatically
+      body: formData,
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || "XML processing failed");
+    }
+    return r.json();
+  },
 };
 
 export default API;

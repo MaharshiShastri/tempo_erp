@@ -28,7 +28,7 @@ INPUT:
 """
 
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[
             {"role": "system", "content": "Return only valid JSON."},
             {"role": "user", "content": prompt}

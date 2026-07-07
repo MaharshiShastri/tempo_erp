@@ -31,6 +31,7 @@ import PrintOrderTemplate from "./print/PrintOrderTemplate";
 import ErrorModal from "./components/shared/ErrorModal";
 import GlobalProductionPulseView from "./views/GlobalProductionPulseView";
 import PersonalSalesAnalyticsView from "./views/PersonalSalesAnalyticsView";
+import TallyImportWorkspaceView from "./views/TallyImportWorkspaceView";
 
 function App() {
     const state = useERPState();
@@ -206,7 +207,7 @@ function App() {
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
                                         </a>
                                     )}
-                                    {isSales && (
+                                    {(isSales || isFactory) && (
                                         <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
                                             <span>📦</span> 
                                             {!sidebarCollapsed && <span>Item Master</span>}
@@ -301,6 +302,11 @@ function App() {
                                         {!sidebarCollapsed && <span>Sales Analytics</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+S</span>
                                     </a>
+                                    <a href="#tally" className={`menu-item ${state.activeTab === 'tally-xml' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-xml')}}>
+                                        <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
+                                        {!sidebarCollapsed && <span>Fetch Tally XML data</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                    </a>
                                 </>
                             )}
                         </div>
@@ -394,6 +400,7 @@ function App() {
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
                     {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
                     {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
+                    {isSuperUser && state.activeTab === 'tally-xml' && <TallyImportWorkspaceView state={state}/>}
                 </div>
             </div>
 
