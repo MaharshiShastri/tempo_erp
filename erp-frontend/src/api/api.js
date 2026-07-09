@@ -826,7 +826,7 @@ const API = {
 
     if (!r.ok) {
       const err = await r.json();
-      throw new Error(err.detail || "XML processing failed");
+      throw new Error(err.detail || "JSON processing failed");
     }
     return r.json();
   },

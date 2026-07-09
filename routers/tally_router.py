@@ -9,9 +9,113 @@ import xml.etree.ElementTree as ET
 from security import verify_bearer_token
 from services.ai_tally_translator import llm_normalize_tally
 import json
-from dependencies import check_department
+from .dependencies import check_department
+import re
+import uuid
+from datetime import datetime, timedelta
+from database.repository import EDBR
 
 router = APIRouter(prefix="/api/v1/tally", tags=["Tally Integration"])
+
+def parse_qty(qty):
+    if not qty:
+        return 0
+
+    m = re.search(r"[\d.]+", qty)
+    return float(m.group()) if m else 0
+def parse_rate(rate):
+    if not rate:
+        return 0
+
+    m = re.search(r"[\d.]+", rate)
+    return float(m.group()) if m else 0
+def parse_tally_date(date_str):
+    return datetime.strptime(date_str, "%Y%m%d").date()
+def convert_sales_order(voucher):
+
+    order_date = parse_tally_date(voucher["date"])
+
+    address = voucher.get("basicbuyeraddress", [])
+
+    if isinstance(address, list):
+        address = " ".join(
+            x for x in address
+            if isinstance(x, str)
+        )
+
+    payment_terms = voucher.get("basicorderterms", [])
+
+    if isinstance(payment_terms, list):
+        payment_terms = " ".join(
+            x for x in payment_terms
+            if isinstance(x, str)
+        )
+
+    order = {
+        "order_acceptance_id": str(uuid.uuid4()),
+        "order_acceptance_date": order_date,
+        "purchase_order_number": voucher.get("vouchernumber"),
+        "purchase_order_date": order_date,
+        "customer_code": voucher.get("partyledgername"),
+        "payment_terms": payment_terms,
+        "billing_name": voucher.get("partyledgername"),
+        "billing_address": address,
+        "due_date": order_date + timedelta(days=30),
+        "items": []
+    }
+
+    items = voucher.get("allinventoryentries", [])
+
+    if isinstance(items, dict):
+        items = [items]
+
+    for item in items:
+
+        desc = item.get("basicuserdescription", "")
+
+        if isinstance(desc, list):
+            desc = "\n".join(
+                x for x in desc
+                if isinstance(x, str)
+            )
+
+        order["items"].append({
+
+            "item_code": item.get("stockitemname"),
+
+            "additional_spec_text": desc,
+
+            "hsn_code": item.get("gsthsnname", ""),
+
+            "quantity": parse_qty(
+                item.get("billedqty")
+            ),
+
+            "rate": parse_rate(
+                item.get("rate")
+            ),
+
+            "discount_percentage": 0
+        })
+
+    return order
+def clean_tally_xml(xml: str) -> str:
+    # Remove decimal control character references
+    xml = re.sub(
+        r'&#(?:0|[1-8]|11|12|1[4-9]|2[0-9]|3[01]);',
+        '',
+        xml
+    )
+
+    # Remove hexadecimal control character references
+    xml = re.sub(
+        r'&#x(?:0?[0-8]|0?B|0?C|0?[E-F]|1[0-9A-F]);',
+        '',
+        xml,
+        flags=re.IGNORECASE
+    )
+
+    return xml
 
 def tally_xml_to_json(xml_string: str):
     try:
@@ -165,75 +269,81 @@ def build_dynamic_tally_xml(payload: TallyQueryPayload) -> str:
 
 
 @router.post("/sync")
-def proxy_tally_request(payload: TallyQueryPayload, user: dict = Depends(verify_bearer_token)):
-    try:
-        # 1. Fetch the List of Sales Orders
-        from_dt = payload.from_date.replace("-", "") if payload.from_date else ""
-        to_dt = payload.to_date.replace("-", "") if payload.to_date else ""
+def proxy_tally_request(payload: TallyQueryPayload):
 
-        # 1. Fetch the List of Sales Vouchers
-        list_xml = build_sales_order_list_xml(from_dt, to_dt)
-        list_response = requests.post(
-            payload.tally_url, 
-            data=list_xml, 
-            headers={"Content-Type": "text/xml"}, 
-            timeout=30
-        )
-        
-        # 2. Extract GUIDs from the raw XML response
-        root = ET.fromstring(list_response.text)
-        guids = [elem.text for elem in root.findall(".//GUID")]
-        
-        if not guids:
-            return {
-                "status": "success", 
-                "message": "No Sales Vouchers found in this date range.", 
-                "data": []
-            }
-            
-        logging.info(f"Found {len(guids)} Sales Vouchers. Beginning extraction loop...")
-        
-        processed_vouchers = []
-        
-        # 3. Loop through each GUID one at a time
-        for idx, guid in enumerate(guids):
-            logging.info(f"Processing Sales Voucher {idx + 1}/{len(guids)}: {guid}")
-            
-            # Fetch detailed XML for this specific voucher
-            voucher_xml = build_single_voucher_xml(guid)
-            voucher_res = requests.post(
-                payload.tally_url, 
-                data=voucher_xml, 
-                headers={"Content-Type": "text/xml"}, 
-                timeout=20
-            )
-            
-            # Convert single voucher XML to Dict/JSON
-            raw_voucher_json = tally_xml_to_json(voucher_res.text)
-            
-            # Pass ONLY this single voucher to the LLM
-            try:
-                llm_json_str = llm_normalize_tally(raw_voucher_json)
-                normalized_voucher = json.loads(llm_json_str)
-            except Exception as llm_err:
-                logging.error(f"LLM failed on {guid}: {llm_err}")
-                # Fallback to the raw parsed JSON if the LLM chokes
-                normalized_voucher = {"error": "LLM Parsing Failed", "raw": raw_voucher_json}
-                
-            processed_vouchers.append(normalized_voucher)
-            
-            # Note: For production with thousands of bills, insert into the DB right here
-            # rather than keeping the entire array in memory.
+    xml = """
+    <ENVELOPE>
+    <HEADER>
+        <VERSION>1</VERSION>
+        <TALLYREQUEST>
+    </HEADER>
 
-        return {
-            "status": "success",
-            "total_processed": len(processed_vouchers),
-            "data": processed_vouchers
-        }
+    <BODY>
+        <DESC>
 
-    except Exception as e:
-        logging.error(f"Sales Voucher Sync Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+            <STATICVARIABLES>
+                <SVFROMDATE>20260401</SVFROMDATE>
+                <SVTODATE>20260731</SVTODATE>
+                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+            </STATICVARIABLES>
+
+            <TDL>
+
+                <TDLMESSAGE>
+
+                    <COLLECTION NAME="TempoSalesOrders">
+
+                        <TYPE>Voucher</TYPE>
+
+                        <FETCH>
+                            GUID,
+                            DATE,
+                            VOUCHERNUMBER,
+                            VOUCHERTYPENAME,
+                            PARTYLEDGERNAME,
+                            BASICBUYERADDRESS,
+                            BASICORDERTERMS,
+                            ALLINVENTORYENTRIES.*
+                        </FETCH>
+
+                        <FILTER>OnlySalesOrders</FILTER>
+
+                    </COLLECTION>
+
+                    <SYSTEM TYPE="Formulae"
+                            NAME="OnlySalesOrders">
+
+                        $VoucherTypeName = "Sales Order"
+
+                    </SYSTEM>
+
+                </TDLMESSAGE>
+
+            </TDL>
+
+        </DESC>
+    </BODY>
+</ENVELOPE>
+    """
+
+    r = requests.post(
+        payload.tally_url,
+        data=xml,
+        headers={
+            "Content-Type": "text/xml"
+        },
+        timeout=30
+    )
+
+    print(r.status_code)
+    print(r.headers.get("Content-Type"))
+    print(r.text[:500])
+
+    return {
+        "status": r.status_code,
+        "content_type": r.headers.get("Content-Type"),
+        "body": r.text
+    }
     
 @router.post("/upload-xml", dependencies=[Depends(check_department("Admin"))])
 async def upload_tally_xml(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
@@ -241,9 +351,10 @@ async def upload_tally_xml(file: UploadFile = File(...), user: dict = Depends(ve
         raise HTTPException(status_code=400, detail="Only Tally XML files are supported.")
         
     content = await file.read()
-    
+    xml_text = clean_tally_xml(content.decode("utf-8", errors="replace"))
+
     try:
-        root = ET.fromstring(content)
+        root = ET.fromstring(content)        
         sales_orders_raw = []
         
         # 1. EXTRACT: Find only Sales Order Vouchers to save LLM tokens
@@ -306,3 +417,38 @@ async def upload_tally_xml(file: UploadFile = File(...), user: dict = Depends(ve
     except Exception as e:
         logging.error(f"Tally XML Upload Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to parse Tally XML: {str(e)}")
+    
+@router.post("/upload-json", dependencies=[Depends(check_department("Admin"))])
+async def upload_tally_json(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
+    if not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Only JSON files are supported.")
+
+    content = await file.read()
+    data = json.loads(content)
+    print(data["tallymessage"][0]["metadata"].keys())
+    orders = []
+
+    for voucher in data["tallymessage"]:
+        
+        metadata = voucher.get("metadata", {})
+
+        if voucher.get("vouchertypename", "").strip().lower() != "sales order":
+            continue
+
+        orders.append(convert_sales_order(voucher))
+
+    saved = []
+    print(orders[0])
+    for order in orders:
+
+        saved.append(
+            EDBR.create_order(order)
+        )
+
+    return {
+        "status": "success",
+        "orders_found": len(orders),
+        "orders_saved": len(saved),
+        "data": saved
+    }
+

@@ -230,7 +230,7 @@ function App() {
                                     )}
                                     {isSales && (
                                         <a href="#lead-generation" className={`menu-item ${state.activeTab === 'target' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('target')}}>
-                                            <span>🏭</span>
+                                            <span>📊</span>
                                             {!sidebarCollapsed && <span>Personal Target</span>}
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+E</span>
                                         </a>

@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics & KPIs"])
 @router.get("/sales", tags=["Admin Only"])
 def get_sales_kpis(user: dict = Depends(verify_bearer_token)):
     # Simple RBAC enforcement at the route level
-    if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:
+    if user.get("role") not in ["Admin", "Chief Full Stack Developer", "Sales Representative"]:
         raise HTTPException(status_code=403, detail="Unauthorized access to KPIs.")
     
     try:
@@ -17,6 +17,10 @@ def get_sales_kpis(user: dict = Depends(verify_bearer_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@router.get("/sales-target", tags=["Open"])
+def return_sales_targets(user: dict=Depends(verify_bearer_token)):
+    return EDBR.get_sales_target()
+
 @router.get("/transport", tags=["Admin Only"])
 def get_transport_kpis(user: dict = Depends(verify_bearer_token)):
     if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:

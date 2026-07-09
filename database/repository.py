@@ -141,8 +141,8 @@ class PostgresRepository:
                 header = cur.fetchone()
                 cur.execute("""
                     INSERT INTO activity_logs(entity_id, entity_type, message, log_type)
-                    VALUES(%s, "ORDER_CREATED", %s, "INFO")
-                    """, (header["order_acceptance_id"], f"New order {header['order_acceptance_id']} added to pipeline."))
+                    VALUES (%s, %s, %s, %s)
+                    """, ( header["order_acceptance_id"],"ORDER_CREATED", f"New order {header['order_acceptance_id']} added to pipeline.", "INFO"))
                 conn.commit()
                 
                 header['order_acceptance_id'] = str(header['order_acceptance_id'])
@@ -1370,7 +1370,10 @@ class PostgresRepository:
                     ORDER BY faqs_answered DESC
                 """)
                 return cur.fetchall()
-            
+    def get_sales_target(self):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT() FROM users ")
     def get_transport_kpis(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:

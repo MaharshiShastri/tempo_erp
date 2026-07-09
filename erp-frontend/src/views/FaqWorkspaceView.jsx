@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API from "../api/api";
-import { FiMessageCircle, FiCheckCircle, FiClock, FiSend } from "react-icons/fi";
+import { FiMessageCircle, FiCheckCircle, FiClock, FiSend, FiFilter } from "react-icons/fi";
 
 export default function FaqWorkspaceView({ state }) {
     const [faqs, setFaqs] = useState([]);
@@ -9,6 +9,7 @@ export default function FaqWorkspaceView({ state }) {
     const [isLoading, setIsLoading] = useState(false);
 
     const isRnD = ["R&D Engineer", "Admin", "Chief Full Stack Developer"].includes(state.user.role);
+    const [statusFilter, setStatusFilter] = useState("all");
 
     useEffect(() => { loadFaqs(); }, []);
 
@@ -45,6 +46,17 @@ export default function FaqWorkspaceView({ state }) {
             state.setIsAlertOpen(true);
         } catch (err) { state.showErrorModal("Error", err.message); }
     };
+    const sortedFaqs = [...faqs].sort((a, b) => {
+        if (a.status === b.status) return 0;
+        return a.status === 'Answered' ? 1 : -1; // false (pending) comes before true
+    });
+
+    // 2. Apply the dropdown filter
+    const filteredFaqs = sortedFaqs.filter(faq => {
+        if (statusFilter === "pending") return faq.status === 'Pending';
+        if (statusFilter === "completed") return faq.status === 'Answered';
+        return true;
+    });
 
     return (
         <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 25 }}>
@@ -71,6 +83,18 @@ export default function FaqWorkspaceView({ state }) {
                 </div>
             )}
             
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "15px", borderBottom: "1px solid var(--border-light)", paddingBottom: "10px" }}>
+                <h4 style={{ margin: 0 }}>Knowledge Base Index</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FiFilter style={{ color: 'var(--text-muted)' }} />
+                    <select className="form-select-native" style={{ fontSize: '12px', padding: '4px 8px' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                        <option value="all">🔍 Show All</option>
+                        <option value="pending">⏳ Pending Answers</option>
+                        <option value="completed">✅ Resolved / Completed</option>
+                    </select>
+                </div>
+            </div>
+
             {/* Sales Input Area */}
             <form onSubmit={handleAskQuestion} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "30px", border: "1px solid var(--border-light)" }}>
                 <h4 style={{ margin: "0 0 10px 0", fontSize: "14px" }}>Ask a Technical Question</h4>
@@ -91,14 +115,17 @@ export default function FaqWorkspaceView({ state }) {
 
             {/* FAQ List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {faqs.map(faq => (
+                {filteredFaqs.map(faq => (
                     <div key={faq.id} style={{ border: '1px solid var(--border-light)', borderRadius: '8px', background: 'var(--bg-surface)', padding: '20px' }}>
                         
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                            <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>Q: {faq.question}</strong>
-                            <span style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', background: faq.status === 'Answered' ? '#eaffea' : 'var(--bg-main)', color: faq.status === 'Answered' ? 'var(--brand-success)' : 'var(--text-muted)', border: `1px solid ${faq.status === 'Answered' ? 'var(--brand-success)' : 'var(--border-light)'}`}}>
-                                {faq.status === 'Answered' ? <><FiCheckCircle style={{verticalAlign: 'middle', marginRight: '4px'}}/> Answered</> : <><FiClock style={{verticalAlign: 'middle', marginRight: '4px'}}/> Pending</>}
-                            </span>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <div style={{ fontSize: '20px', color: 'var(--brand-accent)' }}>Q.</div>
+                            <div>
+                                <strong style={{ fontSize: '15px' }}>{faq.question}</strong>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                    Asked by {faq.asked_by.split('@')[0]} • {new Date(faq.created_at).toLocaleDateString()}
+                                </div>
+                            </div>
                         </div>
                         
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '15px' }}>
@@ -106,10 +133,10 @@ export default function FaqWorkspaceView({ state }) {
                         </div>
 
                         {faq.status === 'Answered' ? (
-                            <div style={{ background: 'var(--bg-main)', padding: '15px', borderRadius: '6px', borderLeft: '4px solid var(--brand-accent)' }}>
-                                <div style={{ color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{faq.answer}</div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '10px', textAlign: 'right' }}>
-                                    Resolved by R&D ({faq.answered_by.split('@')[0]})
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginTop: '15px', background: 'var(--bg-main)', padding: '15px', borderRadius: '6px' }}>
+                                <div style={{ fontSize: '20px', color: 'var(--brand-success)' }}>A.</div>
+                                <div style={{ fontSize: '14px', lineHeight: 1.5, color: 'var(--text-primary)' }}>
+                                    {faq.answer}
                                 </div>
                             </div>
                         ) : (
