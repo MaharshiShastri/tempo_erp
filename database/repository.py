@@ -1280,6 +1280,17 @@ class PostgresRepository:
                     raise ValueError("Target not found or unauthorized.")
                 conn.commit()
                 return deactivated
+    
+    def reject_lead_target(self, target_id: int, rejected_reason: str = None):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""UPDATE lead_targets SET status='Rejected' rejected_reason=%s WHERE id=%s RETURNING id""", (rejected_reason, target_id))
+                row = cur.fetchone()
+                if not row:
+                    raise ValueError("Target not found.")
+                
+                conn.commit()
+                return row
             
     # --- LEAD GENERATOR ENGINE end ---
     # --- SYSTEM AUDIT start ---
@@ -1342,17 +1353,41 @@ class PostgresRepository:
                         u.email, 
                         u.name,
                         u.role,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactive') as targets_queued,
+                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status <> 'Inactive') AS targets_queued,
+                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status IN ('Completed','Awaiting Review')) AS targets_harvested,
+                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status='Rejected') AS rejected,
+                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status='Inactive') AS inactive,
+                        COUNT(DISTINCT crm.id) AS total_crm_leads,
+                        COUNT(DISTINCT fq.id) AS faqs_asked,
+                        COUNT(DISTINCT dr.id) AS dispatches_logged,
+                        COUNT(DISTINCT al.id) AS actions_logged,                            
+                        (COUNT(DISTINCT lt.id) FILTER (WHERE lt.status IN ('Completed','Awaiting Review'))*15
+                            +
+                        COUNT(DISTINCT crm.id)*10
+                            +
+                        COUNT(DISTINCT dr.id)*8
+                            +
+                        COUNT(DISTINCT fq.id)*3
+                            +
+                        COUNT(DISTINCT al.id)
+                        ) AS performance_score
+                    FROM users u
+                    LEFT JOIN lead_targets lt ON lt.requested_by=u.email
+                    LEFT JOIN crm_leads crm ON crm.assigned_to=u.email
+                    LEFT JOIN faq_queries fq ON fq.asked_by=u.email
+                    LEFT JOIN dispatch_records dr ON dr.operator_email = u.email
+                    LEFT JOIN system_audit_logs al ON al.user_email=u.email
+                    WHERE u.role='Sales Representative'
+                    GROUP BY u.email, u.name, u.role
+                    ORDER BY performance_score DESC
+                """)
+                """(SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactive') as targets_queued,
                         (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND (status = 'Completed' OR status='Awaiting Review')) as targets_harvested,
                         (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactive') as targets_inactive,
                         (SELECT COUNT(*) FROM crm_leads WHERE assigned_to = u.email) as total_crm_leads,
                         (SELECT COUNT(*) FROM faq_queries WHERE asked_by = u.email) as faqs_asked,
                         (SELECT COUNT(*) FROM dispatch_records WHERE operator_email = u.email) as dispatches_logged,
-                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged
-                    FROM users u
-                    WHERE u.role IN ('Sales Representative')
-                    ORDER BY actions_logged DESC
-                """)
+                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged"""
                 return cur.fetchall()
     def get_rnd_kpis(self):
         with self._get_connection() as conn:
@@ -1363,12 +1398,19 @@ class PostgresRepository:
                         u.email, 
                         u.name,
                         u.role,
-                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by = u.email) as faqs_answered,
-                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged
+                        COUNT(f.id) as faqs_asnwered,
+                        COUNT(*) FILTER (WHERE f.status='Answered') AS resolved,
+                        COUNT(a.id) AS actions_logged,
+                        (COUNT(f.id)*15 + COUNT(*) FILTER(WHERE f.status='Answered') * 25 + COUNT(a.id) AS knowledge_score)
                     FROM users u
+                    LEFT JOIN ON faq_queries f ON f.answered_by=u.email
+                    LEFT JOIN system_audit_logs a ON a.user_email=u.email
                     WHERE u.role IN ('R&D Engineer')
-                    ORDER BY faqs_answered DESC
+                    GROUP BY u.email, u.name
+                    ORDER BY knowledge_score DESC
                 """)
+                """(SELECT COUNT(*) FROM faq_queries WHERE answered_by = u.email) as faqs_answered,
+                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged"""
                 return cur.fetchall()
     def get_sales_target(self):
         with self._get_connection() as conn:
@@ -1408,7 +1450,11 @@ class PostgresRepository:
                     SELECT 
                         gtm_source,
                         TO_CHAR(added_date, 'YYYY-MM') as month,
-                        COUNT(id) as targets_queued,
+                        COUNT(*) as total_targets,
+                        COUNT(*) FILTER(WHERE status='Completed') completed,
+                        COUNT(*) FILTER(WHERE status='Rejeceted') rejected,
+                        COUNT(*) FILTER(WHERE status='Pending') pending,
+                        COUNT(*) FILTER(WHERE status='Awaiting Review') awaiting_review,
                         SUM(cost_per_credit) as total_spend,
                         SUM(emails_found) as emails_found,
                         COUNT(CASE WHEN email_status IN ('Sent Email', 'Got Reply', 'Closed Enquiry') THEN 1 END) as emails_sent,

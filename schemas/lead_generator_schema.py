@@ -22,3 +22,6 @@ class MappedContact(BaseModel):
 
 class ApproveStagingPayload(BaseModel):
     contacts: List[MappedContact]
+
+class RejectPayload(BaseModel):
+    reason: str | None = None

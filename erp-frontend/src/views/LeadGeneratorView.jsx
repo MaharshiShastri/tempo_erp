@@ -194,7 +194,24 @@ export default function LeadGeneratorView({ state }) {
             } catch (err) { state.showErrorModal("Delete Failed", err.message); }
         }
     };
+    const handleRejectStaging = async(targetId) => {
+        const reason = window.prompt("Reason for rejection(optional):");
+        if(!window.confirm("Reject this harvested data?")) return;
 
+        try{
+            await API.rejectSnovioStaging(targetId, {reason}, state.user.access_token);
+            state.setAlertMessage("❌ Harvest rejected.")
+            state.setIsAlertOpen(true);
+
+            setExpandedTargetId(null);
+            setStagedContacts([]);
+
+            await loadTargets();
+        }
+        catch(err){
+            state.showErrorModal("Reject failed", err.message);
+        }
+    }
     const openEmailModal = (contact, target) => {
         setEmailModal({ isOpen: true, contact, target });
         setDraftSubject("");
@@ -430,6 +447,7 @@ export default function LeadGeneratorView({ state }) {
                             <option value="Awaiting Review">✍️ Awaiting Review</option>
                             <option value="Completed">✅ Completed</option>
                             <option value="Failed">❌ Failed</option>
+                            <option value="Rejected">🚫 Rejected</option>
                         </select>
                     </div>
                 </div>
@@ -471,14 +489,15 @@ export default function LeadGeneratorView({ state }) {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                             <span style={{ 
                                                 fontSize: '11px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold', 
-                                                background: target.status === 'Completed' ? '#eaffea' : (target.status === 'Awaiting Review' ? '#fff8f0' : 'var(--bg-main)'), 
-                                                color: target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#e67e22' : 'var(--text-muted)'),
+                                                background: target.status === 'Completed' ? '#eaffea' : (target.status === 'Awaiting Review' ? '#fff8f0' : (target.status === "Rejected" ? '#ffe8e8' : 'var(--bg-main)')), 
+                                                color: target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#e67e22' : (target.status === 'Rejected' ? '#c62828' : 'var(--text-muted)')),
                                                 border: `1px solid ${target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#ffebcc' : 'var(--border-light)')}`
                                             }}>
-                                                {target.status === 'Completed' ? '✅ Completed' : (target.status === 'Awaiting Review' ? '✍️ Awaiting Review' : '⏳ Pending')}
+                                                {target.status === 'Completed' ? '✅ Completed' : (target.status === 'Awaiting Review' ? '✍️ Awaiting Review' : (target.status === 'Rejected' ? '🚫 Rejected' : '⏳ Pending'))}
                                             </span>
                                             
                                             <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button onClick={(e)=>handleRejectStaging(target.id)} className="btn-text" style={{fontSize: '12px', padding: 0}}>🚫</button>
                                                 <button onClick={(e) => startEditing(e, target)} className="btn-text" style={{ fontSize: '12px', padding: 0 }}>✏️</button>
                                                 <button onClick={(e) => handleDelete(e, target.id)} className="btn-text-danger" style={{ fontSize: '12px', padding: 0 }}>🗑️</button>
                                             </div>
@@ -499,6 +518,7 @@ export default function LeadGeneratorView({ state }) {
                                                 <div style={{ display: 'flex', gap: '8px' }}>
                                                     <button className="btn btn-secondary" onClick={addStagedContactRow}>+ Add Contact Row</button>
                                                     <button className="btn btn-success" onClick={() => handleApproveStaging(target.id)}><FiUserCheck /> Approve & Import</button>
+                                                    <button className="btn btn-text-danger" onClick={() => handleRejectStaging(target.id)}>Reject</button>
                                                 </div>
                                             </div>
                                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>

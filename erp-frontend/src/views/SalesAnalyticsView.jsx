@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../api/api";
-import { FiTrendingUp, FiActivity, FiTruck, FiMapPin, FiPrinter, FiPieChart, FiAlertOctagon, FiTarget, FiDownload, FiUsers, FiPackage } from "react-icons/fi";
+import { FiTrendingUp, FiActivity, FiTruck, FiMapPin, FiPrinter, FiPieChart, FiAlertOctagon, FiTarget, FiDownload, FiUsers, FiPackage, FiMessageSquare  } from "react-icons/fi";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Bar, Pie, Line } from 'react-chartjs-2';
@@ -113,6 +113,22 @@ export default function SalesAnalyticsView({ state }) {
     const conversionRatio = totalQueued > 0 ? ((totalHarvested / totalQueued) * 100).toFixed(1) : 0;
     const totalCrmLeads = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.total_crm_leads || 0), 0);
     const totalErrors = errorLogs.length;
+    const totalFaqAsked = salesKpis.reduce((sum, k) => sum + Number(k.faqs_asked || 0), 0);
+    const totalFaqAnswered = rndKpis.reduce((sum, k)=>sum+Number(k.faqs_answered || 0), 0);
+    const pendingFaqs = totalFaqAsked - totalFaqAnswered;
+    const totalTargets = gtmKpis.reduce((s,g)=>s+Number(g.total_targets||0),0);
+    const totalCompleted = gtmKpis.reduce((s,g)=>s+Number(g.completed||0),0);
+    const totalRejected = gtmKpis.reduce((s,g)=>s+Number(g.rejected||0),0);
+    const totalPending = gtmKpis.reduce((s,g)=>s+Number(g.pending||0),0);
+    const completion = totalTargets ? ((totalCompleted/totalTargets)*100).toFixed(1) : 0;
+    const reject = totalTargets ? ((totalRejected/totalTargets)*100).toFixed(1) : 0;
+    const emailsFound = gtmKpis.reduce((s,g)=>s+Number(g.emails_found||0),0);
+    const emailsSent = gtmKpis.reduce((s,g)=>s+Number(g.emails_sent||0),0);
+    const replies = gtmKpis.reduce((s,g)=>s+Number(g.replies_received||0),0);
+    const deals = gtmKpis.reduce((s,g)=>s+Number(g.deals_closed||0),0);
+    const emailYield = totalTargets  ? ((emailsFound/totalTargets)*100).toFixed(1) : 0;
+    const replyRate = emailsSent   ? ((replies/emailsSent)*100).toFixed(1) : 0;
+    const dealRate = replies  ? ((deals/replies)*100).toFixed(1) : 0;
 
     // --- CHART DATA GENERATORS ---
     const salesPerformanceChart = {
@@ -120,7 +136,7 @@ export default function SalesAnalyticsView({ state }) {
         datasets: [
             {
                 label: 'Activity Score',
-                data: salesKpis.map(k => (parseInt(k.targets_queued) * 2) + (parseInt(k.total_crm_leads) * 5) + (parseInt(k.dispatches_logged) * 10)),
+                data: salesKpis.map(k => k.activity_score),
                 backgroundColor: salesKpis.map(k => {
                     const score = (parseInt(k.targets_queued) * 2) + (parseInt(k.total_crm_leads) * 5) + (parseInt(k.dispatches_logged) * 10);
                     return score > 50 ? 'rgba(75, 192, 192, 0.6)' : 'rgba(255, 99, 132, 0.6)'; // Green if good, Red if low
@@ -129,22 +145,71 @@ export default function SalesAnalyticsView({ state }) {
         ]
     };
 
-    const gtmYieldChart = {
-        labels: gtmKpis.map(k => `${k.gtm_source} (${k.month})`),
-        datasets: [
+    const completionChart={
+
+    labels:gtmKpis.map(g=>g.gtm_source),
+
+    datasets:[
+
             {
-                label: 'Emails Found (Success)',
-                data: gtmKpis.map(k => k.emails_found),
-                backgroundColor: 'rgba(75, 192, 192, 0.8)', // Green
+
+                label:"Completed",
+
+                data:gtmKpis.map(g=>g.completed),
+
+                backgroundColor:"#4CAF50"
+
             },
+
             {
-                label: 'Failed/Empty Lookups (Wasted Cost)',
-                data: gtmKpis.map(k => k.targets_queued - k.emails_found),
-                backgroundColor: 'rgba(255, 99, 132, 0.8)', // Red
+
+                label:"Rejected",
+
+                data:gtmKpis.map(g=>g.rejected),
+
+                backgroundColor:"#F44336"
+
+            },
+
+            {
+
+                label:"Pending",
+
+                data:gtmKpis.map(g=>g.pending),
+
+                backgroundColor:"#FFC107"
+
+            }
+
+        ]
+
+    }
+
+    const faqAskedChart = {
+        labels: salesKpis.map(k=>k.name),
+
+        datasets:[
+            {
+                label:"FAQs Asked",
+
+                data:salesKpis.map(k=>k.faqs_asked),
+
+                backgroundColor:"rgba(255,159,64,0.8)"
             }
         ]
-    };
+    }
 
+    const faqAnswerChart = {
+        labels:rndKpis.map(k=>k.name),
+
+        datasets:[
+            {
+            label:"Knowledge Score",
+            data:rndKpis.map(k=>k.knowledge_score),
+            backgroundColor:"rgba(54,162,235,.8)"
+            }
+        ]
+    }
     const productionPieChart = {
         labels: prodKpis.map(p => p.stage),
         datasets: [{
@@ -191,6 +256,7 @@ export default function SalesAnalyticsView({ state }) {
 
                 <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "25px", overflowX: 'auto', paddingBottom: '10px' }}>
                     <button className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('overview')}>Overview</button>
+                    <button className={`btn ${activeTab === 'faq' ? "btn-primary": "btn-text"}`} onClick={() => setActiveTab("faq")}><FiMessageSquare />F&Q Actions</button>
                     <button className={`btn ${activeTab === 'performance' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('performance')}><FiUsers /> Team Matrix</button>
                     <button className={`btn ${activeTab === 'gtm' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('gtm')}><FiTarget /> GTM ROI</button>
                     <button className={`btn ${activeTab === 'production' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('production')}><FiPackage /> Production Analytics</button>
@@ -216,6 +282,49 @@ export default function SalesAnalyticsView({ state }) {
                             <div style={{ fontSize: '13px', color: 'var(--brand-danger)', marginBottom: '8px' }}>System Faults</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-danger)' }}>{totalErrors}</div>
                         </div>
+                        <br/>
+                        <h3>GTM Completion Ratio</h3>
+                        <table style={{width:"100%", borderCollapse:"collapse" }}>
+                            <thead>
+                                <tr>
+                                    <th>GTM</th>
+                                    <th>Queued</th>
+                                    <th>Completed</th>
+                                    <th>Rejected</th>
+                                    <th>Completion %</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody>
+
+                                {gtmKpis.map(gtm=>{
+                                    const ratio = gtm.total_targets ?((gtm.completed/gtm.total_targets)*100).toFixed(1):0;
+
+                                    return(
+
+                                        <tr key={gtm.gtm_source}>
+
+                                            <td>{gtm.gtm_source}</td>
+
+                                            <td>{gtm.total_targets}</td>
+
+                                            <td>{gtm.completed}</td>
+
+                                            <td>{gtm.rejected}</td>
+
+                                            <td>{ratio}%</td>
+
+                                        </tr>
+
+                                    );
+
+                                })}
+
+                            </tbody>
+
+                        </table>
                     </div>
                 )}
 
@@ -251,6 +360,81 @@ export default function SalesAnalyticsView({ state }) {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Tab: R&D Knowledge Base */}
+                {(activeTab === 'faq') && (
+                    <div className="print-section">
+                        <h4>Knowledge Base Performance</h4>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"30px",marginBottom:"30px"}}>
+                            <div style={{height:320}}>
+                                <Bar data={faqAskedChart} options={{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:"Sales Representatives - Questions Asked"}}}}/>
+                            </div>
+                            <div style={{height:320}}>
+                                <Bar data={faqAnswerChart} options={{ responsive:true, maintainAspectRatio:false, plugins:{title:{display:true,text:"R&D Knowledge Scores"}}}}/>
+                            </div>
+                        </div>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"20px"}}>
+                            <div className="frappe-card">
+                                <h4>Answered</h4>
+                                <h2>{totalFaqAnswered}</h2>
+                            </div>
+                            
+                            <div className="frappe-card">
+                                <h4>Pending</h4>
+                                <h2>{pendingFaqs}</h2>
+                            </div>
+                            <br/>
+                            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"30px"}}>
+                                <div>
+                                    <h3>Sales Representative Ranking</h3>
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Name</th>
+                                                <th>Questions</th>
+                                                <th>Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {salesKpis.sort((a,b)=>b.activity_score-a.activity_score).map((k,i)=>
+                                            <tr key={k.email}>
+                                                <td>{i+1}</td>
+                                                <td>{k.name}</td>
+                                                <td>{k.faqs_asked}</td>
+                                                <td>{k.activity_score}</td>
+                                            </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div>
+                                    <h3>R&D Ranking</h3>
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Name</th>
+                                                <th>Answered</th>
+                                                <th>Knowledge Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rndKpis.sort((a,b)=>b.knowledge_score-a.knowledge_score).map((k,i)=>                                            
+                                                <tr key={k.email}>
+                                                    <td>{i+1}</td>
+                                                    <td>{k.name}</td>
+                                                    <td>{k.faqs_answered}</td>
+                                                    <td>{k.knowledge_score}</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -291,8 +475,49 @@ export default function SalesAnalyticsView({ state }) {
                             </table>
                         </div>
 
-                        <div style={{ height: '300px', marginBottom: '30px' }}>
-                            <Bar data={gtmYieldChart} options={{ responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { title: { display: true, text: 'GTM Source Yield (Success vs Failures)' } } }} />
+                        <div style={{ height: '350px', marginBottom: '30px' }}>
+                            <Bar data={completionChart} options={{ responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { title: { display: true, text: 'Lead Completion Status by GTM' } } }} />
+                            <br/>
+                            <table style={{width:"100%"}}>
+                                    <thead>
+                                        <tr>
+                                            <th>Source</th>
+                                            <th>Targets</th>
+                                            <th>Emails</th>
+                                            <th>Email Yield</th>
+                                            <th>Reply Rate</th>
+                                            <th>Deal Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+
+                                    {gtmKpis.map(g=>{
+                                        const yieldRate = g.total_targets ?((g.emails_found/g.total_targets)*100).toFixed(1):0;
+
+                                        const reply = g.emails_sent ?((g.replies_received/g.emails_sent)*100).toFixed(1) :0;
+
+                                        const deal = g.replies_received ?((g.deals_closed/g.replies_received)*100).toFixed(1) :0;
+
+                                        return( 
+                                            <tr key={g.gtm_source}>
+
+                                                <td>{g.gtm_source}</td>
+
+                                                <td>{g.total_targets}</td>
+
+                                                <td>{g.emails_found}</td>
+
+                                                <td>{yieldRate}%</td>
+
+                                                <td>{reply}%</td>
+
+                                                <td>{deal}%</td>
+
+                                            </tr>
+                                        )
+                                    })}
+                                    </tbody>
+                            </table>
                         </div>
                     </div>
                 )}

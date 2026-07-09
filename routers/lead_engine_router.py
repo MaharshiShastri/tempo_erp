@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
-from schemas.lead_generator_schema import TargetPayload, EmailGenPayload, MappedContact, ApproveStagingPayload
+from schemas.lead_generator_schema import TargetPayload, EmailGenPayload, MappedContact, ApproveStagingPayload, RejectPayload
 from fastapi import UploadFile, File
 import pandas as pd
 import io
@@ -121,3 +121,7 @@ def approve_snovio_staging(target_id: int, payload: ApproveStagingPayload, user:
             cur.execute("UPDATE lead_targets SET status = 'Completed', emails_found = %s WHERE id = %s", (len(payload.contacts), target_id))
             conn.commit()
     return {"status": "success"}
+
+@router.post("/targets/{target_id}/reject-staging")
+def reject_staging(target_id: int, payload: RejectPayload, user: dict = Depends(verify_bearer_token)):
+    return EDBR.reject_lead_target(target_id, payload.reason)

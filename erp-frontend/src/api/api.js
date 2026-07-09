@@ -771,7 +771,20 @@ const API = {
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
+  async rejectSnovioStaging(targetId, payload, token){
+    const r = await fetch(`/api/v1/lead-engine/targets/${targetId}/reject-staging`,{
+      method: "POST",
+      headers: this.headers(token),
+      body: JSON.stringify(payload)
+    });
 
+    if (!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+
+    return r.json();
+  },
   updateQuarterlyTarget: async (token, email, targetValue) => {
         const response = await fetch(`/api/v1/analytics/admin/users/${email}/target`, {
             method: "PATCH",
