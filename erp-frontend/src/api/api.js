@@ -826,7 +826,14 @@ const API = {
     }
     return r.json();
   },
-
+  async searchPOAutocomplete(query, token) {
+    const r = await fetch(`/api/v1/orders/search/po-autocomplete?q=${encodeURIComponent(query)}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!r.ok) throw new Error("Autocomplete search failed");
+    return r.json();
+  },
+  
   async uploadTallyXML(file, token) {
     const formData = new FormData();
     formData.append("file", file);

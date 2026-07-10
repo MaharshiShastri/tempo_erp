@@ -10,7 +10,8 @@ class ItemMasterCreate(BaseModel):
     additional_spec_text: Optional[str] = Field(default="")
     hsn_code: Optional[str] = Field(default="")
     revision_no: Optional[str] = Field(default="")
-
+    available_stock: Optional[int] = Field(default=0)
+    
 class ItemMasterUpdate(BaseModel):
     item_name: Optional[str] = None
     item_group: Optional[str] = None

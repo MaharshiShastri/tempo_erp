@@ -38,3 +38,4 @@ class OrderHeaderCreate(BaseModel):
     delivery_terms: Optional[str] = ""
     due_date: date
     items: List[OrderItemCreate]
+    ordered_by: str = Field(..., min_length=1)

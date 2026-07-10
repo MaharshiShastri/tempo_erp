@@ -9,7 +9,7 @@ import os
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/tempo_erp")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -131,12 +131,12 @@ class PostgresRepository:
                 cur.execute("""
                     INSERT INTO order_headers (order_acceptance_id, order_acceptance_date, purchase_order_number, 
                                         purchase_order_date, customer_code, payment_terms, billing_name, 
-                                        billing_address, due_date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+                                        billing_address, due_date, ordered_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
                 """, (
                     str(order_data['order_acceptance_id']), order_data['order_acceptance_date'], order_data['purchase_order_number'],
                     order_data['purchase_order_date'], order_data['customer_code'], order_data.get('payment_terms', ''),
-                    order_data['billing_name'], order_data['billing_address'], order_data['due_date']
+                    order_data['billing_name'], order_data['billing_address'], order_data['due_date'], order_data['ordered_by']
                 ))
                 header = cur.fetchone()
                 cur.execute("""
@@ -171,6 +171,40 @@ class PostgresRepository:
                 conn.commit()
                 header['items'] = inserted_items
                 return header
+    def get_order_by_po(self, po_number: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM order_headers WHERE purchase_order_number = %s LIMIT 1", (po_number,))
+                header = cur.fetchone()
+                if not header: return None
+                
+                header['order_acceptance_id'] = str(header['order_acceptance_id'])
+                header['order_acceptance_date'] = str(header['order_acceptance_date'])
+                header['purchase_order_date'] = str(header['purchase_order_date'])
+                header['due_date'] = str(header['due_date'])
+                
+                cur.execute("SELECT * FROM order_items WHERE order_acceptance_id = %s", (header['order_acceptance_id'],))
+                items = cur.fetchall()
+                for i in items:
+                    i['rate'] = float(i['rate'])
+                    i['discount_percentage'] = float(i['discount_percentage'])
+                    i['amount'] = float(i['amount'])
+                header['items'] = items
+                return header
+    
+    def search_po_autocomplete(self, query: str):
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                # ILIKE allows case-insensitive partial matching
+                cur.execute("""
+                    SELECT purchase_order_number 
+                    FROM order_headers 
+                    WHERE purchase_order_number ILIKE %s
+                    LIMIT 20
+                """, (f"%{query}%",))
+                results = cur.fetchall()
+                # Return a flat list of strings
+                return [r['purchase_order_number'] for r in results]
     # --- GLOBAL ORDERS ENGINE end---
     # --- GLOBAL BILLS ENGINE start---
     def get_all_bills(self):
@@ -639,8 +673,8 @@ class PostgresRepository:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO items_master (item_code, item_name, item_group, rate, unit_measure, additional_spec_text, hsn_code, revision_no)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+                    INSERT INTO items_master (item_code, item_name, item_group, rate, unit_measure, additional_spec_text, hsn_code, revision_no, available_stock)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
                 """, (
                     item_data['item_code'].strip(), 
                     item_data['item_name'].strip(), 
@@ -649,7 +683,8 @@ class PostgresRepository:
                     item_data['unit_measure'].strip(),
                     item_data['additional_spec_text'].strip(),
                     item_data['hsn_code'].strip(),
-                    item_data['revision_no'].strip()
+                    item_data['revision_no'].strip(),
+                    int(item_data['available_stock'])
                 ))
                 conn.commit()
                 res = cur.fetchone()
@@ -686,7 +721,8 @@ class PostgresRepository:
                             unit_measure=%s,
                             hsn_code=%s,
                             additional_spec_text=%s,
-                            revision_no=%s
+                            revision_no=%s,
+                            available_stock=%s
                         WHERE item_code=%s
                         RETURNING *
                     """, (
@@ -697,6 +733,7 @@ class PostgresRepository:
                         data.get("hsn_code"),
                         data.get("additional_spec_text"),
                         data.get("revision_no"),
+                        data.get("available_stock"),
                         item_code
                     ))
 
@@ -1349,46 +1386,46 @@ class PostgresRepository:
             with conn.cursor() as cur:
                 # Replaced 'dispatches_logged' with 'actions_logged' targeting the new Audit table
                 cur.execute("""
-                    SELECT 
-                        u.email, 
-                        u.name,
-                        u.role,
-                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status <> 'Inactive') AS targets_queued,
-                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status IN ('Completed','Awaiting Review')) AS targets_harvested,
-                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status='Rejected') AS rejected,
-                        COUNT(DISTINCT lt.id) FILTER (WHERE lt.status='Inactive') AS inactive,
-                        COUNT(DISTINCT crm.id) AS total_crm_leads,
-                        COUNT(DISTINCT fq.id) AS faqs_asked,
-                        COUNT(DISTINCT dr.id) AS dispatches_logged,
-                        COUNT(DISTINCT al.id) AS actions_logged,                            
-                        (COUNT(DISTINCT lt.id) FILTER (WHERE lt.status IN ('Completed','Awaiting Review'))*15
-                            +
-                        COUNT(DISTINCT crm.id)*10
-                            +
-                        COUNT(DISTINCT dr.id)*8
-                            +
-                        COUNT(DISTINCT fq.id)*3
-                            +
-                        COUNT(DISTINCT al.id)
-                        ) AS performance_score
-                    FROM users u
-                    LEFT JOIN lead_targets lt ON lt.requested_by=u.email
-                    LEFT JOIN crm_leads crm ON crm.assigned_to=u.email
-                    LEFT JOIN faq_queries fq ON fq.asked_by=u.email
-                    LEFT JOIN dispatch_records dr ON dr.operator_email = u.email
-                    LEFT JOIN system_audit_logs al ON al.user_email=u.email
-                    WHERE u.role='Sales Representative'
-                    GROUP BY u.email, u.name, u.role
-                    ORDER BY performance_score DESC
-                """)
-                """(SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status <> 'Inactive') as targets_queued,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND (status = 'Completed' OR status='Awaiting Review')) as targets_harvested,
-                        (SELECT COUNT(*) FROM lead_targets WHERE requested_by = u.email AND status = 'Inactive') as targets_inactive,
-                        (SELECT COUNT(*) FROM crm_leads WHERE assigned_to = u.email) as total_crm_leads,
-                        (SELECT COUNT(*) FROM faq_queries WHERE asked_by = u.email) as faqs_asked,
-                        (SELECT COUNT(*) FROM dispatch_records WHERE operator_email = u.email) as dispatches_logged,
-                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged"""
+                            SELECT u.email, u.name, u.role, u.quarterly_order_value_target,
+                            (SELECT COALESCE(SUM(lt.cost_per_credit), 0) FROM lead_targets lt WHERE lt.requested_by=u.email) AS total_spend,
+                            (SELECT COUNT(*) FROM lead_targets lt WHERE lt.requested_by = u.email AND lt.status <> 'Inactive' ) AS targets_queued,
+                            (SELECT COALESCE(SUM(oi.quantity *oi.rate *(1 - oi.discount_percentage / 100.0)),0)
+                                FROM order_headers oh
+                                JOIN order_items oi ON oi.order_acceptance_id = oh.order_acceptance_id
+                                WHERE oh.ordered_by = u.email AND DATE_TRUNC('month', oh.created_at) = DATE_TRUNC('month', CURRENT_DATE)) AS monthly_order_value,
+
+                            (SELECT COUNT(*) FROM lead_targets lt WHERE lt.requested_by=u.email AND lt.status='Rejected' ) AS rejected,
+
+                            (SELECT COUNT(*) FROM lead_targets lt WHERE lt.requested_by=u.email AND lt.status='Inactive') AS inactive,
+
+                            (SELECT COUNT(*) FROM crm_leads c WHERE c.assigned_to=u.email ) AS total_crm_leads,
+
+                            (SELECT COUNT(*) FROM faq_queries f WHERE f.asked_by=u.email) AS faqs_asked,
+
+                            (SELECT COUNT(*) FROM dispatch_records d WHERE d.operator_email=u.email ) AS dispatches_logged,
+
+                            (SELECT COUNT(*) FROM system_audit_logs a WHERE a.user_email=u.email ) AS actions_logged,
+
+                            (COALESCE((SELECT SUM(oi.quantity * oi.rate * (1-oi.discount_percentage/100.0))
+                                FROM order_headers oh JOIN order_items oi ON oi.order_acceptance_id=oh.order_acceptance_id
+                                WHERE oh.ordered_by=u.email AND DATE_TRUNC('month',oh.created_at) = DATE_TRUNC('month',CURRENT_DATE)),0)/1000
+                                +
+                                (SELECT COUNT(*) FROM crm_leads WHERE assigned_to=u.email)*10
+                                +
+                                ( SELECT COUNT(*) FROM dispatch_records WHERE operator_email=u.email)*8
+                                +
+                                (SELECT COUNT(*) FROM faq_queries WHERE asked_by=u.email)*3
+                                +
+                                (SELECT COUNT(*) FROM system_audit_logs WHERE user_email=u.email)
+
+                            ) AS performance_score
+
+                        FROM users u
+                        WHERE u.role='Sales Representative'
+                        ORDER BY performance_score DESC;
+                    """)
                 return cur.fetchall()
+    
     def get_rnd_kpis(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
@@ -1398,24 +1435,20 @@ class PostgresRepository:
                         u.email, 
                         u.name,
                         u.role,
-                        COUNT(f.id) as faqs_asnwered,
-                        COUNT(*) FILTER (WHERE f.status='Answered') AS resolved,
-                        COUNT(a.id) AS actions_logged,
-                        (COUNT(f.id)*15 + COUNT(*) FILTER(WHERE f.status='Answered') * 25 + COUNT(a.id) AS knowledge_score)
-                    FROM users u
-                    LEFT JOIN ON faq_queries f ON f.answered_by=u.email
-                    LEFT JOIN system_audit_logs a ON a.user_email=u.email
-                    WHERE u.role IN ('R&D Engineer')
-                    GROUP BY u.email, u.name
-                    ORDER BY knowledge_score DESC
+                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email) AS faqs_answered,
+                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email AND status='Answered') AS resolved,
+                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email=u.email) AS actions_logged,
+                        ((SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email)*15 + 
+                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email AND status='Answered') * 25 +
+                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email=u.email)) AS knowledge_score
+                        FROM users u
+                        WHERE u.role='R&D Engineer'
+                        ORDER BY knowledge_score DESC;
                 """)
                 """(SELECT COUNT(*) FROM faq_queries WHERE answered_by = u.email) as faqs_answered,
                         (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged"""
                 return cur.fetchall()
-    def get_sales_target(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT COUNT() FROM users ")
+
     def get_transport_kpis(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
@@ -1452,7 +1485,7 @@ class PostgresRepository:
                         TO_CHAR(added_date, 'YYYY-MM') as month,
                         COUNT(*) as total_targets,
                         COUNT(*) FILTER(WHERE status='Completed') completed,
-                        COUNT(*) FILTER(WHERE status='Rejeceted') rejected,
+                        COUNT(*) FILTER(WHERE status='Rejected') rejected,
                         COUNT(*) FILTER(WHERE status='Pending') pending,
                         COUNT(*) FILTER(WHERE status='Awaiting Review') awaiting_review,
                         SUM(cost_per_credit) as total_spend,
@@ -1461,7 +1494,7 @@ class PostgresRepository:
                         COUNT(CASE WHEN email_status = 'Got Reply' THEN 1 END) as replies_received,
                         COUNT(CASE WHEN email_status = 'Closed Enquiry' THEN 1 END) as deals_closed
                     FROM lead_targets
-                    WHERE added_date >= CURRENT_DATE - INTERVAL '1 month' AND status = 'Completed'
+                    WHERE added_date >= CURRENT_DATE - INTERVAL '1 month'
                     GROUP BY gtm_source, TO_CHAR(added_date, 'YYYY-MM')
                     ORDER BY month DESC, gtm_source ASC
                 """)

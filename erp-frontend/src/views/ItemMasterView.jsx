@@ -20,6 +20,7 @@ export default function ItemMasterView({ state }) {
                             <th>Product Code</th>
                             <th>Product Name</th>
                             <th>Category Group</th>
+                            <th style={{textAlign:"center"}}>Available Stock</th>
                             <th>UoM</th>
                             <th style={{ textAlign: 'right' }}>Standard Base Price</th>
                         </tr>
@@ -31,6 +32,7 @@ export default function ItemMasterView({ state }) {
                                     <td><span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{item.item_code}</span></td>
                                     <td>{item.item_name}</td>
                                     <td><span style={{ background: 'var(--combobox-hover)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px' }}>{item.item_group || 'General'}</span></td>
+                                    <td style={{textAlign:"center",fontWeight:"bold"}}>{item.available_stock}</td>
                                     <td>{item.unit_measure}</td>
                                     <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹{parseFloat(item.rate).toFixed(2)}</td>
                                 </tr>

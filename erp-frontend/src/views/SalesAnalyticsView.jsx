@@ -108,108 +108,180 @@ export default function SalesAnalyticsView({ state }) {
     };
 
     // --- AGGREGATES ---
-    const totalQueued = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.targets_queued || 0), 0);
-    const totalHarvested = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.targets_harvested || 0), 0);
-    const conversionRatio = totalQueued > 0 ? ((totalHarvested / totalQueued) * 100).toFixed(1) : 0;
-    const totalCrmLeads = salesKpis.reduce((acc, kpi) => acc + parseInt(kpi.total_crm_leads || 0), 0);
+    const totalQueued = salesKpis.reduce((a,b)=>a+Number(b.targets_queued||0),0);
+    const totalOrderValue = salesKpis.reduce((a,b)=>a+Number(b.monthly_order_value||0),0);
+    const totalCRM = salesKpis.reduce((a,b)=>a+Number(b.total_crm_leads||0),0);
+    const totalDispatches = salesKpis.reduce((a,b)=>a+Number(b.dispatches_logged||0),0);
+    const totalActions = salesKpis.reduce((a,b)=>a+Number(b.actions_logged||0),0);
+    const totalRejected = salesKpis.reduce((a,b)=>a+Number(b.rejected||0),0);
+    const totalInactive = salesKpis.reduce((a,b)=>a+Number(b.inactive||0),0);
     const totalErrors = errorLogs.length;
-    const totalFaqAsked = salesKpis.reduce((sum, k) => sum + Number(k.faqs_asked || 0), 0);
-    const totalFaqAnswered = rndKpis.reduce((sum, k)=>sum+Number(k.faqs_answered || 0), 0);
-    const pendingFaqs = totalFaqAsked - totalFaqAnswered;
-    const totalTargets = gtmKpis.reduce((s,g)=>s+Number(g.total_targets||0),0);
-    const totalCompleted = gtmKpis.reduce((s,g)=>s+Number(g.completed||0),0);
-    const totalRejected = gtmKpis.reduce((s,g)=>s+Number(g.rejected||0),0);
-    const totalPending = gtmKpis.reduce((s,g)=>s+Number(g.pending||0),0);
-    const completion = totalTargets ? ((totalCompleted/totalTargets)*100).toFixed(1) : 0;
-    const reject = totalTargets ? ((totalRejected/totalTargets)*100).toFixed(1) : 0;
-    const emailsFound = gtmKpis.reduce((s,g)=>s+Number(g.emails_found||0),0);
-    const emailsSent = gtmKpis.reduce((s,g)=>s+Number(g.emails_sent||0),0);
-    const replies = gtmKpis.reduce((s,g)=>s+Number(g.replies_received||0),0);
-    const deals = gtmKpis.reduce((s,g)=>s+Number(g.deals_closed||0),0);
-    const emailYield = totalTargets  ? ((emailsFound/totalTargets)*100).toFixed(1) : 0;
-    const replyRate = emailsSent   ? ((replies/emailsSent)*100).toFixed(1) : 0;
-    const dealRate = replies  ? ((deals/replies)*100).toFixed(1) : 0;
-
+    const totalFaqAsked = salesKpis.reduce((a,b)=>a+Number(b.faqs_asked||0),0);
+    const totalFaqAnswered = rndKpis.reduce((a,b)=>a+Number(b.faqs_answered||0),0);
+    const pendingFaqs = totalFaqAsked-totalFaqAnswered;
+    
     // --- CHART DATA GENERATORS ---
     const salesPerformanceChart = {
-        labels: salesKpis.map(k => k.name.split(' ')[0]),
-        datasets: [
+        labels:salesKpis.map(k=>k.name),
+
+        datasets:[
             {
-                label: 'Activity Score',
-                data: salesKpis.map(k => k.activity_score),
-                backgroundColor: salesKpis.map(k => {
-                    const score = (parseInt(k.targets_queued) * 2) + (parseInt(k.total_crm_leads) * 5) + (parseInt(k.dispatches_logged) * 10);
-                    return score > 50 ? 'rgba(75, 192, 192, 0.6)' : 'rgba(255, 99, 132, 0.6)'; // Green if good, Red if low
-                }),
+                label:"Monthly Order Value",
+
+                data:salesKpis.map(k=>Number(k.monthly_order_value)),
+
+                backgroundColor:"#2196f3"
+            }
+        ]
+    };
+    const performanceChart={
+        labels:salesKpis.map(k=>k.name),
+
+        datasets:[
+            {
+                label:"Performance Score",
+
+                data:salesKpis.map(k=>Number(k.performance_score)),
+
+                backgroundColor:"#4CAF50"
             }
         ]
     };
 
-    const completionChart={
+    const transportChart={
 
-    labels:gtmKpis.map(g=>g.gtm_source),
-
-    datasets:[
-
-            {
-
-                label:"Completed",
-
-                data:gtmKpis.map(g=>g.completed),
-
-                backgroundColor:"#4CAF50"
-
-            },
-
-            {
-
-                label:"Rejected",
-
-                data:gtmKpis.map(g=>g.rejected),
-
-                backgroundColor:"#F44336"
-
-            },
-
-            {
-
-                label:"Pending",
-
-                data:gtmKpis.map(g=>g.pending),
-
-                backgroundColor:"#FFC107"
-
-            }
-
-        ]
-
-    }
-
-    const faqAskedChart = {
-        labels: salesKpis.map(k=>k.name),
+        labels:transportKpis.monthly_costs.map(m=>m.month_period),
 
         datasets:[
             {
-                label:"FAQs Asked",
 
-                data:salesKpis.map(k=>k.faqs_asked),
+                label:"Dispatch Cost",
 
-                backgroundColor:"rgba(255,159,64,0.8)"
+                data:transportKpis.monthly_costs.map(
+                    m=>Number(m.total_cost)
+                ),
+
+                borderColor:"#f44336",
+
+                backgroundColor:"rgba(244,67,54,0.25)",
+
+                fill:true,
+
+                tension:0.35
             }
         ]
-    }
+    };
 
-    const faqAnswerChart = {
+    
+    const completionChart = {
+        labels: gtmKpis.map(g => `${g.gtm_source}\n${g.month}`),
+
+        datasets: [
+            {
+                label: "Completed",
+                data: gtmKpis.map(g => Number(g.completed)),
+                backgroundColor: "#4CAF50"
+            },
+            {
+                label: "Awaiting Review",
+                data: gtmKpis.map(g => Number(g.awaiting_review)),
+                backgroundColor: "#2196F3"
+            },
+            {
+                label: "Rejected",
+                data: gtmKpis.map(g => Number(g.rejected)),
+                backgroundColor: "#F44336"
+            },
+            {
+                label: "Queued",
+                data: gtmKpis.map(g => Number(g.total_targets)),
+                backgroundColor: "#9E9E9E"
+            },
+            {
+                label: "Email Yield %",
+                data: gtmKpis.map(g =>
+                    g.total_targets
+                        ? ((g.emails_found / g.total_targets) * 100).toFixed(1)
+                        : 0
+                ),
+                backgroundColor: "#FF9800"
+            },
+            {
+                label: "Reply Rate %",
+                data: gtmKpis.map(g =>
+                    g.emails_sent
+                        ? ((g.replies_received / g.emails_sent) * 100).toFixed(1)
+                        : 0
+                ),
+                backgroundColor: "#9C27B0"
+            },
+            {
+                label: "Deal Rate %",
+                data: gtmKpis.map(g =>
+                    g.replies_received
+                        ? ((g.deals_closed / g.replies_received) * 100).toFixed(1)
+                        : 0
+                ),
+                backgroundColor: "#009688"
+            }
+        ]
+    };
+
+    const faqAskedChart={
+
+        labels:salesKpis.map(k=>k.name),
+
+        datasets:[
+
+            {
+
+                label:"Questions Asked",
+
+                data:salesKpis.map(k=>Number(k.faqs_asked)),
+
+                backgroundColor:"#FF9800"
+
+            }
+
+        ]
+
+    };
+    const faqAnswerChart={
+
         labels:rndKpis.map(k=>k.name),
 
         datasets:[
+
             {
-            label:"Knowledge Score",
-            data:rndKpis.map(k=>k.knowledge_score),
-            backgroundColor:"rgba(54,162,235,.8)"
+
+                label:"Knowledge Score",
+
+                data:rndKpis.map(k=>Number(k.knowledge_score)),
+
+                backgroundColor:"#4CAF50"
+
+            }
+
+        ]
+
+    };
+
+    const faqChart = {
+        labels: salesKpis.map(k => k.name),
+        datasets: [
+            {
+                label: "FAQs Asked",
+                data: salesKpis.map(k => Number(k.faqs_asked)),
+                backgroundColor: "#ff9800"
+            },
+            {
+                label: "FAQs Answered",
+                data: rndKpis.map(k => Number(k.faqs_answered)),
+                backgroundColor: "#2196f3"
             }
         ]
-    }
+    };
+
     const productionPieChart = {
         labels: prodKpis.map(p => p.stage),
         datasets: [{
@@ -258,6 +330,7 @@ export default function SalesAnalyticsView({ state }) {
                     <button className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('overview')}>Overview</button>
                     <button className={`btn ${activeTab === 'faq' ? "btn-primary": "btn-text"}`} onClick={() => setActiveTab("faq")}><FiMessageSquare />F&Q Actions</button>
                     <button className={`btn ${activeTab === 'performance' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('performance')}><FiUsers /> Team Matrix</button>
+                    <button className={`btn ${activeTab === 'transport' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('transport')}><FiTruck /> Transport</button>
                     <button className={`btn ${activeTab === 'gtm' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('gtm')}><FiTarget /> GTM ROI</button>
                     <button className={`btn ${activeTab === 'production' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('production')}><FiPackage /> Production Analytics</button>
                     <button className={`btn ${activeTab === 'health' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('health')}><FiAlertOctagon /> System Health</button>
@@ -270,13 +343,13 @@ export default function SalesAnalyticsView({ state }) {
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Total Targets Queued</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{totalQueued}</div>
                         </div>
-                        <div style={{ background: 'rgba(75, 192, 192, 0.1)', padding: '25px', borderRadius: '8px', border: '1px solid rgba(75, 192, 192, 0.3)' }}>
+                        {<div style={{ background: 'rgba(75, 192, 192, 0.1)', padding: '25px', borderRadius: '8px', border: '1px solid rgba(75, 192, 192, 0.3)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Lead Harvest Ratio</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: conversionRatio > 50 ? 'rgba(75, 192, 192, 1)' : 'var(--brand-danger)' }}>{conversionRatio}%</div>
-                        </div>
+                        </div>}
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active CRM Deals</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-success)' }}>{totalCrmLeads}</div>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-success)' }}>{totalCRM}</div>
                         </div>
                         <div style={{ background: 'rgba(255, 99, 132, 0.1)', padding: '25px', borderRadius: '8px', border: '1px solid rgba(255, 99, 132, 0.3)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--brand-danger)', marginBottom: '8px' }}>System Faults</div>
@@ -287,11 +360,13 @@ export default function SalesAnalyticsView({ state }) {
                         <table style={{width:"100%", borderCollapse:"collapse" }}>
                             <thead>
                                 <tr>
-                                    <th>GTM</th>
-                                    <th>Queued</th>
-                                    <th>Completed</th>
-                                    <th>Rejected</th>
-                                    <th>Completion %</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Month</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>GTM</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Queued</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Awaiting Review</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Completed</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Rejected</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Completion %</th>
 
                                 </tr>
 
@@ -300,22 +375,18 @@ export default function SalesAnalyticsView({ state }) {
                             <tbody>
 
                                 {gtmKpis.map(gtm=>{
-                                    const ratio = gtm.total_targets ?((gtm.completed/gtm.total_targets)*100).toFixed(1):0;
+                                    const ratio = gtm.total_targets ? ((gtm.completed/gtm.total_targets)*100).toFixed(1):0;
 
                                     return(
 
                                         <tr key={gtm.gtm_source}>
-
-                                            <td>{gtm.gtm_source}</td>
-
-                                            <td>{gtm.total_targets}</td>
-
-                                            <td>{gtm.completed}</td>
-
-                                            <td>{gtm.rejected}</td>
-
-                                            <td>{ratio}%</td>
-
+                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.month}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.gtm_source}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.total_targets}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.awaiting_review}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.completed}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.rejected}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{ratio}%</td>
                                         </tr>
 
                                     );
@@ -339,10 +410,11 @@ export default function SalesAnalyticsView({ state }) {
                                 <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
                                     <th style={{padding: '12px'}}>Serial number</th>
                                     <th style={{ padding: '12px' }}>Executive Name</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Targets Queued</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Active CRM Deals</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Dispatches</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>QTR Target (₹)</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>Monthly Order Value</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>Performance Score</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>Quarterly Target</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>Achievement %</th>
+                                    <th style={{ padding: '12px', textAlign: 'center' }}>Set Quarterly Target</th>
                                     <th style={{ padding: '12px', textAlign: 'center' }}>Action</th>
                                 </tr>
                             </thead>
@@ -351,9 +423,10 @@ export default function SalesAnalyticsView({ state }) {
                                     <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                                         <td style={{padding: '12px'}}>{idx+1}</td>
                                         <td style={{ padding: '12px' }}><strong>{kpi.name}</strong></td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.targets_queued}</td>
-                                        <td style={{ padding: '12px', textAlign: 'center', color: 'var(--brand-success)' }}>{kpi.total_crm_leads}</td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.dispatches_logged}</td>
+                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.monthly_order_value}</td>
+                                        <td style={{ padding: '12px', textAlign: 'center', color: 'var(--brand-success)' }}>{kpi.performance_score}</td>
+                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.quarterly_order_value_target}</td>
+                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.quarterly_order_value_target > 0 ? ((Number(kpi.monthly_order_value)/Number(kpi.quarterly_order_value_target))*100).toFixed(1) : 0}%</td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}><input type="number" min="0" placeholder="Total QTR Value" defaultValue={kpi.quarterly_target || ""} onChange={(e) => setQuarterlyTargets(prev => ({ ...prev, [kpi.email]: e.target.value }))} style={{  padding: '6px',  borderRadius: '4px',  border: '1px solid var(--border-light)',  width: '120px' }}/></td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}><button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}onClick={() => handleUpdateTarget(kpi.email)}>Save</button></td>
                                     </tr>
@@ -362,7 +435,54 @@ export default function SalesAnalyticsView({ state }) {
                         </table>
                     </div>
                 )}
+                
+                {activeTab==="transport"&&(
 
+                    <div className="print-section">
+                        <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"20px", marginBottom:"30px"}}>
+
+                            <div className="frappe-card">
+                                <h4>Total Logistics Partners</h4>
+                                <h2>{transportKpis.total_partners}</h2>
+                            </div>
+
+                            <div className="frappe-card">
+                                <h4>Total Dispatches</h4>
+                                <h2>{transportKpis.monthly_costs.reduce((a,b)=>a+Number(b.total_dispatches),0)}</h2>
+                            </div>
+
+                            <div className="frappe-card">
+                                <h4>Total Freight Spend</h4>
+                                <h2>₹{transportKpis.monthly_costs.reduce((a,b)=>a+Number(b.total_cost),0).toLocaleString()}</h2>
+                            </div>
+
+                        </div>
+                        
+                        <div style={{height:"350px", marginBottom:"30px"}}>
+                            <Line data={transportChart} options={{responsive:true, maintainAspectRatio:false, plugins:{title:{display:true,text:"Monthly Logistics Spend"}}}}/>
+                        </div>
+
+                        <table style={{ width:"100%", borderCollapse:"collapse"}}>
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Dispatches</th>
+                                    <th>Total Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {transportKpis.monthly_costs.map((m,i)=>
+                                    <tr key={i}>
+                                        <td>{m.month_period}</td>
+                                        <td>{m.total_dispatches}</td>
+                                        <td>₹{Number(m.total_cost).toLocaleString()}</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                
                 {/* Tab: R&D Knowledge Base */}
                 {(activeTab === 'faq') && (
                     <div className="print-section">
@@ -460,14 +580,11 @@ export default function SalesAnalyticsView({ state }) {
                                 </thead>
                                 <tbody>
                                     {salesKpis.map((kpi, idx) => {
-                                        const repCost = (parseInt(kpi.targets_harvested) * creditCost).toFixed(2);
                                         return (
                                             <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                                                 <td style={{ padding: '10px', fontWeight: 'bold' }}>{kpi.name}</td>
                                                 <td style={{ padding: '10px', textAlign: 'center' }}>{kpi.targets_queued}</td>
-                                                <td style={{ padding: '10px', textAlign: 'right', color: repCost > 10 ? 'var(--brand-danger)' : 'var(--text-primary)' }}>
-                                                    ₹{repCost}
-                                                </td>
+                                                <td style={{ padding: '10px', textAlign: 'right', color: Number(kpi.total_spend) > 500 ? 'var(--brand-danger)' : 'var(--text-primary)' }}>₹{Number(kpi.total_spend).toFixed(2)}</td>
                                             </tr>
                                         );
                                     })}
@@ -476,48 +593,8 @@ export default function SalesAnalyticsView({ state }) {
                         </div>
 
                         <div style={{ height: '350px', marginBottom: '30px' }}>
-                            <Bar data={completionChart} options={{ responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { title: { display: true, text: 'Lead Completion Status by GTM' } } }} />
+                            <Bar data={completionChart} options={{ responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'GTM Performance Dashboard' }, legend:{position:"bottom"} } }} />
                             <br/>
-                            <table style={{width:"100%"}}>
-                                    <thead>
-                                        <tr>
-                                            <th>Source</th>
-                                            <th>Targets</th>
-                                            <th>Emails</th>
-                                            <th>Email Yield</th>
-                                            <th>Reply Rate</th>
-                                            <th>Deal Rate</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-
-                                    {gtmKpis.map(g=>{
-                                        const yieldRate = g.total_targets ?((g.emails_found/g.total_targets)*100).toFixed(1):0;
-
-                                        const reply = g.emails_sent ?((g.replies_received/g.emails_sent)*100).toFixed(1) :0;
-
-                                        const deal = g.replies_received ?((g.deals_closed/g.replies_received)*100).toFixed(1) :0;
-
-                                        return( 
-                                            <tr key={g.gtm_source}>
-
-                                                <td>{g.gtm_source}</td>
-
-                                                <td>{g.total_targets}</td>
-
-                                                <td>{g.emails_found}</td>
-
-                                                <td>{yieldRate}%</td>
-
-                                                <td>{reply}%</td>
-
-                                                <td>{deal}%</td>
-
-                                            </tr>
-                                        )
-                                    })}
-                                    </tbody>
-                            </table>
                         </div>
                     </div>
                 )}

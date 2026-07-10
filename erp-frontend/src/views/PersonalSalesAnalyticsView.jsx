@@ -14,18 +14,23 @@ export default function PersonalSalesAnalyticsView({ state }) {
                 setAllSalesData(data);
                 
                 // Identify the logged in user's specific row
-                const me = data.find(k => k.email === state.user.email);
-                setMyData(me);
+                if (state.user.role === "Sales Representative") {
+                    const me = data.find(k => k.email === state.user.email);
+                    setMyData(me);
+                } else {
+                    setMyData(null);
+                }
+
             } catch (err) { state.showErrorModal("Error", err.message); }
         };
         fetchGlobalSalesData();
     }, []);
 
-    if (!myData) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading live leaderboards...</div>;
+    if (state.user.role === "Sales Representative" && !myData) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading live leaderboards...</div>;
 
     // Personal Metrics
-    const target = parseFloat(myData.quarterly_order_value_target || myData.monthly_lead_target || 0);
-    const harvested = parseFloat(myData.targets_harvested || 0); // Repurposed for Order Value amount
+    const target = parseFloat(myData?.quarterly_order_value_target || myData?.monthly_lead_target || 0);
+    const harvested = parseFloat(myData?.targets_harvested || 0);
     const shortfall = Math.max(0, target - harvested);
     const progressPercentage = target > 0 ? Math.min(100, (harvested / target) * 100) : 0;
 
@@ -44,7 +49,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
 
     return (
         <div className="frappe-card" style={{ maxWidth: 1100, margin: "0 auto", padding: 30 }}>
-            
+            {state.user.role === "Sales Representative" && (<>
             {/* 1. PERSONAL METRICS */}
             <div className="system-header" style={{ marginBottom: "20px" }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}><FiTarget /> My Quarterly Quota</h2>
@@ -80,7 +85,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
                     {progressPercentage >= 100 ? <><FiAward /> Target Achieved! Excellent work.</> : <><FiAlertCircle /> You are {progressPercentage.toFixed(1)}% to goal.</>}
                 </div>
             </div>
-
+            </>)}
             {/* 2. COMPETITIVE LEADERBOARDS */}
             <div className="system-header" style={{ marginBottom: "20px" }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}><FiAward /> Team Leaderboards</h2>
@@ -113,7 +118,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
                         </tbody>
                     </table>
                 </div>
-
+                
                 {/* Board B: By Percentage */}
                 <div style={{ flex: 1, minWidth: '350px', border: '1px solid var(--border-light)', borderRadius: '8px', background: 'var(--bg-surface)', overflow: 'hidden' }}>
                     <div style={{ background: 'var(--bg-sidebar)', padding: '15px', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
