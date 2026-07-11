@@ -424,31 +424,20 @@ async def upload_tally_json(file: UploadFile = File(...), user: dict = Depends(v
         raise HTTPException(status_code=400, detail="Only JSON files are supported.")
 
     content = await file.read()
-    data = json.loads(content)
-    print(data["tallymessage"][0]["metadata"].keys())
-    orders = []
+    
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON format.")
 
-    for voucher in data["tallymessage"]:
-        
-        metadata = voucher.get("metadata", {})
-
-        if voucher.get("vouchertypename", "").strip().lower() != "sales order":
-            continue
-
-        orders.append(convert_sales_order(voucher))
-
-    saved = []
-    print(orders[0])
-    for order in orders:
-
-        saved.append(
-            EDBR.create_order(order)
-        )
+    # Delegate the parsing and DB staging to your new staging engine method
+    try:
+        inserted_count = EDBR.ingest_tally_json(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
 
     return {
         "status": "success",
-        "orders_found": len(orders),
-        "orders_saved": len(saved),
-        "data": saved
+        "orders_found": len(data.get("tallymessage", [])),
+        "orders_staged": inserted_count,
     }
-

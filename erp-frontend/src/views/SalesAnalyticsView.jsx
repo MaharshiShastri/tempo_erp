@@ -119,7 +119,8 @@ export default function SalesAnalyticsView({ state }) {
     const totalFaqAsked = salesKpis.reduce((a,b)=>a+Number(b.faqs_asked||0),0);
     const totalFaqAnswered = rndKpis.reduce((a,b)=>a+Number(b.faqs_answered||0),0);
     const pendingFaqs = totalFaqAsked-totalFaqAnswered;
-    
+    const total_completed = Number(gtmKpis[0]?.total_completed || 0);
+    const conversionRatio = totalQueued > 0 ? ((total_completed/totalQueued) * 100).toFixed(1) : 0;
     // --- CHART DATA GENERATORS ---
     const salesPerformanceChart = {
         labels:salesKpis.map(k=>k.name),
@@ -338,15 +339,17 @@ export default function SalesAnalyticsView({ state }) {
 
                 {/* --- TAB: OVERVIEW --- */}
                 {(activeTab === 'overview') && (
+                    <>
                     <div className="print-section form-grid-layout" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '30px' }}>
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Total Targets Queued</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{totalQueued}</div>
                         </div>
-                        {<div style={{ background: 'rgba(75, 192, 192, 0.1)', padding: '25px', borderRadius: '8px', border: '1px solid rgba(75, 192, 192, 0.3)' }}>
+                        <div style={{ background: 'rgba(75, 192, 192, 0.1)', padding: '25px 25px 0px 25px', borderRadius: '8px', border: '1px solid rgba(75, 192, 192, 0.3)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Lead Harvest Ratio</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: conversionRatio > 50 ? 'rgba(75, 192, 192, 1)' : 'var(--brand-danger)' }}>{conversionRatio}%</div>
-                        </div>}
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)'}}>{total_completed} out of {totalQueued}</div>
+                        </div>
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active CRM Deals</div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-success)' }}>{totalCRM}</div>
@@ -356,6 +359,8 @@ export default function SalesAnalyticsView({ state }) {
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-danger)' }}>{totalErrors}</div>
                         </div>
                         <br/>
+                    </div>
+                    <div className="print-section" style={{overflowX: "auto"}}>
                         <h3>GTM Completion Ratio</h3>
                         <table style={{width:"100%", borderCollapse:"collapse" }}>
                             <thead>
@@ -396,7 +401,7 @@ export default function SalesAnalyticsView({ state }) {
                             </tbody>
 
                         </table>
-                    </div>
+                    </div></>
                 )}
 
                 {/* --- TAB: TEAM PERFORMANCE --- */}

@@ -5,7 +5,7 @@ from datetime import datetime
 from schemas.logistics_schema import FullPartnerProfile
 import logging
 import os
-
+import re
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
@@ -171,40 +171,119 @@ class PostgresRepository:
                 conn.commit()
                 header['items'] = inserted_items
                 return header
-    def get_order_by_po(self, po_number: str):
+            
+    def search_oa_autocomplete(self, query: str):
+        """Searches the staging table for un-processed Order Acceptance IDs"""
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT * FROM order_headers WHERE purchase_order_number = %s LIMIT 1", (po_number,))
-                header = cur.fetchone()
-                if not header: return None
-                
-                header['order_acceptance_id'] = str(header['order_acceptance_id'])
-                header['order_acceptance_date'] = str(header['order_acceptance_date'])
-                header['purchase_order_date'] = str(header['purchase_order_date'])
-                header['due_date'] = str(header['due_date'])
-                
-                cur.execute("SELECT * FROM order_items WHERE order_acceptance_id = %s", (header['order_acceptance_id'],))
-                items = cur.fetchall()
-                for i in items:
-                    i['rate'] = float(i['rate'])
-                    i['discount_percentage'] = float(i['discount_percentage'])
-                    i['amount'] = float(i['amount'])
-                header['items'] = items
-                return header
-    
-    def search_po_autocomplete(self, query: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # ILIKE allows case-insensitive partial matching
                 cur.execute("""
-                    SELECT purchase_order_number 
-                    FROM order_headers 
-                    WHERE purchase_order_number ILIKE %s
+                    SELECT order_acceptance_id 
+                    FROM stg_order_headers 
+                    WHERE order_acceptance_id ILIKE %s AND status = 'PENDING'
                     LIMIT 20
                 """, (f"%{query}%",))
                 results = cur.fetchall()
-                # Return a flat list of strings
-                return [r['purchase_order_number'] for r in results]
+                return [r['order_acceptance_id'] for r in results]
+
+    def get_staged_order_by_oa(self, order_acceptance_id: str):
+        """Fetches the staged draft so the frontend can auto-fill the form"""
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM stg_order_headers WHERE order_acceptance_id = %s LIMIT 1", (order_acceptance_id,))
+                header = cur.fetchone()
+                if not header: return None
+                
+                # Format for JSON output
+                header['order_acceptance_date'] = str(header['order_acceptance_date']) if header['order_acceptance_date'] else ""
+                header['created_at'] = header['created_at'].isoformat() if header['created_at'] else None
+                
+                # Fetch Staged Items
+                cur.execute("SELECT * FROM stg_order_items WHERE order_acceptance_id = %s", (header['order_acceptance_id'],))
+                items = cur.fetchall()
+                
+                for i in items:
+                    i['rate'] = float(i['rate'])
+                    i['quantity'] = float(i['quantity'])
+                    i['amount'] = float(i['amount'])
+                    
+                header['items'] = items
+                return header
+                
+    def mark_staged_order_processed(self, order_acceptance_id: str):
+        """Call this after create_order() succeeds to remove it from Drafts"""
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE stg_order_headers SET status = 'PROCESSED' WHERE order_acceptance_id = %s", (order_acceptance_id,))
+            conn.commit()
+
+    def _parse_tally_date(self, date_str):
+        if not date_str: return None
+        return datetime.strptime(date_str, '%Y%m%d').date()
+
+    def _parse_tally_number(self, val_str):
+        if not val_str: return 0.0
+        # Extracts just the numeric part from things like " 4 Nos." or "846.61/Nos."
+        match = re.search(r"[-+]?\d*\.\d+|\d+", str(val_str))
+        return float(match.group()) if match else 0.0
+
+    def _extract_tally_text_list(self, field_list):
+        if not field_list or not isinstance(field_list, list):
+            return ""
+        # Filter out the dicts (e.g., {"metadata": true, "type": "String"}), keep strings
+        return "\n".join([str(item) for item in field_list if isinstance(item, str)]).strip()
+
+    # --- STAGING ENGINE METHODS ---
+    def ingest_tally_json(self, tally_data: dict) -> int:
+        """Parses Tally JSON export and inserts into Staging Tables."""
+        inserted_count = 0
+        vouchers = tally_data.get("tallymessage", [])
+        
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                for voucher in vouchers:
+                    # Map Tally fields to our Staging Schema
+                    order_acceptance_id = voucher.get("vouchernumber")
+                    if not order_acceptance_id:
+                        continue # Skip if no voucher number
+                        
+                    order_date = self._parse_tally_date(voucher.get("date"))
+                    po_number = voucher.get("reference", "")
+                    billing_name = voucher.get("partyname", "")
+                    billing_address = self._extract_tally_text_list(voucher.get("basicbuyeraddress"))
+                    payment_terms = voucher.get("basicduedateofpymt", "")
+                    
+                    # 1. Insert/Update Staging Header
+                    cur.execute("""
+                        INSERT INTO stg_order_headers 
+                        (order_acceptance_id, order_acceptance_date, purchase_order_number, billing_name, billing_address, payment_terms)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (order_acceptance_id) 
+                        DO UPDATE SET 
+                            status = 'PENDING',
+                            purchase_order_number = EXCLUDED.purchase_order_number;
+                    """, (order_acceptance_id, order_date, po_number, billing_name, billing_address, payment_terms))
+
+                    # 2. Clear old staging items if re-uploaded, then Insert Items
+                    cur.execute("DELETE FROM stg_order_items WHERE order_acceptance_id = %s", (order_acceptance_id,))
+                    
+                    items = voucher.get("allinventoryentries", [])
+                    for item in items:
+                        item_code = item.get("stockitemname", "")
+                        spec_text = self._extract_tally_text_list(item.get("basicuserdescription"))
+                        hsn_code = item.get("gsthsnname", "")
+                        qty = self._parse_tally_number(item.get("actualqty"))
+                        rate = self._parse_tally_number(item.get("rate"))
+                        amount = self._parse_tally_number(item.get("amount"))
+
+                        cur.execute("""
+                            INSERT INTO stg_order_items 
+                            (order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, rate, amount)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (order_acceptance_id, item_code, spec_text, hsn_code, qty, rate, amount))
+                    
+                    inserted_count += 1
+            conn.commit()
+        return inserted_count
     # --- GLOBAL ORDERS ENGINE end---
     # --- GLOBAL BILLS ENGINE start---
     def get_all_bills(self):
@@ -1490,6 +1569,8 @@ class PostgresRepository:
                         COUNT(*) FILTER(WHERE status='Awaiting Review') awaiting_review,
                         SUM(cost_per_credit) as total_spend,
                         SUM(emails_found) as emails_found,
+                        (SELECT COUNT(*) FILTER (WHERE status <> 'Inactive')) AS total_queued,
+                        (SELECT COUNT(*) FILTER (WHERE status='Completed')) AS total_completed,
                         COUNT(CASE WHEN email_status IN ('Sent Email', 'Got Reply', 'Closed Enquiry') THEN 1 END) as emails_sent,
                         COUNT(CASE WHEN email_status = 'Got Reply' THEN 1 END) as replies_received,
                         COUNT(CASE WHEN email_status = 'Closed Enquiry' THEN 1 END) as deals_closed

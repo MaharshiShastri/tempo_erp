@@ -19,7 +19,7 @@ export default function TallyImportWorkspaceView({ state }) {
         state.setIsAlertOpen(true);
 
         try {
-            const response = await API.uploadTallyXML(file, state.user.access_token);
+            const response = await API.uploadTallyJSON(file, state.user.access_token);
             setStagedOrders(response.extracted_orders || []);
             
             state.setAlertMessage(`✅ Successfully translated ${response.extracted_orders?.length || 0} orders.`);
@@ -74,7 +74,7 @@ export default function TallyImportWorkspaceView({ state }) {
                     <FiDatabase /> Tally XML Migration Engine
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                    Upload DayBook XMLs. AI will translate the data into the ERP schema for your review.
+                    Upload DayBook JSON. AI will translate the data into the ERP schema for your review.
                 </p>
             </div>
 
@@ -82,7 +82,7 @@ export default function TallyImportWorkspaceView({ state }) {
             <form onSubmit={handleFileUpload} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "8px", border: "1px dashed var(--brand-accent)", marginBottom: "30px", display: "flex", gap: "15px", alignItems: "center" }}>
                 <input 
                     type="file" 
-                    accept=".xml" 
+                    accept=".json" 
                     className="form-input" 
                     onChange={e => setFile(e.target.files[0])} 
                     style={{ flex: 1 }}

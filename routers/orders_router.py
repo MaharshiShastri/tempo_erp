@@ -44,17 +44,18 @@ def update_stage(order_id: str, payload: StageUpdatePayload, user: dict = Depend
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-@router.get("/search/po/{po_number}", dependencies=[Depends(check_department("Sales Representative"))])
-def search_order_by_po(po_number: str, user_profile: dict = Depends(verify_bearer_token)):
-    order = EDBR.get_order_by_po(po_number)
+@router.get("/search/oa/{oa_id:path}", dependencies=[Depends(check_department("Sales Representative"))])
+def search_order_by_po(oa_id: str, user_profile: dict = Depends(verify_bearer_token)):
+    
+    order = EDBR.get_staged_order_by_oa(oa_id)
     if not order:
         raise HTTPException(status_code=404, detail="Purchase Order not found in database.")
     return order
-@router.get("/search/po-autocomplete", dependencies=[Depends(check_department("Sales Representative"))])
+@router.get("/search/oa-autocomplete", dependencies=[Depends(check_department("Sales Representative"))])
 def po_autocomplete(q: str, user_profile: dict = Depends(verify_bearer_token)):
     if not q or len(q) < 2:
         return []
-    return EDBR.search_po_autocomplete(q)
+    return EDBR.search_oa_autocomplete(q)
 
 @router.post("/ocr", dependencies=[Depends(check_department("Sales Representative"))])
 async def extract_order_from_document(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):

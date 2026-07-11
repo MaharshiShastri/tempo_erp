@@ -9,87 +9,97 @@ export default function OrderEntryFormView({ state }) {
     const maxDateString = maxFutureDate.toISOString().split('T')[0];
     const [isOcrLoading, setIsOcrLoading] = useState(false);
 
-    const [poSuggestions, setPoSuggestions] = useState([]);
-    const [showPoSuggestions, setShowPoSuggestions] = useState(false);
-    const poInputRef = useRef(null);
+    // Renamed state variables to reflect OA instead of PO
+    const [oaSuggestions, setOaSuggestions] = useState([]);
+    const [showOaSuggestions, setShowOaSuggestions] = useState(false);
+    const oaInputRef = useRef(null);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (poInputRef.current && !poInputRef.current.contains(event.target)) {
-                setShowPoSuggestions(false);
+            if (oaInputRef.current && !oaInputRef.current.contains(event.target)) {
+                setShowOaSuggestions(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handlePoInputChange = async (e) => {
-        const query = e.target.value;
-        state.setOrderHeader({...state.orderHeader, purchase_order_number: query});
+    const handleOaInputChange = async (e) => {
+        const query = e.target.value.toUpperCase();
+        state.setOrderHeader({...state.orderHeader, order_acceptance_id: query});
         
         if (query.length >= 2) {
             try {
-                const data = await API.searchPOAutocomplete(query, state.user.access_token);
+                // Ensure you have added searchOAAutocomplete to your api.js
+                // Alternatively, you can use a direct fetch here: fetch(`/api/v1/orders/search/oa-autocomplete?q=${query}`)
+                const data = await API.searchOAAutocomplete(query, state.user.access_token);
                 
                 const sortedData = data.sort((a, b) => {
                     const queryLower = query.toLowerCase();
                     const aLower = a.toLowerCase();
                     const bLower = b.toLowerCase();
                     
-                    const aStarts = aLower.startsWith(queryLower);
-                    const bStarts = bLower.startsWith(queryLower);
+                    // Replaced startsWith() with includes()
+                    const aIncludes = aLower.includes(queryLower);
+                    const bIncludes = bLower.includes(queryLower);
                     
-                    if (aStarts && !bStarts) return -1;
-                    if (!aStarts && bStarts) return 1;
+                    if (aIncludes && !bIncludes) return -1;
+                    if (!aIncludes && bIncludes) return 1;
                     return a.localeCompare(b);
                 });
                 
-                setPoSuggestions(sortedData);
-                setShowPoSuggestions(true);
+                setOaSuggestions(sortedData);
+                setShowOaSuggestions(true);
             } catch (err) {
-                console.error("PO Autocomplete error:", err);
+                console.error("OA Autocomplete error:", err);
             }
         } else {
-            setPoSuggestions([]);
-            setShowPoSuggestions(false);
+            setOaSuggestions([]);
+            setShowOaSuggestions(false);
         }
     };
+    
+    const handleOaSelect = (selectedOa) => {
+        state.setOrderHeader({...state.orderHeader, order_acceptance_id: selectedOa});
+        setShowOaSuggestions(false);
+        handleOaSearch(selectedOa);
+    };
 
-    const handlePOSearch = async (exactPoNumber) => {
-        if (!exactPoNumber) return;
+    const handleOaSearch = async (exactOaId) => {
+        if (!exactOaId) return;
         
-        setShowPoSuggestions(false); 
+        setShowOaSuggestions(false); 
         
         try {
-            state.setAlertMessage("Searching records for PO...");
+            state.setAlertMessage("Searching staging records for OA...");
             state.setIsAlertOpen(true);
-            
-            const r = await fetch(`/api/v1/orders/search/po/${exactPoNumber}`, {
+            const safeId = encodeURIComponent(exactOaId);
+
+            const r = await fetch(`/api/v1/orders/search/oa/${safeId}`, {
                 headers: { "Authorization": `Bearer ${state.user.access_token}` }
             });
             
-            if (!r.ok) throw new Error("Purchase Order not found.");
+            if (!r.ok) throw new Error("Order Acceptance draft not found.");
             const data = await r.json();
             
             state.setOrderHeader({
                 ...state.orderHeader,
-                purchase_order_number: exactPoNumber,
-                purchase_order_date: data.purchase_order_date,
-                customer_code: data.customer_code,
+                order_acceptance_id: exactOaId,
+                order_acceptance_date: data.order_acceptance_date || state.orderHeader.order_acceptance_date,
+                purchase_order_number: data.purchase_order_number || "",
                 payment_terms: data.payment_terms || "",
-                billing_name: data.billing_name,
-                billing_address: data.billing_address,
-                due_date: data.due_date,
-                // ordered_by is now handled invisibly
+                billing_name: data.billing_name || "",
+                billing_address: data.billing_address || "",
+                // We leave due_date as is since it doesn't come from the staging pull
             });
             
             if (data.items && data.items.length > 0) {
                 state.setOrderItems(data.items);
             }
             
-            state.setAlertMessage("✅ Existing Purchase Order data populated.");
+            state.setAlertMessage("✅ Staged Order Acceptance data populated.");
         } catch (error) {
-            state.showErrorModal("PO Lookup Failed", error.message);
+            state.showErrorModal("OA Lookup Failed", error.message);
         }
     };
 
@@ -124,56 +134,61 @@ export default function OrderEntryFormView({ state }) {
             </div>
             
             <form onSubmit={(e) => {
-                // Ensure the implicit user email is attached right before submitting
                 state.setOrderHeader(prev => ({...prev, ordered_by: state.user.email}));
                 state.commitOrderSubmit(e);
             }}>
                 <div className="form-grid-layout" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                     
+                    {/* Auto-complete shifted to Order Acceptance ID */}
                     <div className="form-group">
-                        <label className="input-label">Order Acceptance ID (Auto UUID Locked) *</label>
-                        <input type="text" required className="form-input" value={state.orderHeader.order_acceptance_id} onChange={(e) => state.setOrderHeader({...state.orderHeader, order_acceptance_id: e.target.value.toUpperCase()})} placeholder="e.g. XXX/000" maxLength={30} />
-                    </div>
-
-                    <div className="form-group">
-                        <label className="input-label">Customer PO Ref *</label>
-                        <div ref={poInputRef} style={{ position: 'relative', display: 'flex', gap: '8px' }}>
+                        <label className="input-label">Order Acceptance ID (Staged Search) *</label>
+                        <div ref={oaInputRef} style={{ position: 'relative', display: 'flex', gap: '8px' }}>
                             <input 
                                 type="text" 
                                 required 
                                 className="form-input" 
-                                value={state.orderHeader.purchase_order_number} 
-                                onChange={handlePoInputChange}
-                                onFocus={() => { if (poSuggestions.length > 0) setShowPoSuggestions(true); }}
-                                placeholder="PO-XXXX" 
+                                value={state.orderHeader.order_acceptance_id} 
+                                onChange={handleOaInputChange}
+                                onFocus={() => { if (oaSuggestions.length > 0) setShowOaSuggestions(true); }}
+                                placeholder="XXX/000" 
+                                maxLength={6}
                             />
-                            <button type="button" className="btn btn-secondary" onClick={() => handlePOSearch(state.orderHeader.purchase_order_number)} style={{ whiteSpace: 'nowrap' }}>
+                            <button type="button" className="btn btn-secondary" onClick={() => handleOaSearch(state.orderHeader.order_acceptance_id)} style={{ whiteSpace: 'nowrap' }}>
                                 🔍 Lookup
                             </button>
 
-                            {showPoSuggestions && poSuggestions.length > 0 && (
+                            {showOaSuggestions && oaSuggestions.length > 0 && (
                                 <ul style={{
                                     position: 'absolute', top: '100%', left: 0, width: 'calc(100% - 90px)', 
                                     background: 'var(--bg-main)', border: '1px solid var(--brand-accent)', 
                                     borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: 0, 
                                     margin: '4px 0 0 0', listStyle: 'none', zIndex: 1000, maxHeight: '200px', overflowY: 'auto'
                                 }}>
-                                    {poSuggestions.map((po, index) => (
+                                    {oaSuggestions.map((oa, index) => (
                                         <li 
-                                            key={index} onClick={() => handlePOSearch(po)}
+                                            key={index} onClick={() => handleOaSelect(oa)}
                                             style={{
-                                                padding: '10px 12px', cursor: 'pointer', borderBottom: index === poSuggestions.length - 1 ? 'none' : '1px solid var(--border-light)',
-                                                fontSize: '13px', fontWeight: po.toLowerCase().startsWith(state.orderHeader.purchase_order_number.toLowerCase()) ? 'bold' : 'normal', color: 'var(--text-primary)'
+                                                padding: '10px 12px', cursor: 'pointer', borderBottom: index === oaSuggestions.length - 1 ? 'none' : '1px solid var(--border-light)',
+                                                fontSize: '13px', 
+                                                // Replaced startsWith() with includes() for bolding
+                                                fontWeight: oa.toLowerCase().includes(state.orderHeader.order_acceptance_id.toLowerCase()) ? 'bold' : 'normal', 
+                                                color: 'var(--text-primary)'
                                             }}
                                             onMouseEnter={(e) => e.target.style.background = 'var(--bg-surface)'}
                                             onMouseLeave={(e) => e.target.style.background = 'transparent'}
                                         >
-                                            {po}
+                                            {oa}
                                         </li>
                                     ))}
                                 </ul>
                             )}
                         </div>
+                    </div>
+
+                    {/* Customer PO Ref is now a standard input */}
+                    <div className="form-group">
+                        <label className="input-label">Customer PO Ref *</label>
+                        <input type="text" required className="form-input" value={state.orderHeader.purchase_order_number} onChange={e => state.setOrderHeader({...state.orderHeader, purchase_order_number: e.target.value})} placeholder="PO-XXXX" />
                     </div>
 
                     <div className="form-group">
@@ -274,7 +289,7 @@ export default function OrderEntryFormView({ state }) {
                                             <input type="text" className="form-input" value={item.hsn_code} onChange={e => state.updateOrderItemField(index, 'hsn_code', e.target.value)} placeholder="HSN" />
                                         </td>
                                         <td>
-                                            <input type="number" required min="1" className="form-input" value={item.quantity} onChange={e => state.updateOrderItemField(index, 'quantity', parseInt(e.target.value) || 0)} />
+                                            <input type="number" required min="1" className="form-input" value={item.quantity === 0 ? 1 : item.quantity} onChange={e => {const val = e.target.value; state.updateOrderItemField(index, 'quantity', val === 1 ? 1 : parseInt(val, 10))}} />
                                         </td>
                                         <td>
                                             <input type="text" required className="form-input" value={item.unit_measure} onChange={e => state.updateOrderItemField(index, 'unit_measure', e.target.value)} placeholder="NOS" />

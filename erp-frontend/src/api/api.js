@@ -826,19 +826,19 @@ const API = {
     }
     return r.json();
   },
-  async searchPOAutocomplete(query, token) {
-    const r = await fetch(`/api/v1/orders/search/po-autocomplete?q=${encodeURIComponent(query)}`, {
+  async searchOAAutocomplete(query, token) {
+    const r = await fetch(`/api/v1/orders/search/oa-autocomplete?q=${encodeURIComponent(query)}`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
     if (!r.ok) throw new Error("Autocomplete search failed");
     return r.json();
   },
   
-  async uploadTallyXML(file, token) {
+  async uploadTallyJSON(file, token) {
     const formData = new FormData();
     formData.append("file", file);
 
-    const r = await fetch("/api/v1/tally/upload-xml", {
+    const r = await fetch("/api/v1/tally/upload-json", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` }, // Browser handles multipart boundaries automatically
       body: formData,

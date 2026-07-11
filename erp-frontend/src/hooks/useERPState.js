@@ -506,7 +506,7 @@ export default function useERPState() {
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
         tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
-        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast,
+        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems
     };
 }
 
