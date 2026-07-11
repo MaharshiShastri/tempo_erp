@@ -12,7 +12,7 @@ export default function TasksWorkspaceView({ state }) {
     const [newTaskDetails, setNewTaskDetails] = useState('');
     const [selectedAssignees, setSelectedAssignees] = useState([]);
     const [newTaskDeadline, setNewTaskDeadline] = useState('');
-    const [newTaskFile, setNewTaskFile] = useState(null);
+   const [newTaskFile, setNewTaskFile] = useState([]);
 
     const tasksArray = state.tasks || [];
     
@@ -29,13 +29,13 @@ export default function TasksWorkspaceView({ state }) {
             details: newTaskDetails,
             direction: 'dispatched',
             assigned_to: selectedAssignees,
-            attachment: newTaskFile,
+            attachments: newTaskFile,
             deadline: newTaskDeadline
         });
         setNewTaskTitle('');
         setNewTaskDetails('');
         setSelectedAssignees([]);
-        setNewTaskFile(null);
+        setNewTaskFile([]);
         setNewTaskDeadline('');
         document.getElementById('task-file-input').value = "";
     };

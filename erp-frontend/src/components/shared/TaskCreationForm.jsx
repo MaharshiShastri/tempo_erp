@@ -39,9 +39,18 @@ export default function TaskCreationForm({state, selectedAssignees, setSelectedA
                             id="task-file-input" 
                             type="file" 
                             accept=".pdf, .jpg, .jpeg, .png, .xlsx, .xls, .doc, .docx" 
+                            multiple
                             className="form-input"  
                             style={{ padding: '6px' }} 
-                            onChange={e => setNewTaskFile(e.target.files[0])} 
+                            onChange={e => {
+                                const files = Array.from(e.target.files);
+                                if(files.length>5){
+                                    alert("You can upload a maximum of 5 files.");
+                                    e.target.value = "";
+                                    return;
+                                }
+                                setNewTaskFile(files)
+                            }} 
                             title="Attach optional file (PDF, Image, Excel, Word)"
                         />
                     </div>

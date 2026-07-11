@@ -36,22 +36,28 @@ def get_task_attachment(file_name: str, user_profile: dict = Depends(verify_bear
     return FileResponse(file_path, filename=clean_name)
 
 @router.post("/create", dependencies=[Depends(check_department("Shop Floor Administrator"))])
-async def create_new_task(title: str = Form(...), details: str = Form(...), direction: str = Form("dispatched"), deadline: str = Form(None), assigned_to: List[str] = Form(...), attachment: UploadFile = File(None), user_profile: dict = Depends(verify_bearer_token)):
+async def create_new_task(title: str = Form(...), details: str = Form(...), direction: str = Form("dispatched"), deadline: str = Form(None), assigned_to: List[str] = Form(...), attachments: List[UploadFile] = File(default=[]), user_profile: dict = Depends(verify_bearer_token)):
     if not title.strip():
         raise HTTPException(status_code=400, detail="Metadata view header title required.")
     
-    saved_file_path = None
+    saved_file_paths = []
 
-    if attachment:
+    if len(attachments) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 attachments are allowed.")
+        
+    for attachment in attachments:
+        if not attachment.filename:
+            continue
+        
         try:
-            unique_filename = f"{int(time.time())}_{attachment.filename}"
+            unique_filename = f"{int(time.time() * 1000)}_{attachment.filename}"
             file_location = UPLOAD_DIR / unique_filename
             
             with file_location.open("wb+") as buffer:
                 shutil.copyfileobj(attachment.file, buffer)
             
             # Store just the filename to make the download URL cleaner
-            saved_file_path = unique_filename
+            saved_file_paths.append(unique_filename)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save system attachment: {str(e)}")
 
@@ -60,7 +66,7 @@ async def create_new_task(title: str = Form(...), details: str = Form(...), dire
         "details": details,
         "direction": direction,
         "assigned_to": assigned_to,
-        "attachment_url": saved_file_path,
+        "attachment_urls": saved_file_paths,
         "deadline": deadline
     }
 
@@ -127,12 +133,12 @@ def export_task(task_id: int, user: dict = Depends(verify_bearer_token)):
 
     c.drawText(text)
 
-    if task.get("attachment_url"):
+    if task.get("attachment_urls"):
         c.setFont("Helvetica-Oblique", 10)
         c.drawString(
             50,
             120,
-            f"Original attachment included in this ZIP: {task['attachment_url']}"
+            f"{len(task.get('attachment_urls'))} attachment(s) included in this ZIP."
         )
 
     c.save()
@@ -152,15 +158,11 @@ def export_task(task_id: int, user: dict = Depends(verify_bearer_token)):
         )
 
         # Add original attachment if present
-        if task.get("attachment_url"):
-
-            attachment_file = Path(task["attachment_url"])
-
-            if attachment_file.exists():
-                zip_file.write(
-                    attachment_file,
-                    arcname=attachment_file.name
-                )
+        if task.get("attachment_urls"):
+            for filename in task.get("attachment_urls"):
+                attachment_file = UPLOAD_DIR/filename
+                if attachment_file.exists():
+                    zip_file.write(attachment_file, arcname=attachment_file.name)
 
     zip_buffer.seek(0)
 

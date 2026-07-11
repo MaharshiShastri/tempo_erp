@@ -63,18 +63,14 @@ export default function CompanyEntryFormView({ state }) {
 
                     <div className="form-group">
                         <label className="input-label">City *</label>
-                        <select className="form-select-native" required value={state.companyForm.city} onChange={e => state.setCompanyForm({...state.companyForm, city: e.target.value})}>
-                            <option value="">-- Choose City --</option>
-                            {industrialCities.map(city => <option key={city} value={city}>{city}</option>)}
-                        </select>
+                        <input type="text" list="city-options" required className="form-input" value={state.companyForm.city} onChange={e=>state.setCompanyForm({...state.companyForm, city: e.target.value})} placeholder="Select or type city..."/>
+                        <datalist id="company-options">{industrialCities.map(city=><option key={city} value={city}/>)}</datalist>
                     </div>
 
                     <div className="form-group">
                         <label className="input-label">State / Province *</label>
-                        <select className="form-select-native" required value={state.companyForm.state} onChange={e => state.setCompanyForm({...state.companyForm, state: e.target.value})}>
-                            <option value="">-- Choose State --</option>
-                            {indianStates.map(st => <option key={st} value={st}>{st}</option>)}
-                        </select>
+                        <input type="text" list="state-options" required className="form-input" value={state.companyForm.state} onChange={e => state.setCompanyForm({...state.companyForm, state: e.target.value})} placeholder="Select or type state..." />
+                        <datalist id="state-options">{indianStates.map(st => <option key={st} value={st} />)}</datalist>
                     </div>
 
                     <div className="form-group">
@@ -94,10 +90,8 @@ export default function CompanyEntryFormView({ state }) {
 
                     <div className="form-group">
                         <label className="input-label">Corporate Designation *</label>
-                        <select className="form-select-native" required value={state.companyForm.contact_role} onChange={e => state.setCompanyForm({...state.companyForm, contact_role: e.target.value})}>
-                            <option value="">-- Select Role --</option>
-                            {professionalRoles.map(role => <option key={role} value={role}>{role}</option>)}
-                        </select>
+                        <input type="text" list="role-options" required className="form-input" value={state.companyForm.contact_role} onChange={e => state.setCompanyForm({...state.companyForm, contact_role: e.target.value})}placeholder="Select or type role..." />
+                        <datalist id="role-options">{professionalRoles.map(role => <option key={role} value={role} />)}</datalist>
                     </div>
 
                     <div className="form-group">

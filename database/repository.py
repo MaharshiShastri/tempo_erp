@@ -9,7 +9,7 @@ import re
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
+DB_DSN = os.getenv("DATABASE_UrRL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -349,9 +349,9 @@ class PostgresRepository:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO tasks (title, details, direction, is_incomplete, assigned_by, assigned_to, attachment_url, deadline)
+                    INSERT INTO tasks (title, details, direction, is_incomplete, assigned_by, assigned_to, attachment_urls, deadline)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', []), task_dict.get('attachment_url'), task_dict.get('deadline')))
+                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', []), task_dict.get('attachment_urls'), task_dict.get('deadline')))
                 conn.commit()
                 new_task = cur.fetchone()
                 new_task['created_at'] = new_task['created_at'].isoformat()

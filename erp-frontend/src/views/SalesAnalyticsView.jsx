@@ -25,6 +25,8 @@ export default function SalesAnalyticsView({ state }) {
     const [quarterlyTargets, setQuarterlyTargets] = useState({});
     
     const dashboardRef = useRef(null);
+    const reportRef = useRef(null);
+    const wait = (ms) => new Promise(resolve=>setTimeout(resolve, ms));
 
     useEffect(() => {
         const fetchAllKPIs = async () => {
@@ -89,7 +91,44 @@ export default function SalesAnalyticsView({ state }) {
         }
     };
 
+    const exportAllReports = async() =>{
+        const previousTab = activeTab;
+        const pdf = new jsPDF("p", "mm", "a4");
+        let firstPage = true;
+        for(const tab of reportTabs){
+            setActiveTab(tab);
+            await wait(500);
+            const canvas = await html2canvas(reportRef.current, {scale: 2, useCORS: true});
+
+            const img = canvas.toDataURL("image/png");
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+            if(!firstPage)  pdf.addPage();
+            let heightLeft = pdfHeight;
+            let position = 0;
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            pdf.addImage(img, 'PNG', 0, position, pdfWidth, pdfHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - pdfHeight;
+                pdf.addPage();
+                pdf.addImage(img, 'PNG', 0, position, pdfWidth, pdfHeight);
+                heightLeft -= pageHeight;
+            }
+
+            firstPage=false;
+        }
+        setActiveTab(previousTab);
+
+        pdf.save(`Executive Master report_${new Date().toISOString().split('T')[0]}.pdf`)
+    }
+
     if (isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Command Center Data...</div>;
+    
     const handleUpdateTarget = async (email) => {
         const targetValue = quarterlyTargets[email];
         if (!targetValue || isNaN(targetValue)) {
@@ -121,6 +160,8 @@ export default function SalesAnalyticsView({ state }) {
     const pendingFaqs = totalFaqAsked-totalFaqAnswered;
     const total_completed = Number(gtmKpis[0]?.total_completed || 0);
     const conversionRatio = totalQueued > 0 ? ((total_completed/totalQueued) * 100).toFixed(1) : 0;
+    const reportTabs= ["overview", "faq", "performance", "transport", "gtm", "production", "health"];
+
     // --- CHART DATA GENERATORS ---
     const salesPerformanceChart = {
         labels:salesKpis.map(k=>k.name),
@@ -301,6 +342,8 @@ export default function SalesAnalyticsView({ state }) {
     return (
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "15px" }}>
+                <button className="btn btn-primary" onClick={exportAllReports}><FiDownload />Export Master Data</button>
+                <span>or</span>
                 <button className="btn btn-primary" onClick={handleExportPDF} disabled={isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FiDownload /> {isExporting ? "Generating PDF..." : "Export to PDF"}
                 </button>
@@ -336,7 +379,7 @@ export default function SalesAnalyticsView({ state }) {
                     <button className={`btn ${activeTab === 'production' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('production')}><FiPackage /> Production Analytics</button>
                     <button className={`btn ${activeTab === 'health' ? 'btn-primary' : 'btn-text'}`} onClick={() => setActiveTab('health')}><FiAlertOctagon /> System Health</button>
                 </div>
-
+                <div ref={reportRef}>
                 {/* --- TAB: OVERVIEW --- */}
                 {(activeTab === 'overview') && (
                     <>
@@ -654,6 +697,7 @@ export default function SalesAnalyticsView({ state }) {
                         </table>
                     </div>
                 )}
+                </div>
             </div>
         </div>
     );

@@ -67,10 +67,14 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {/* Attachment Button */}
-                    {!isEditing && task.attachment_url && (
-                        <button type="button" className="btn btn-secondary" style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={(e) => { e.stopPropagation(); handleFileAction(task.attachment_url); }} title={getDisplayFileName(task.attachment_url)}>
-                            📎 {getDisplayFileName(task.attachment_url)}
-                        </button>
+                    {!isEditing && task.attachment_urls?.length > 0 && (
+                        <div style={{display:"flex", gap:"6px", flexWrap:"wrap"}}>
+                            {task.attachment_urls.map(file => (
+                            <button key={file} className="btn btn-secondary" onClick={(e)=>{ e.stopPropagation(); handleFileAction(file);}}>
+                                📎 {getDisplayFileName(file)}
+                            </button>
+                            ))}
+                        </div>
                     )}
 
                     {/* Action Toolbar */}

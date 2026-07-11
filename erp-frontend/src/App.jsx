@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw } from "react-icons/fi";
 import useERPState from "./hooks/useERPState";
-
+import packageJson from "../package.json";
 import LoginView from "./views/LoginView";
 import OrdersListView from "./views/OrdersListView";
 import OrderEntryFormView from "./views/OrderEntryFormView";
@@ -39,7 +39,7 @@ function App() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [showNotifDropdown, setShowNotifDropdown] = useState(false);
     const [openModules, setOpenModules] = useState({global: true, sales: true, factory: true, admin: false});
-    
+    const __APP_VERSION = packageJson.version;
     const toggleModule = (moduleKey) => {
         setOpenModules(prev => ({ ...prev, [moduleKey]: !prev[moduleKey] }));
     };
@@ -158,6 +158,11 @@ function App() {
                                     {!sidebarCollapsed && <span>R&D Knowledge Base</span>}
                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                 </a>
+                                <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
+                                            <span>📦</span> 
+                                            {!sidebarCollapsed && <span>Item Master</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
+                                </a>
                             </>
                         )}
                     </div>
@@ -205,13 +210,6 @@ function App() {
                                             <span>🤝</span>
                                             {!sidebarCollapsed && <span>Logistics Master</span>}
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
-                                        </a>
-                                    )}
-                                    {(isSales || isFactory) && (
-                                        <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
-                                            <span>📦</span> 
-                                            {!sidebarCollapsed && <span>Item Master</span>}
-                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
                                         </a>
                                     )}
                                     {isSales && (
@@ -320,6 +318,7 @@ function App() {
                     <div className="navbar-left">
                         <span className="navbar-breadcrumb">Workspace / {state.activeTab.replace('-', ' ').toUpperCase()}</span>
                     </div>
+                    <span style={{color: "var(--brand-accent)", fontWeight: "bold"}}>v{__APP_VERSION}</span>
                     <div className="navbar-right">
                         <div style={{ position: 'relative' }}>
                             <button className="btn-text" style={{ position: 'relative', fontSize: '18px', padding: '8px' }} onClick={() => { setShowNotifDropdown(!showNotifDropdown); state.markAllNotifsRead(); }}>

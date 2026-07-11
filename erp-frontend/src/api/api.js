@@ -198,8 +198,10 @@ const API = {
         formData.append("deadline", payload.deadline);
     }
 
-    if (payload.attachment) {
-        formData.append("attachment", payload.attachment);
+    if (payload.attachments?.length) {
+      payload.attachments.forEach(file=>{
+        formData.append("attachments", file);
+      });
     }
 
     const r = await fetch("/api/v1/tasks/create", {

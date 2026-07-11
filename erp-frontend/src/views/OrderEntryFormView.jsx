@@ -14,6 +14,8 @@ export default function OrderEntryFormView({ state }) {
     const [showOaSuggestions, setShowOaSuggestions] = useState(false);
     const oaInputRef = useRef(null);
 
+    const [showMissingClientModal, setShowMissingClientModal] = useState(false);
+
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (oaInputRef.current && !oaInputRef.current.contains(event.target)) {
@@ -117,6 +119,45 @@ export default function OrderEntryFormView({ state }) {
 
     return (
         <div className="frappe-card">
+            {showMissingClientModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+                    <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', width: '450px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)' }}>⚠️ Client Not Found in Registry</h3>
+                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '25px', lineHeight: '1.5' }}>
+                            Please fill in the new client details right away or the order will not be updated. Do you want to register them now?
+                        </p>
+                        <div style={{ display: 'flex', gap: '15px' }}>
+                            <button 
+                                type="button" 
+                                className="btn" 
+                                style={{ flex: 1, background: 'var(--brand-danger)', color: 'white', border: 'none' }}
+                                onClick={() => setShowMissingClientModal(false)}
+                            >
+                                Cancel Order
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn" 
+                                style={{ flex: 1, background: 'var(--brand-success)', color: 'white', border: 'none' }}
+                                onClick={() => {
+                                    setShowMissingClientModal(false);
+                                    // Transfer billing details over to the Company form
+                                    state.setCompanyForm(prev => ({
+                                        ...prev,
+                                        name: state.orderHeader.billing_name || "",
+                                        address_line_1: state.orderHeader.billing_address || ""
+                                    }));
+                                    state.setIsEditingCompany(false);
+                                    // Make sure this matches your exact tab ID for the company entry form
+                                    state.setActiveTab('company-entry'); 
+                                }}
+                            >
+                                Fill Client Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="system-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3>Establish Order Acceptance Entity Payload</h3>
                 
