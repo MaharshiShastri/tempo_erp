@@ -9,12 +9,13 @@ export default function OrderEntryFormView({ state }) {
     const maxDateString = maxFutureDate.toISOString().split('T')[0];
     const [isOcrLoading, setIsOcrLoading] = useState(false);
 
-    // Renamed state variables to reflect OA instead of PO
     const [oaSuggestions, setOaSuggestions] = useState([]);
     const [showOaSuggestions, setShowOaSuggestions] = useState(false);
     const oaInputRef = useRef(null);
 
-    const [showMissingClientModal, setShowMissingClientModal] = useState(false);
+    // Controls tracking for a temporary, unregistered client
+    const [isNewClient, setIsNewClient] = useState(false);
+    const [temporaryClientName, setTemporaryClientName] = useState("");
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -32,16 +33,11 @@ export default function OrderEntryFormView({ state }) {
         
         if (query.length >= 2) {
             try {
-                // Ensure you have added searchOAAutocomplete to your api.js
-                // Alternatively, you can use a direct fetch here: fetch(`/api/v1/orders/search/oa-autocomplete?q=${query}`)
                 const data = await API.searchOAAutocomplete(query, state.user.access_token);
-                
                 const sortedData = data.sort((a, b) => {
                     const queryLower = query.toLowerCase();
                     const aLower = a.toLowerCase();
                     const bLower = b.toLowerCase();
-                    
-                    // Replaced startsWith() with includes()
                     const aIncludes = aLower.includes(queryLower);
                     const bIncludes = bLower.includes(queryLower);
                     
@@ -69,9 +65,7 @@ export default function OrderEntryFormView({ state }) {
 
     const handleOaSearch = async (exactOaId) => {
         if (!exactOaId) return;
-        
         setShowOaSuggestions(false); 
-        
         try {
             state.setAlertMessage("Searching staging records for OA...");
             state.setIsAlertOpen(true);
@@ -83,20 +77,67 @@ export default function OrderEntryFormView({ state }) {
             
             if (!r.ok) throw new Error("Order Acceptance draft not found.");
             const data = await r.json();
+
+            // Helper function to safely isolate YYYY-MM-DD for standard HTML5 date pickers
+            const cleanDateString = (rawDate) => {
+                if (!rawDate) return "";
+                return rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.substring(0, 10);
+            };
             
+            // Map the API data parameters safely to your frontend input states
             state.setOrderHeader({
                 ...state.orderHeader,
                 order_acceptance_id: exactOaId,
-                order_acceptance_date: data.order_acceptance_date || state.orderHeader.order_acceptance_date,
+                order_acceptance_date: cleanDateString(data.order_acceptance_date),
                 purchase_order_number: data.purchase_order_number || "",
+                purchase_order_date: cleanDateString(data.purchase_order_date),
+                due_date: cleanDateString(data.due_date),
                 payment_terms: data.payment_terms || "",
                 billing_name: data.billing_name || "",
                 billing_address: data.billing_address || "",
-                // We leave due_date as is since it doesn't come from the staging pull
+                
+                // Logistics and Tracking additions
+                dispatched_through: data.dispatched_through || "",
+                delivery_terms: data.terms_of_delivery || "", 
+                
+                // Financial fallback values handled smoothly
+                packing_charges: data.packing_charges ?? 0,
+                freight_charges: data.freight_charges ?? 0,
+                tax_rate: data.tax_rate ?? 18,
             });
+
+            // Auto-check if the company exists
+            if (data.billing_name) {
+                try {
+                    const compRes = await fetch(`/api/v1/orders/search/companies?q=${encodeURIComponent(data.billing_name)}`, {
+                        headers: { "Authorization": `Bearer ${state.user.access_token}` }
+                    });
+                    if (compRes.ok) {
+                        const companies = await compRes.json();
+                        const exists = companies.some(c => c.name?.toLowerCase() === data.billing_name.toLowerCase());
+                        
+                        if (!exists) {
+                            setIsNewClient(true);
+                            setTemporaryClientName(data.billing_name);
+                        }
+                    }
+                } catch (companySearchErr) {
+                    console.error("Failed to check company existence:", companySearchErr);
+                }
+            }
             
+            // Auto-populate line items
             if (data.items && data.items.length > 0) {
-                state.setOrderItems(data.items);
+                const formattedItems = data.items.map(item => ({
+                    item_code: item.item_code || "",
+                    additional_spec_text: item.additional_spec_text || "",
+                    hsn_code: item.hsn_code || "",
+                    quantity: item.quantity || 0,
+                    rate: item.rate || 0,
+                    discount_percentage: item.discount_percentage || 0,
+                    amount: item.amount || 0
+                }));
+                state.setOrderItems(formattedItems);
             }
             
             state.setAlertMessage("✅ Staged Order Acceptance data populated.");
@@ -105,62 +146,55 @@ export default function OrderEntryFormView({ state }) {
         }
     };
 
-    // --- Footer Calculations ---
+    // Form Interceptor Handling the Post-Submit Transition
+    const handleFormSubmit = async (e) => {
+        // Fix: Ensure `e` exists and is a true event object before calling preventDefault
+        if (e && typeof e.preventDefault === 'function') {
+            e.preventDefault();
+        }
+        
+        const finalHeader = {
+            ...state.orderHeader,
+            ordered_by: state.user.email,
+            customer_code: isNewClient ? "TEMP_UNREGISTERED_HOLDER" : state.orderHeader.customer_code
+        };
+
+        try {
+            await state.commitOrderSubmit(finalHeader, state.orderItems);
+            
+            // Post-Submission Redirect Check modified for CompanyEntryForm routing view targets
+            if (isNewClient) {
+                state.setIsEditingCompany(true);
+                state.setCompanyForm(prev => ({
+                    ...prev,
+                    name: temporaryClientName || finalHeader.billing_name || "",
+                    address_line_1: finalHeader.billing_address || "", city: "", state: "", pincode: "",
+                    contact_name: "", contact_role: "", contact_phone: ""
+                }));
+                state.setIsEditingCompany(false);
+                state.setAlertMessage("🎉 Order staged! Please finish registering the client profile now.");
+                state.setActiveTab('company-new'); // Switch cleanly to view target route
+            }
+        } catch (err) {
+            state.showErrorModal("Submission Failed", err.message);
+        }
+    };
+
     const itemSubtotal = state.orderItems.reduce((acc, item) => {
         return acc + ((item.quantity || 0) * (item.rate || 0) * (1 - (item.discount_percentage || 0) / 100));
     }, 0);
 
     const packingCharges = parseFloat(state.orderHeader.packing_charges || 0);
     const freightCharges = parseFloat(state.orderHeader.freight_charges || 0);
-    const taxRate = parseFloat(state.orderHeader.tax_rate || 18); // Default to 18% GST
+    const taxRate = parseFloat(state.orderHeader.tax_rate || 18); 
     const taxableAmount = itemSubtotal + packingCharges + freightCharges;
     const taxAmount = taxableAmount * (taxRate / 100);
     const grandTotal = taxableAmount + taxAmount;
 
     return (
         <div className="frappe-card">
-            {showMissingClientModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-                    <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', width: '450px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-                        <h3 style={{ margin: '0 0 10px 0', color: 'var(--text-primary)' }}>⚠️ Client Not Found in Registry</h3>
-                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '25px', lineHeight: '1.5' }}>
-                            Please fill in the new client details right away or the order will not be updated. Do you want to register them now?
-                        </p>
-                        <div style={{ display: 'flex', gap: '15px' }}>
-                            <button 
-                                type="button" 
-                                className="btn" 
-                                style={{ flex: 1, background: 'var(--brand-danger)', color: 'white', border: 'none' }}
-                                onClick={() => setShowMissingClientModal(false)}
-                            >
-                                Cancel Order
-                            </button>
-                            <button 
-                                type="button" 
-                                className="btn" 
-                                style={{ flex: 1, background: 'var(--brand-success)', color: 'white', border: 'none' }}
-                                onClick={() => {
-                                    setShowMissingClientModal(false);
-                                    // Transfer billing details over to the Company form
-                                    state.setCompanyForm(prev => ({
-                                        ...prev,
-                                        name: state.orderHeader.billing_name || "",
-                                        address_line_1: state.orderHeader.billing_address || ""
-                                    }));
-                                    state.setIsEditingCompany(false);
-                                    // Make sure this matches your exact tab ID for the company entry form
-                                    state.setActiveTab('company-entry'); 
-                                }}
-                            >
-                                Fill Client Details
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
             <div className="system-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3>Establish Order Acceptance Entity Payload</h3>
-                
                 <div style={{ position: 'relative' }}>
                     <input 
                         type="file" 
@@ -174,13 +208,9 @@ export default function OrderEntryFormView({ state }) {
                 </div>
             </div>
             
-            <form onSubmit={(e) => {
-                state.setOrderHeader(prev => ({...prev, ordered_by: state.user.email}));
-                state.commitOrderSubmit(e);
-            }}>
+            <form onSubmit={handleFormSubmit}>
                 <div className="form-grid-layout" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                     
-                    {/* Auto-complete shifted to Order Acceptance ID */}
                     <div className="form-group">
                         <label className="input-label">Order Acceptance ID (Staged Search) *</label>
                         <div ref={oaInputRef} style={{ position: 'relative', display: 'flex', gap: '8px' }}>
@@ -192,7 +222,7 @@ export default function OrderEntryFormView({ state }) {
                                 onChange={handleOaInputChange}
                                 onFocus={() => { if (oaSuggestions.length > 0) setShowOaSuggestions(true); }}
                                 placeholder="XXX/000" 
-                                maxLength={6}
+                                maxLength={7}
                             />
                             <button type="button" className="btn btn-secondary" onClick={() => handleOaSearch(state.orderHeader.order_acceptance_id)} style={{ whiteSpace: 'nowrap' }}>
                                 🔍 Lookup
@@ -211,7 +241,6 @@ export default function OrderEntryFormView({ state }) {
                                             style={{
                                                 padding: '10px 12px', cursor: 'pointer', borderBottom: index === oaSuggestions.length - 1 ? 'none' : '1px solid var(--border-light)',
                                                 fontSize: '13px', 
-                                                // Replaced startsWith() with includes() for bolding
                                                 fontWeight: oa.toLowerCase().includes(state.orderHeader.order_acceptance_id.toLowerCase()) ? 'bold' : 'normal', 
                                                 color: 'var(--text-primary)'
                                             }}
@@ -226,7 +255,6 @@ export default function OrderEntryFormView({ state }) {
                         </div>
                     </div>
 
-                    {/* Customer PO Ref is now a standard input */}
                     <div className="form-group">
                         <label className="input-label">Customer PO Ref *</label>
                         <input type="text" required className="form-input" value={state.orderHeader.purchase_order_number} onChange={e => state.setOrderHeader({...state.orderHeader, purchase_order_number: e.target.value})} placeholder="PO-XXXX" />
@@ -252,9 +280,45 @@ export default function OrderEntryFormView({ state }) {
                         <input type="text" className="form-input" value={state.orderHeader.payment_terms} onChange={e => state.setOrderHeader({...state.orderHeader, payment_terms: e.target.value})} placeholder="e.g. Net 30 Days" />
                     </div>
 
+                    {/* Master Registration & Toggle Block */}
                     <div className="form-group grid-span-3" style={{ marginTop: '8px' }}>
-                        <label className="input-label" style={{ color: 'var(--brand-accent)' }}>Link Master Corporate Client Registry Account *</label>
-                        <SearchBox searchUrl="/api/v1/orders/search/companies" placeholder="Search customer (type name or code)..." onSelect={(cust) => { state.handleCustomerMasterSelection(cust.id); }}/>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <label className="input-label" style={{ color: 'var(--brand-accent)', margin: 0 }}>Link Master Corporate Client Registry Account *</label>
+                            <button 
+                                type="button" 
+                                className="btn" 
+                                style={{ padding: '2px 8px', fontSize: '11px', background: isNewClient ? 'var(--brand-danger)' : 'var(--brand-success)', color: 'white', border: 'none' }}
+                                onClick={() => {
+                                    setIsNewClient(!isNewClient);
+                                    if(!isNewClient) state.setOrderHeader(p => ({...p, customer_code: ""}));
+                                }}
+                            >
+                                {isNewClient ? "✕ Link Existing Client Instead" : "＋ Register New Client Profile Post-Submit"}
+                            </button>
+                        </div>
+                        
+                        {!isNewClient ? (
+                            <SearchBox 
+                                searchUrl="/api/v1/orders/search/companies" 
+                                placeholder="Search customer (type name or code)..." 
+                                onSelect={(cust) => { state.handleCustomerMasterSelection(cust.id); }}
+                            />
+                        ) : (
+                            <input 
+                                type="text" 
+                                required 
+                                className="form-input" 
+                                style={{ border: '1px dashed var(--brand-success)' }}
+                                value={temporaryClientName}
+                                onChange={(e) => {
+                                    setTemporaryClientName(e.target.value);
+                                    if (state.isBillingSameAsCustomer) {
+                                        state.setOrderHeader(prev => ({...prev, billing_name: e.target.value}));
+                                    }
+                                }}
+                                placeholder="Enter temporary client corporate name here..." 
+                            />
+                        )}
                     </div>
 
                     <div className="form-group grid-span-3" style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid var(--border-light)' }}>
@@ -278,12 +342,6 @@ export default function OrderEntryFormView({ state }) {
                                 <textarea required className="form-input" rows="2" style={{ height: 'auto' }} value={state.orderHeader.billing_address} onChange={e => state.setOrderHeader({...state.orderHeader, billing_address: e.target.value})} placeholder="Enter distinct drop-off logistics routing target..." />
                             </div>
                         </React.Fragment>
-                    )}
-
-                    {state.isBillingSameAsCustomer && state.orderHeader.customer_code && (
-                        <div className="form-group grid-span-3" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                            ℹ️ Inheriting: <strong>{state.orderHeader.billing_name}</strong> at <em>{state.orderHeader.billing_address}</em>
-                        </div>
                     )}
                 </div>
 
@@ -309,7 +367,12 @@ export default function OrderEntryFormView({ state }) {
                                 return (
                                     <tr key={index}>
                                         <td>
-                                            <select className="form-select-native" value={item.item_code} onChange={e => state.handleItemMasterSelection(index, e.target.value)} required>
+                                            <select 
+                                                className="form-select-native" 
+                                                value={item.item_code} 
+                                                onChange={e => state.updateOrderItemField(index, 'item_code', e.target.value)} 
+                                                required
+                                            >
                                                 <option value="">-- Choose --</option>
                                                 {state.itemsMaster?.map(im => <option key={im.item_code} value={im.item_code}>{im.item_code}</option>)}
                                                 <option value="TRIGGER_ERR_UNREGISTERED_PART">Non-standard Code</option>
@@ -330,7 +393,18 @@ export default function OrderEntryFormView({ state }) {
                                             <input type="text" className="form-input" value={item.hsn_code} onChange={e => state.updateOrderItemField(index, 'hsn_code', e.target.value)} placeholder="HSN" />
                                         </td>
                                         <td>
-                                            <input type="number" required min="1" className="form-input" value={item.quantity === 0 ? 1 : item.quantity} onChange={e => {const val = e.target.value; state.updateOrderItemField(index, 'quantity', val === 1 ? 1 : parseInt(val, 10))}} />
+                                            {/* Fix: Safely map quantity allowing for 0 to show, and correct the onChange input parsing */}
+                                            <input 
+                                                type="number" 
+                                                required 
+                                                min="0" 
+                                                className="form-input" 
+                                                value={item.quantity ?? 0} 
+                                                onChange={e => {
+                                                    const val = e.target.value; 
+                                                    state.updateOrderItemField(index, 'quantity', val === '' ? '' : Number(val));
+                                                }} 
+                                            />
                                         </td>
                                         <td>
                                             <input type="text" required className="form-input" value={item.unit_measure} onChange={e => state.updateOrderItemField(index, 'unit_measure', e.target.value)} placeholder="NOS" />
@@ -355,12 +429,12 @@ export default function OrderEntryFormView({ state }) {
                 </div>
                 <button type="button" className="btn btn-secondary" style={{ marginTop: '12px' }} onClick={state.appendOrderItemRow}>+ Append Line Row Node</button>
                 
-                {/* --- FINANCIAL FOOTER --- */}
                 <div style={{ marginTop: '20px', padding: '15px', background: 'var(--bg-surface)', border: '1px solid var(--border-light)', borderRadius: '8px', width: '350px', marginLeft: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: 'var(--text-muted)' }}>
                         <span>Item Subtotal:</span>
                         <strong>₹{itemSubtotal.toFixed(2)}</strong>
                     </div>
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                         <span style={{ fontSize: '13px' }}>Packing Charges (₹):</span>
                         <input type="number" step="0.01" className="form-input" style={{ width: '120px', padding: '4px 8px', textAlign: 'right' }} value={state.orderHeader.packing_charges || ''} onChange={e => state.setOrderHeader({...state.orderHeader, packing_charges: e.target.value})} placeholder="0.00" />

@@ -22,6 +22,7 @@ export default function GlobalProductionPulseView({ state }) {
         try {
             const data = await API.fetchProductionPulse(state.user.access_token);
             setOrders(data);
+            console.log(data);
         } catch (err) { state.showErrorModal("Error", err.message); }
         finally { setIsLoading(false); }
     };

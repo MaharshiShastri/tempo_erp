@@ -16,7 +16,6 @@ router = APIRouter(prefix="/api/v1/dispatch", tags=["Dispatch Logistics Engine"]
 
 @router.get("/partners")
 def get_partners(user: dict = Depends(verify_bearer_token)):
-    print("User ", user['email'], "tried accessing the .")
     return EDBR.get_logistics_partners()
 
 @router.get("/partners/active", dependencies=[Depends(check_department("Sales Representative"))])

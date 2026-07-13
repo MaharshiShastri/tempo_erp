@@ -26,10 +26,6 @@ def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/master/items", dependencies=[Depends(check_department("Sales Representative"))])
-def list_items_master(user_profile: dict = Depends(verify_bearer_token)):
-    return  EDBR.get_all_items()
-
 @router.get("/pulse")
 def get_production_pulse(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_global_production_pulse()

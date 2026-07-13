@@ -410,19 +410,39 @@ export default function useERPState() {
         setOrderItems(items);
     };
 
-    const commitOrderSubmit = async (e) => {
-        e.preventDefault();
-        if (!orderHeader.customer_code || !orderHeader.billing_name.trim() || !orderHeader.billing_address.trim()) {
-            setAlertMessage("Customer Code, Billing Name, and Address are strictly required."); setIsAlertOpen(true); return;
+    // Change the parameters to accept the header and items being passed from the component
+    const commitOrderSubmit = async (passedHeader, passedItems) => {
+        // 1. Remove e.preventDefault() completely. 
+
+        // 2. Validate using the passed payload, or fallback to state if needed
+        const headerToSubmit = passedHeader || orderHeader;
+        const itemsToSubmit = passedItems || orderItems;
+
+        if (!headerToSubmit.customer_code || !headerToSubmit.billing_name.trim() || !headerToSubmit.billing_address.trim()) {
+            setAlertMessage("Customer Code, Billing Name, and Address are strictly required."); 
+            setIsAlertOpen(true); 
+            return;
         }
+
         try {
-            const payloadItems = orderItems.map(item => ({ ...item, amount: Math.round(((item.quantity || 0) * (item.rate || 0) * (1.0 - ((item.discount_percentage || 0) / 100.0))) * 100) / 100 }));
-            const savedData = await API.saveOrder({ ...orderHeader, items: payloadItems }, sessionToken);
-            setAlertMessage("Order successfully shared to factory.")
-            executePrintWorkflow(savedData, 'order');
-            setOrderHeader({ ...defaultOrderHeader }); setOrderItems([{ ...defaultOrderItem }]); refreshDashboard();
-            await refreshDataHub(); setActiveTab('orders-list');
-        } catch (err) { alert(err.message); }
+            const payloadItems = itemsToSubmit.map(item => ({ 
+                ...item, 
+                amount: Math.round(((item.quantity || 0) * (item.rate || 0) * (1.0 - ((item.discount_percentage || 0) / 100.0))) * 100) / 100 
+            }));
+
+            const savedData = await API.saveOrder({ ...headerToSubmit, items: payloadItems }, sessionToken);
+            
+            setAlertMessage("Order successfully shared to factory.");
+            /*executePrintWorkflow(savedData, 'order');*/
+            setOrderHeader({ ...defaultOrderHeader }); 
+            setOrderItems([{ ...defaultOrderItem }]); 
+            refreshDashboard();
+            
+            await refreshDataHub(); 
+            setActiveTab('orders-list');
+        } catch (err) { 
+            alert(err.message); 
+        }
     };
 
     const commitCompanySubmit = async (e) => {
@@ -506,7 +526,8 @@ export default function useERPState() {
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
         tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
-        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems
+        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems,
+        setIsEditingCompany,
     };
 }
 

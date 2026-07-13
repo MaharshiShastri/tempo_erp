@@ -18,7 +18,7 @@ class OrderItemCreate(BaseModel):
     additional_spec_text: str = Field(..., min_length=1)
     hsn_code: str = Field(..., min_length=4, max_length=8)
     quantity: int = Field(..., gt=0)
-    unit_measure: str = Field(..., min_length=1)
+    unit_measure: Optional[str] = Field("NOS", min_length=1)
     rate: float = Field(..., ge=0.0)
     discount_percentage: float = Field(0.0, ge=0.0, le=100.0)
 
@@ -26,7 +26,7 @@ class StageUpdatePayload(BaseModel):
     stage: str
 
 class OrderHeaderCreate(BaseModel):
-    order_acceptance_id: UUID  # Strict structural UUID verification pattern enforced
+    order_acceptance_id: str = Field(..., min_length=1, max_length=50)  # Strict structural UUID verification pattern enforced
     order_acceptance_date: date
     purchase_order_number: str = Field(..., min_length=1)
     purchase_order_date: date

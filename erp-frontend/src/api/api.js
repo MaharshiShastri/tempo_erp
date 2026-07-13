@@ -337,7 +337,7 @@ const API = {
     return r.json();
   },
   async fetchItemMaster(token){
-    const r = await fetch('/api/v1/master/items/', {
+    const r = await fetch('/api/v1/master/items', {
       headers: this.headers(token)
     });
     if (!r.ok){

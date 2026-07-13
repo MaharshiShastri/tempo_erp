@@ -9,7 +9,7 @@ import re
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
 
-DB_DSN = os.getenv("DATABASE_UrRL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -125,41 +125,66 @@ class PostgresRepository:
 
                 return cur.fetchall()
     def create_order(self, order_data: dict) -> dict:
+        """Saves finalized UI form data into production order_headers and order_items"""
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                # 1. Insert into Header Table
+                # 1. Insert into Production Header Table with all extended fields
                 cur.execute("""
-                    INSERT INTO order_headers (order_acceptance_id, order_acceptance_date, purchase_order_number, 
-                                        purchase_order_date, customer_code, payment_terms, billing_name, 
-                                        billing_address, due_date, ordered_by)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+                    INSERT INTO order_headers (
+                        order_acceptance_id, order_acceptance_date, purchase_order_number, 
+                        purchase_order_date, customer_code, payment_terms, billing_name, 
+                        billing_address, dispatched_through, delivery_terms, due_date, 
+                        ordered_by, packing_charges, freight_charges, tax_rate
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                    RETURNING *
                 """, (
-                    str(order_data['order_acceptance_id']), order_data['order_acceptance_date'], order_data['purchase_order_number'],
-                    order_data['purchase_order_date'], order_data['customer_code'], order_data.get('payment_terms', ''),
-                    order_data['billing_name'], order_data['billing_address'], order_data['due_date'], order_data['ordered_by']
+                    str(order_data['order_acceptance_id']), 
+                    order_data['order_acceptance_date'], 
+                    order_data['purchase_order_number'],
+                    order_data['purchase_order_date'], 
+                    order_data['customer_code'], 
+                    order_data.get('payment_terms', ''),
+                    order_data['billing_name'], 
+                    order_data['billing_address'],
+                    order_data.get('dispatched_through', ''),
+                    order_data.get('delivery_terms', ''), # Maps to Tally's terms_of_delivery
+                    order_data['due_date'], 
+                    order_data['ordered_by'],
+                    float(order_data.get('packing_charges', 0.0)),
+                    float(order_data.get('freight_charges', 0.0)),
+                    float(order_data.get('tax_rate', 18.0))
                 ))
                 header = cur.fetchone()
+                
+                # Create System Activity Logs
                 cur.execute("""
                     INSERT INTO activity_logs(entity_id, entity_type, message, log_type)
                     VALUES (%s, %s, %s, %s)
-                    """, ( header["order_acceptance_id"],"ORDER_CREATED", f"New order {header['order_acceptance_id']} added to pipeline.", "INFO"))
-                conn.commit()
+                """, (header["order_acceptance_id"], "ORDER_CREATED", f"New order {header['order_acceptance_id']} added to pipeline.", "INFO"))
                 
                 header['order_acceptance_id'] = str(header['order_acceptance_id'])
 
-                # 2. Insert into Items Table iteratively
+                # 2. Insert into Production Items Table
                 inserted_items = []
                 for item in order_data["items"]:
                     if not item.get("additional_spec_text") or not item["additional_spec_text"].strip():
                         raise ValueError("Specification text details cannot be left blank.")
                     
-                    # Note: We don't calculate 'amount' in Python because your SQL schema uses GENERATED ALWAYS
                     cur.execute("""
-                        INSERT INTO order_items (order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, rate, discount_percentage)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *
+                        INSERT INTO order_items (
+                            order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, um, rate, discount_percentage
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
                     """, (
-                        header['order_acceptance_id'], item['item_code'], item['additional_spec_text'].strip(),
-                        item.get('hsn_code', ''), item['quantity'], item['rate'], item.get('discount_percentage', 0.0)
+                        header['order_acceptance_id'], 
+                        item['item_code'], 
+                        item['additional_spec_text'].strip(),
+                        item.get('hsn_code', ''), 
+                        item['quantity'],
+                        item['unit_measure'] ,
+                        item['rate'], 
+                        item.get('discount_percentage', 0.0)
                     ))
                     
                     inserted_item = cur.fetchone()
@@ -193,22 +218,33 @@ class PostgresRepository:
                 header = cur.fetchone()
                 if not header: return None
                 
-                # Format for JSON output
+                # Format Dates to Strings for safe JSON serialization
                 header['order_acceptance_date'] = str(header['order_acceptance_date']) if header['order_acceptance_date'] else ""
+                header['purchase_order_date'] = str(header['purchase_order_date']) if header['purchase_order_date'] else ""
                 header['created_at'] = header['created_at'].isoformat() if header['created_at'] else None
+                
+                # Handle Numeric / Decimal conversions safely
+                numeric_fields = ['freight_charges', 'packing_charges', 'tax_amount', 'grand_total', 'tax_rate']
+                for field in numeric_fields:
+                    if field in header and header[field] is not None:
+                        header[field] = float(header[field])
+                    else:
+                        header[field] = 0.0 if field != 'tax_rate' else 18.0
                 
                 # Fetch Staged Items
                 cur.execute("SELECT * FROM stg_order_items WHERE order_acceptance_id = %s", (header['order_acceptance_id'],))
                 items = cur.fetchall()
                 
                 for i in items:
-                    i['rate'] = float(i['rate'])
-                    i['quantity'] = float(i['quantity'])
-                    i['amount'] = float(i['amount'])
+                    i['rate'] = float(i['rate']) if i.get('rate') else 0.0
+                    i['quantity'] = float(i['quantity']) if i.get('quantity') else 0.0
+                    i['amount'] = float(i['amount']) if i.get('amount') else 0.0
+                    if i.get('due_date'):
+                        i['due_date'] = str(i['due_date'])
                     
                 header['items'] = items
                 return header
-                
+                        
     def mark_staged_order_processed(self, order_acceptance_id: str):
         """Call this after create_order() succeeds to remove it from Drafts"""
         with self._get_connection() as conn:
@@ -241,27 +277,69 @@ class PostgresRepository:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 for voucher in vouchers:
-                    # Map Tally fields to our Staging Schema
                     order_acceptance_id = voucher.get("vouchernumber")
                     if not order_acceptance_id:
-                        continue # Skip if no voucher number
+                        continue 
                         
+                    # Standard Fields
                     order_date = self._parse_tally_date(voucher.get("date"))
                     po_number = voucher.get("reference", "")
                     billing_name = voucher.get("partyname", "")
                     billing_address = self._extract_tally_text_list(voucher.get("basicbuyeraddress"))
                     payment_terms = voucher.get("basicduedateofpymt", "")
                     
+                    # New Crucial Fields based on document requirements
+                    gstin = voucher.get("partygstin", "")
+                    other_references = voucher.get("basicorderref", None)
+                    dispatched_through = voucher.get("basicshippedby", "")
+                    destination = voucher.get("basicfinaldestination", "")
+                    terms_of_delivery = self._extract_tally_text_list(voucher.get("basicorderterms"))
+                    
+                    # Parse Ledger Entries for Totals & Taxes
+                    freight_charges = 0.0
+                    tax_amount = 0.0
+                    grand_total = 0.0
+                    
+                    for ledger in voucher.get("ledgerentries", []):
+                        lname = ledger.get("ledgername", "").upper()
+                        amt = self._parse_tally_number(ledger.get("amount"))
+                        
+                        if "FREIGHT" in lname:
+                            freight_charges += amt
+                        elif any(tax in lname for tax in ["CGST", "SGST", "IGST"]):
+                            tax_amount += amt
+                        elif ledger.get("ispartyledger", False):
+                            # Party ledger (grand total) is represented as a negative balance in Tally JSON
+                            grand_total = abs(amt)
+                    
                     # 1. Insert/Update Staging Header
+                    # Ensure you add these new columns to your PostgreSQL `stg_order_headers` table first.
                     cur.execute("""
                         INSERT INTO stg_order_headers 
-                        (order_acceptance_id, order_acceptance_date, purchase_order_number, billing_name, billing_address, payment_terms)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        (
+                            order_acceptance_id, order_acceptance_date, purchase_order_number, 
+                            billing_name, billing_address, payment_terms, buyer_gstin, 
+                            purchase_order_date, dispatched_through, destination, terms_of_delivery,
+                            freight_charges, tax_amount, grand_total
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (order_acceptance_id) 
                         DO UPDATE SET 
                             status = 'PENDING',
-                            purchase_order_number = EXCLUDED.purchase_order_number;
-                    """, (order_acceptance_id, order_date, po_number, billing_name, billing_address, payment_terms))
+                            purchase_order_number = EXCLUDED.purchase_order_number,
+                            buyer_gstin = EXCLUDED.buyer_gstin,
+                            dispatched_through = EXCLUDED.dispatched_through,
+                            destination = EXCLUDED.destination,
+                            terms_of_delivery = EXCLUDED.terms_of_delivery,
+                            freight_charges = EXCLUDED.freight_charges,
+                            tax_amount = EXCLUDED.tax_amount,
+                            grand_total = EXCLUDED.grand_total;
+                    """, (
+                        order_acceptance_id, order_date, po_number, billing_name, 
+                        billing_address, payment_terms, gstin, other_references, 
+                        dispatched_through, destination, terms_of_delivery, 
+                        freight_charges, tax_amount, grand_total
+                    ))
 
                     # 2. Clear old staging items if re-uploaded, then Insert Items
                     cur.execute("DELETE FROM stg_order_items WHERE order_acceptance_id = %s", (order_acceptance_id,))
@@ -275,11 +353,17 @@ class PostgresRepository:
                         rate = self._parse_tally_number(item.get("rate"))
                         amount = self._parse_tally_number(item.get("amount"))
 
+                        # Attempt to extract item due date from batch allocations
+                        due_date_str = None
+                        allocations = item.get("batchallocations", [])
+                        if allocations and isinstance(allocations, list):
+                            due_date_str = allocations[0].get("orderduedate")
+                        
                         cur.execute("""
                             INSERT INTO stg_order_items 
-                            (order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, rate, amount)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, (order_acceptance_id, item_code, spec_text, hsn_code, qty, rate, amount))
+                            (order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, rate, amount, due_date)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (order_acceptance_id, item_code, spec_text, hsn_code, qty, rate, amount, due_date_str))
                     
                     inserted_count += 1
             conn.commit()
@@ -858,7 +942,8 @@ class PostgresRepository:
         with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(""" SELECT * FROM items_master """)
-                return cur.fetchall()
+                data = cur.fetchall()
+                return data
             
     # --- ITEM MASTERY end---
     
@@ -1400,7 +1485,7 @@ class PostgresRepository:
     def reject_lead_target(self, target_id: int, rejected_reason: str = None):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("""UPDATE lead_targets SET status='Rejected' rejected_reason=%s WHERE id=%s RETURNING id""", (rejected_reason, target_id))
+                cur.execute("""UPDATE lead_targets SET status='Rejected', rejected_reason=%s WHERE id=%s RETURNING id""", (rejected_reason, target_id))
                 row = cur.fetchone()
                 if not row:
                     raise ValueError("Target not found.")
@@ -1625,15 +1710,47 @@ class PostgresRepository:
     def get_global_production_pulse(self):
         with self._get_connection() as conn:
             with conn.cursor() as cur:
+                # 1. Fetch headers AND items using a LEFT JOIN
                 cur.execute("""
-                    SELECT order_acceptance_id, billing_name, due_date, production_stage
-                    FROM order_headers
-                    ORDER BY due_date ASC
+                    SELECT 
+                        h.order_acceptance_id, 
+                        h.billing_name, 
+                        h.due_date, 
+                        h.production_stage,
+                        i.item_code, 
+                        i.quantity
+                    FROM order_headers h
+                    LEFT JOIN order_items i ON h.order_acceptance_id = i.order_acceptance_id
+                    ORDER BY h.due_date ASC
                 """)
-                orders = cur.fetchall()
-                for o in orders:
-                    o['due_date'] = str(o['due_date']) if o['due_date'] else None
-                return orders
+                
+                rows = cur.fetchall()
+                
+                # 2. Group the flattened SQL rows into a nested JSON structure
+                grouped_orders = {}
+                
+                for row in rows:
+                    oa_id = row['order_acceptance_id']
+                    
+                    # Create the order header profile if we haven't seen it yet
+                    if oa_id not in grouped_orders:
+                        grouped_orders[oa_id] = {
+                            'order_acceptance_id': oa_id,
+                            'billing_name': row['billing_name'],
+                            'due_date': str(row['due_date']) if row['due_date'] else None,
+                            'production_stage': row['production_stage'],
+                            'items': [] # Initialize empty items array
+                        }
+                    
+                    # 3. Append the product to the order's items array
+                    if row.get('item_code'):
+                        grouped_orders[oa_id]['items'].append({
+                            'item_code': row['item_code'],
+                            'quantity': row['quantity']
+                        })
+                        
+                # 4. Return the grouped values as a list for the API
+                return list(grouped_orders.values())
 
     def update_order_stage(self, order_id: str, new_stage: str):
         with self._get_connection() as conn:

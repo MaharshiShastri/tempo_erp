@@ -1,7 +1,6 @@
 import React from 'react';
 
 export default function ItemMasterView({ state }) {
-
     return (
         <div className="frappe-card">
             <div className="system-header">
@@ -12,7 +11,7 @@ export default function ItemMasterView({ state }) {
             </div>
 
             {/* Existing Items Ledger */}
-            <h4 style={{ color: 'var(--text-primary)', marginBottom: '15px' }}>Current Master Catalog</h4>
+            <h4 style={{ color: 'var(--text-primary)', marginBottom: '15px' }}>Current Master Catalog ({state.itemsMaster?.length})</h4>
             <div style={{ overflowX: 'auto' }}>
                 <table>
                     <thead>

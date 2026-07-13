@@ -158,11 +158,6 @@ function App() {
                                     {!sidebarCollapsed && <span>R&D Knowledge Base</span>}
                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                 </a>
-                                <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
-                                            <span>📦</span> 
-                                            {!sidebarCollapsed && <span>Item Master</span>}
-                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
-                                </a>
                             </>
                         )}
                     </div>
@@ -253,6 +248,11 @@ function App() {
                                         {!sidebarCollapsed && <span>Task Management </span>}
                                         {pendingTasksCount > 0 && <span className="sidebar-badge">{pendingTasksCount}</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+T</span>
+                                    </a>
+                                    <a href="#items" className={`menu-item ${state.activeTab === 'items-master' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('items-master')}}>
+                                        <span>📦</span> 
+                                        {!sidebarCollapsed && <span>Item Master</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
                                     </a>
                                     {/* Legacy Activity Tree if still needed */}
                                     <a href="#activity-tree" className={`menu-item ${state.activeTab === 'accountability-hub' ? 'active': ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('accountability-hub')}}>

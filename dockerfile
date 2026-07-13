@@ -1,8 +1,8 @@
 FROM python:3.12
 WORKDIR /app
 LABEL name="tempo-erp-app"
-LABEL version="v1.2.2"
-LABEL description="Added new feature of KPIs & transport analyser"
+LABEL version="v1.3.0"
+LABEL description="Updated system to initiate with Global Production Pulse"
 LABEL maintainer="Backend Team"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
