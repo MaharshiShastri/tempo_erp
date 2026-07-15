@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import TaskCreationForm from "../components/shared/TaskCreationForm";
 import TaskList from "../components/shared/TaskList";
-import API from "../api/api"; 
 
 export default function TasksWorkspaceView({ state }) {
     const [expandedTaskId, setExpandedTaskId] = useState(null);
@@ -12,8 +11,8 @@ export default function TasksWorkspaceView({ state }) {
     const [newTaskDetails, setNewTaskDetails] = useState('');
     const [selectedAssignees, setSelectedAssignees] = useState([]);
     const [newTaskDeadline, setNewTaskDeadline] = useState('');
-   const [newTaskFile, setNewTaskFile] = useState([]);
-
+    const [newTaskFile, setNewTaskFile] = useState([]);
+    console.log("Tasks: ", state.tasks);
     const tasksArray = state.tasks || [];
     
     const filteredTasks = tasksArray.filter(t => {
@@ -24,7 +23,7 @@ export default function TasksWorkspaceView({ state }) {
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
-        await state.handleCreateTask({
+        await state.createTask({
             title: newTaskTitle,
             details: newTaskDetails,
             direction: 'dispatched',
@@ -39,55 +38,7 @@ export default function TasksWorkspaceView({ state }) {
         setNewTaskDeadline('');
         document.getElementById('task-file-input').value = "";
     };
-
-    // UPDATED: Uses Native Browser Tabs instead of a custom modal
-    const handleFileAction = async (attachmentPath) => {
-        try {
-            const baseName = attachmentPath.split(/[\\/]/).pop();
-            const displayName = baseName.substring(baseName.indexOf('_') + 1) || baseName;
-            const ext = displayName.split('.').pop().toLowerCase();
-
-            state.setAlertMessage("Fetching secure attachment...");
-            state.setIsAlertOpen(true);
-
-            const rawBlob = await API.fetchTaskAttachment(baseName, state.user.access_token);
-            
-            // Explicitly map MIME types so the browser knows how to render the new tab
-            let mimeType = rawBlob.type;
-            if (ext === 'pdf') mimeType = 'application/pdf';
-            else if (['jpg', 'jpeg'].includes(ext)) mimeType = 'image/jpeg';
-            else if (ext === 'png') mimeType = 'image/png';
-
-            // Reconstruct the blob with the explicit MIME type
-            const typedBlob = new Blob([rawBlob], { type: mimeType });
-            const url = URL.createObjectURL(typedBlob);
-            
-            state.setIsAlertOpen(false);
-
-            const previewable = ['pdf', 'jpg', 'jpeg', 'png'].includes(ext);
-
-            if (previewable) {
-                // Open native browser viewer in a new tab
-                const newWindow = window.open(url, '_blank');
-                if (!newWindow) {
-                    throw new Error("Popup blocked. Please allow popups for this site to view files.");
-                }
-            } else {
-                // Word/Excel force a direct browser download due to security restrictions
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = displayName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 1000); 
-            }
-        } catch (e) {
-            state.setIsAlertOpen(false);
-            state.showErrorModal("File Access Error", e.message);
-        }
-    };
-
+    
     return (
         <div className="frappe-card">
             <div className="system-header">
@@ -135,7 +86,7 @@ export default function TasksWorkspaceView({ state }) {
                 expandedTaskId={expandedTaskId}
                 setExpandedTaskId={setExpandedTaskId}
                 state={state}
-                handleFileAction={handleFileAction} 
+                handleFileAction={state.openAttachment} 
             />
         </div>
     );

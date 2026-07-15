@@ -22,7 +22,7 @@ from schemas.logistics_schema import FullPartnerProfile
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABAsSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -750,8 +750,10 @@ class PostgresRepository:
                 logs.append(log_dict)
             return logs
 
-    def add_manual_activity_log(self, order_id: str, message: str, operator_email: str, operator_name: str):
+    def add_manual_activity_log(self, order_id: str, message: str, operator_email: str):
         with SessionLocal() as session:
+            operator = (session.query(User).filter(User.email==operator_email).first())
+            operator_name = operator.name if operator else None
             log = ActivityLog(
                 entity_id=order_id,
                 entity_type="ORDER", # Presumed contextual type

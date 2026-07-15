@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import API from "../api/api";
-
+import useTasks from "./useTasks";
 const API_HOST = window.location.hostname;
 
 export default function useERPState() {
@@ -12,7 +12,7 @@ export default function useERPState() {
     const [activeTab, setActiveTab] = useState('global-pulse');
     const [orders, setOrders] = useState([]);
     const [bills, setBills] = useState([]);
-    const [tasks, setTasks] = useState([]); 
+
     const [toasts, setToasts] = useState([]);
     const [dashboardData, setDashboardData] = useState({ past: [], ongoing: [], future: [] });
     const [systemUsers, setSystemUsers] = useState([]);
@@ -56,6 +56,49 @@ export default function useERPState() {
     const [isEditingItem, setIsEditingItem] = useState(false);
     
     const sessionToken = user ? user.access_token : null;
+    const showErrorModal = ( title, message) => {
+        setErrorModal({
+            title,
+            message
+        });
+
+        setErrorModalOpen(true);
+    };
+    
+    const dispatchSystemNotification = (title, message) => {
+        setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
+        setIsAlertOpen(true);
+        if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(title, { body: message });
+        }
+    };
+    const clearNotifications = () => {
+        setNotifications([])
+    }
+    const addToast = (message, type="info") => {
+        const id = Date.now();
+        setToasts(prev => [...prev, {id, message, type}]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));   
+        }, 5000);
+    };
+
+    const taskState = useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification});
+    const refreshTaskHub = useCallback(async () => {
+        if (!user?.access_token) return;
+
+        try {
+            await taskState.loadTasks();
+        } catch (err) {
+            console.error(err);
+        }
+    }, [user, taskState.loadTasks]);
+    
+    useEffect(() => {
+        if (!user || (user?.role !== 'Shop Floor Administrator' || user?.role !== 'Admin' || user?.role !== 'Chief Full Stack Developer')) return;
+
+        refreshTaskHub();
+    }, [user]);
 
     useEffect(() => {
         if ("Notification" in window && Notification.permission === "default") {
@@ -95,32 +138,6 @@ export default function useERPState() {
         }
     }, [user]);
 
-    const showErrorModal = ( title, message) => {
-        setErrorModal({
-            title,
-            message
-        });
-
-        setErrorModalOpen(true);
-    };
-    const dispatchSystemNotification = (title, message) => {
-        setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
-        setIsAlertOpen(true);
-        if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(title, { body: message });
-        }
-    };
-    const clearNotifications = () => {
-        setNotifications([])
-    }
-    const addToast = (message, type="info") => {
-        const id = Date.now();
-        setToasts(prev => [...prev, {id, message, type}]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id));   
-        }, 5000);
-    };
-
     useEffect(() => {
         if (!sessionToken) return;
         
@@ -152,10 +169,6 @@ export default function useERPState() {
                     setUnreadNotifCount(prev => prev + 1);
                     addToast(`${data.title}`, 'info');
 
-                    // If it's a task, refresh the tasks list
-                    if (data.type === 'TASK') {
-                        API.fetchTasks(sessionToken).then(setTasks).catch(console.error);
-                    }
                 }
             } catch(e) {
                 console.error('Failed to parse SSE payload.', e);
@@ -313,16 +326,15 @@ export default function useERPState() {
 
     const refreshDataHub = async () => {
         try {
-	        const [ord, bl, comp, tsk, usersData, dispatchData, itemList] = await Promise.all([
+            const [ord, bl, comp, usersData, dispatchData, itemList] = await Promise.all([
                 API.fetchOrders(sessionToken),
                 API.fetchBills(sessionToken),
                 API.fetchCompaniesMaster(sessionToken),
-                API.fetchTasks(sessionToken),
                 fetch('/api/v1/auth/users', {headers: {'Authorization': `Bearer ${sessionToken}`}}).then(r => r.json()),
                 API.getPartners(sessionToken).then(r => r.data),
                 API.fetchItemMaster(sessionToken),
             ]);
-            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setTasks(tsk); setSystemUsers(usersData); setDispatch(dispatchData); setItemsMaster(itemList);
+            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setSystemUsers(usersData); setDispatch(dispatchData); setItemsMaster(itemList);
         } catch (e) {
             setErrorMessage('Network transmission failure across Postgres nodes.');
         }
@@ -332,6 +344,7 @@ export default function useERPState() {
         try {
             const data = await API.fetchActivityTree(sessionToken);
             setDashboardData(data);
+            refreshTaskHub();
         } catch (err) {
             setAlertMessage("Failed to sync Production Pulse: " + err.message);
             setIsAlertOpen(true);
@@ -398,6 +411,7 @@ export default function useERPState() {
             const data = await API.login(loginEmail, loginPassword);
             localStorage.setItem('tempo_erp_user', JSON.stringify(data));
             setUser(data);
+            await refreshTaskHub();
         } catch (err) { setErrorMessage('Access denied. Invalid signature parameters.'); }
     };
 
@@ -485,14 +499,6 @@ export default function useERPState() {
         } catch (err) { alert(err.message); }
     };
 
-    const handleCreateTask = async (payload) => {
-        try {
-            const r = await API.saveTask(payload, sessionToken);
-            setTasks(prev => [...prev, r]);
-            dispatchSystemNotification("Task Dispatched", `Notification sent to assigned operators.`);
-        } catch (e) { setAlertMessage(e.message); setIsAlertOpen(true); }
-    };
-  
     const commitItemSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -507,13 +513,6 @@ export default function useERPState() {
         }
     };
     
-    const handleToggleTask = async (taskId) => {
-        try {
-            const updatedTask = await API.toggleTaskStatus(taskId, sessionToken);
-            setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-        } catch (err) { setAlertMessage(err.message); setIsAlertOpen(true); }
-    };
-
     const executePrintWorkflow = (data, type) => {
         setActivePrintJob(data); setPrintType(type);
         setTimeout(() => { window.print(); setActivePrintJob(null); setPrintType(null); }, 300);
@@ -524,10 +523,9 @@ export default function useERPState() {
         orderHeader, setOrderHeader, orderItems, appendOrderItemRow, popOrderItemRow, updateOrderItemField, commitOrderSubmit, handleCustomerMasterSelection, handleItemMasterSelection, triggerNewOrderInitialization,
         billHeader, setBillHeader, billItems, setBillItems, triggerInvoiceSetupForOrder, commitBillSubmit, handleLogin, handleLogout,
         isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
-        tasks, handleCreateTask, handleToggleTask, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
+        ...taskState, refreshTaskHub, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
         isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems,
         setIsEditingCompany,
     };
 }
-

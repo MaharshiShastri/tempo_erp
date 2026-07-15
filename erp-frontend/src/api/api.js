@@ -718,7 +718,7 @@ const API = {
   },
 
   async addManualActivityLog(orderId, payload, token) {
-    const r = await fetch(`/api/v1/dashboard/logs`, { method: "POST", headers: this.headers(token), body: JSON.stringify(payload) });
+    const r = await fetch(`/api/v1/dashboard/logs?order_id=${encodeURIComponent(orderId)}`, { method: "POST", headers: this.headers(token), body: JSON.stringify(payload) });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },

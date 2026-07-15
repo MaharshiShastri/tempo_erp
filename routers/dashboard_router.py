@@ -13,7 +13,7 @@ def get_activity_tree(user_profile: dict = Depends(verify_bearer_token)):
 @router.post("/logs", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def add_custom_log(order_id: str, payload: ManualLogPayload, user: dict = Depends(verify_bearer_token)):
     try:
-        return EDBR.add_manual_activity_log(order_id, payload.message, user["email"], user["name"])
+        return EDBR.add_manual_activity_log(order_id, payload.message, user["email"])
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

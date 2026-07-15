@@ -99,7 +99,7 @@ export default function ActivityDashboardView({ state }) {
                                         <div onClick={() => toggleRow(order.order_acceptance_id)} style={{ padding: '12px 15px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isRowOpen ? 'var(--bg-main)' : 'transparent', borderBottom: isRowOpen ? '1px solid var(--border-subtle)' : 'none' }}>
                                             <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                                 <span style={{ fontFamily: 'monospace', fontSize: '12px', background: 'var(--combobox-hover)', padding: '3px 8px', borderRadius: '4px' }}>
-                                                    {order.order_acceptance_id.substring(0, 8)}...
+                                                    {order.order_acceptance_id.length > 7 ? `${order.order_acceptance_id.substring(0, 7)}...` : order.order_acceptance_id.substring(0, 7)}
                                                 </span>
                                                 <strong style={{ fontSize: '13px' }}>{order.billing_name}</strong>
                                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Due: {order.due_date}</span>

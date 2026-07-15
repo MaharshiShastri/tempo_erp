@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import API from "../../api/api";
 import { FiEdit2, FiTrash2, FiSave, FiX } from "react-icons/fi";
 
 export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTaskId, handleFileAction, state}) {
@@ -29,12 +28,8 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
     const handleUpdate = async (e) => {
         e.stopPropagation();
         try {
-            await API.updateTask(task.id, editForm, state.user.access_token);
-            state.setAlertMessage("✅ Task updated successfully.");
-            state.setIsAlertOpen(true);
+            await state.updateTask(task.id, editForm);
             setIsEditing(false);
-            // Trigger refresh via the parent hook
-            if (state.refreshDataHub) state.refreshDataHub();
         } catch (err) { state.showErrorModal("Update Failed", err.message); }
     };
 
@@ -42,10 +37,7 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
         e.stopPropagation();
         if (!window.confirm("Are you sure you want to permanently delete this task?")) return;
         try {
-            await API.deleteTask(task.id, state.user.access_token);
-            state.setAlertMessage("🗑️ Task deleted.");
-            state.setIsAlertOpen(true);
-            if (state.refreshDataHub) state.refreshDataHub();
+            await state.deleteTask(task.id);
         } catch (err) { state.showErrorModal("Delete Failed", err.message); }
     };
 
@@ -67,7 +59,7 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {/* Attachment Button */}
-                    {!isEditing && task.attachment_urls?.length > 0 && (
+                    {!isEditing && task?.attachment_urls.length > 0 && (
                         <div style={{display:"flex", gap:"6px", flexWrap:"wrap"}}>
                             {task.attachment_urls.map(file => (
                             <button key={file} className="btn btn-secondary" onClick={(e)=>{ e.stopPropagation(); handleFileAction(file);}}>
@@ -89,12 +81,12 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                                 <div style={{ display: 'flex', gap: '5px' }}>
                                     <button className="btn-text" onClick={(e) => { e.stopPropagation(); setIsEditing(true); setExpandedTaskId(task.id); }} style={{ padding: '4px' }}><FiEdit2 /></button>
                                     <button className="btn-text-danger" onClick={handleDelete} style={{ padding: '4px' }}><FiTrash2 /></button>
-                                    <button className="btn-text" title="Export to PDF" onClick={(e) => { e.stopPropagation();  API.downloadPdf(task.id, state.user.access_token); }} style={{ padding: '4px', color: 'var(--brand-accent)' }}>📄 Download PDF</button>
+                                    <button className="btn-text" title="Export to PDF" onClick={(e) => { e.stopPropagation();  state.downloadTaskPDF(task.id); }} style={{ padding: '4px', color: 'var(--brand-accent)' }}>📄 Download Task</button>
                                 </div>
                             )}
                             <label onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', background: 'var(--bg-main)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
                                 <span>Status: <strong style={{ color: task.is_incomplete ? 'var(--brand-danger)' : 'var(--brand-success)' }}>{task.is_incomplete ? 'Pending' : 'Done'}</strong></span>
-                                <input type="checkbox" checked={!task.is_incomplete} onChange={() => state.handleToggleTask(task.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                <input type="checkbox" checked={!task.is_incomplete} onChange={() => state.toggleTask(task.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                             </label>
                         </>
                     )}
