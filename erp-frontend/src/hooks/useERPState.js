@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import API from "../api/api";
 import useTasks from "./useTasks";
+import useDispatchHub from "./useDispatchHub";
+
 const API_HOST = window.location.hostname;
 
 export default function useERPState() {
@@ -83,9 +85,11 @@ export default function useERPState() {
         }, 5000);
     };
 
-    const taskState = useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification});
+    const taskState = useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification}); //Tasks subsystem
+    const dispatchState = useDispatchHub({sessionToken, showErrorModal, addToast}); //Dispatch & transport state
+    
     const refreshTaskHub = useCallback(async () => {
-        if (!user?.access_token) return;
+        if (!user?.access_token && (user?.role !== 'Shop Floor Administrator' || user?.role !== 'Admin' || user?.role !== 'Chief Full Stack Developer')) return;
 
         try {
             await taskState.loadTasks();
@@ -95,7 +99,7 @@ export default function useERPState() {
     }, [user, taskState.loadTasks]);
     
     useEffect(() => {
-        if (!user || (user?.role !== 'Shop Floor Administrator' || user?.role !== 'Admin' || user?.role !== 'Chief Full Stack Developer')) return;
+        if (!user) return;
 
         refreshTaskHub();
     }, [user]);
@@ -526,6 +530,6 @@ export default function useERPState() {
         ...taskState, refreshTaskHub, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
         isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems,
-        setIsEditingCompany,
+        setIsEditingCompany, ...dispatchState
     };
 }
