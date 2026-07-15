@@ -3,7 +3,7 @@ import json
 import time
 import requests
 import redis
-from database.repository import EDBR
+from database.repository import EDBR, SessionLocal
 from groq import Groq
 import logging
 from datetime import datetime
@@ -11,6 +11,8 @@ import tldextract
 from urllib.parse import urlparse
 import re
 import pprint
+from sqlalchemy import select, func
+from database.models import LeadTarget
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("leadgen")
@@ -312,65 +314,52 @@ def process_target_domain(domain: str):
 
 def run_automated_job():
     logger.info("===== START AUTOMATED JOB =====")
-    with EDBR._get_connection() as conn:
-        with conn.cursor() as cur:
-            
-            cur.execute("""
-                SELECT id, domain, requested_by
-                FROM (
-                    SELECT *,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY requested_by
-                            ORDER BY created_at
-                        ) AS rn
-                    FROM lead_targets
-                    WHERE status = 'Pending'
-                ) t
-                WHERE rn <= 10;
-            """)
-            pending_targets = cur.fetchall()
+    with SessionLocal() as session:
+        ranked = (select(LeadTarget.id, LeadTarget.domain, LeadTarget.requested_by, func.row_number().over(partition_by=LeadTarget.requested_by, order_by=LeadTarget.created_at).label("rn")).where(LeadTarget.status == "Pending").subquery())
 
+        stmt = (select(ranked.c.id, ranked.c.domain, ranked.c.requested_by).where(ranked.c.rn <= 10))
+
+        pending_targets = session.execute(stmt).mappings().all()
+    
     logger.info(f"Found {len(pending_targets)} targets")
 
-    for target in pending_targets:
-        try:
-            logger.info(f"Processing target {target['id']} | {target['domain']}")
-            staging_data = process_target_domain(target["domain"])
+    with SessionLocal() as session:
+        for target in pending_targets:
+            try:
+                logger.info(f"Processing target {target['id']} | {target['domain']}")
+                staging_data = process_target_domain(target["domain"])
 
-            with EDBR._get_connection() as conn:
-                with conn.cursor() as cur:
+                lead_target = session.get(LeadTarget, target['id'])
+                if not lead_target:
+                    logger.warning(f"Target {target.id} disappeared")
+                    continue
+                        
+                logger.info("=" * 80)
+                logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
+                logger.info(f"Target ID {target['id']} committed successfully.")
+                logger.info("=" * 80)
+                time.sleep(3)
+
+                lead_target.status = "Awaiting Review"
+                lead_target.snovio_raw_data = staging_data
+
+                session.commit()
                     
-                    logger.info("=" * 80)
-                    logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
-                    logger.info(f"Target ID {target['id']} committed successfully.")
-                    logger.info("=" * 80)
-                    time.sleep(3)
+                logger.info("=" * 80)
+                logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
+                logger.info(f"Target ID {target['id']} committed successfully.")
+                logger.info("=" * 80)
+                time.sleep(3)
 
-                    cur.execute("""
-                        UPDATE lead_targets
-                        SET status = 'Awaiting Review',
-                            snovio_raw_data = %s
-                        WHERE id = %s
-                    """, (json.dumps(staging_data), target["id"]))
-                    conn.commit()
+                logger.info(f"SUCCESS target {target['id']}")
+            except Exception as e:
+                logger.error(f"FAILED target {target['id']} | {e}")
+                with SessionLocal() as session:
+                    lead_target = session.get(LeadTarget, target.id)
 
-                    logger.info("=" * 80)
-                    logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
-                    logger.info(f"Target ID {target['id']} committed successfully.")
-                    logger.info("=" * 80)
-                    time.sleep(3)
-
-            logger.info(f"SUCCESS target {target['id']}")
-        except Exception as e:
-            logger.error(f"FAILED target {target['id']} | {e}")
-            with EDBR._get_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        UPDATE lead_targets
-                        SET status = 'Failed'
-                        WHERE id = %s
-                    """, (target["id"],))
-                    conn.commit()
-
+                    if lead_target:
+                        lead_target.status = "Failed"
+                        session.commit()
+                        
 def run_automated_job_entry():
     return run_automated_job()

@@ -4,7 +4,9 @@ from fastapi.responses import StreamingResponse
 import asyncio
 import json
 from security import verify_bearer_token
-from database.repository import EDBR
+from database.repository import EDBR, SessionLocal
+from database.models import SystemNotification
+from sqlalchemy import select
 
 router = APIRouter(prefix="/api/v1/stream", tags=["Unified SSE Stream"])
 
@@ -21,31 +23,25 @@ async def event_generator(request: Request, user_email: str, user: dict = Depend
                 break
 
             # 1. Fetch unread notifications for this specific user
-            with EDBR._get_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT id, title, message, type, created_at 
-                        FROM system_notifications 
-                        WHERE user_email = %s AND is_read = FALSE
-                        ORDER BY created_at ASC
-                    """, (user_email,))
-                    notifications = cur.fetchall()
+            with SessionLocal() as session:
+                stmt = (select(SystemNotification).where(SystemNotification.user_email == user_email, SystemNotification.is_read == False)
+                        .order_by(SystemNotification.created_at.asc()))
+                
+                notifications = session.scalars(stmt).all()
 
-                    for notif in notifications:
-                        # Yield the notification to the frontend
-                        payload = json.dumps({
-                            "id": notif["id"],
-                            "title": notif["title"],
-                            "message": notif["message"],
-                            "type": notif["type"],
-                            "timestamp": notif["created_at"].isoformat()
-                        })
-                        yield f"data: {payload}\n\n"
-                        
-                        # Mark as read immediately after sending so it doesn't duplicate
-                        cur.execute("UPDATE system_notifications SET is_read = TRUE WHERE id = %s", (notif["id"],))
-                    conn.commit()
+                for notif in notifications:
+                    payload = json.dumps({
+                        "id": notif.id,
+                        "title": notif.title,
+                        "message": notif.message,
+                        "type": notif.type,
+                        "timestamp": notif.created_at.isoformat()
+                    })
+                    yield f"data: {payload}\n\n"
 
+                    notif.is_read = True
+                session.commit()
+                
             # 2. System Pulse / Heartbeat (Keeps connection alive and proves server status)
             yield f"data: {json.dumps({'type': 'SYSTEM_PULSE', 'message': 'alive'})}\n\n"
 

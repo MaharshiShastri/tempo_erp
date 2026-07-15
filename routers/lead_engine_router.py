@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from database.repository import EDBR
+from database.repository import EDBR, SessionLocal
 from security import verify_bearer_token
 from .dependencies import check_department
 from schemas.lead_generator_schema import TargetPayload, EmailGenPayload, MappedContact, ApproveStagingPayload, RejectPayload
@@ -7,6 +7,7 @@ from fastapi import UploadFile, File
 import pandas as pd
 import io
 from services.ai_generate_email import generate_mail
+from database.models import LeadContact, LeadTarget
 
 router = APIRouter(prefix="/api/v1/lead-engine", tags=["Lead Generation Engine"])
 
@@ -108,18 +109,17 @@ def generate_cold_email(payload: EmailGenPayload, user: dict = Depends(verify_be
     
 @router.post("/targets/{target_id}/approve-staging", dependencies=[Depends(check_department("Admin"))])
 def approve_snovio_staging(target_id: int, payload: ApproveStagingPayload, user: dict = Depends(verify_bearer_token)):
-    with EDBR._get_connection() as conn:
-        with conn.cursor() as cur:
-            # Insert approved contacts
-            for c in payload.contacts:
-                cur.execute("""
-                    INSERT INTO lead_contacts (target_id, full_name, designation, email, is_priority)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (target_id, c.full_name, c.designation, c.email, c.is_priority))
-            
-            # Update target status to Completed
-            cur.execute("UPDATE lead_targets SET status = 'Completed', emails_found = %s WHERE id = %s", (len(payload.contacts), target_id))
-            conn.commit()
+    with SessionLocal() as session:
+        target = session.get(LeadTarget, target_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="Lead target not found")
+    
+        target.contacts.extend([LeadContact(full_name=c.full_name, designation=c.designation, email=c.email, is_priority=c.is_priority) for c in payload.contacts])
+
+        target.status = "Completed"
+        target.emails_found = len(payload.contacts)
+
+        session.commit()
     return {"status": "success"}
 
 @router.post("/targets/{target_id}/reject-staging")

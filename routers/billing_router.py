@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.billing_schema import BillHeaderCreate
-from database.repository import EDBR
+from database.repository import EDBR, SessionLocal
 from security import verify_bearer_token
 from .dependencies import check_department
+from database.models import User
+from sqlalchemy import select
 
 router = APIRouter(prefix="/api/v1/bills", tags=["Billing Execution Engine"])
 
@@ -19,11 +21,7 @@ def create_bill(payload: BillHeaderCreate, user_profile: dict = Depends(verify_b
     
 @router.get("/target", dependencies=[Depends(check_department("Sales Representative"))])
 def get_target(user_profile: dict = Depends(verify_bearer_token)):
-    with EDBR._get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT quarterly_order_value_target FROM users WHERE email = %s", (user_profile.get('email'),))
-            return cur.fetchone()
-    
-    return {
-        "target": row[0] if row else 0
-    }
+    with SessionLocal() as session:
+        stmt = select(User.quarterly_order_value_target).where(User.email==user_profile.get("email"))
+        target = session.scalar(stmt)
+        return {"target": target or 0}

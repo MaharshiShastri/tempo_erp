@@ -1,409 +1,655 @@
 from __future__ import annotations
 
-from sqlalchemy import (
-    String, Integer, BigInteger, Text, Date, DateTime, Boolean,
-    Numeric, ForeignKey, CheckConstraint, func, text
-)
-from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, Numeric, String, Text, JSON, func, Computed
+
+from sqlalchemy.dialects.postgresql import ARRAY
+
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-
-# =========================
-# Base
-# =========================
 
 class Base(DeclarativeBase):
     pass
 
-
-# =========================
-# USERS
-# =========================
-
 class User(Base):
     __tablename__ = "users"
-
+    #Done
     email: Mapped[str] = mapped_column(String(255), primary_key=True)
+
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
     role: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    dob: Mapped[str | None] = mapped_column(Date)
+    dob: Mapped[date | None] = mapped_column(Date)
+
     phone_personal: Mapped[str | None] = mapped_column(String(20))
+
     phone_business: Mapped[str | None] = mapped_column(String(20))
 
     regions: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
-    department: Mapped[str] = mapped_column(String(50), server_default=text("'General'"))
 
-    # relationships
-    activity_logs = relationship("ActivityLog", back_populates="operator")
-    tasks_assigned = relationship(
-        "Task",
-        primaryjoin="User.email==Task.assigned_by",
-        viewonly=True
-    )
+    department: Mapped[str] = mapped_column(String(50), default="General")
+
+    quarterly_order_value_target: Mapped[int] = mapped_column(Integer, default=0)
 
 
-# =========================
-# ACTIVITY LOGS
-# =========================
+    # Relationships
+    activity_logs: Mapped[list["ActivityLog"]] = relationship(back_populates="operator", passive_deletes=True)
+
+    dispatch_records: Mapped[list["DispatchRecord"]] = relationship(back_populates="operator", passive_deletes=True)
+
+    grn_headers: Mapped[list["GRNHeader"]] = relationship(back_populates="operator", passive_deletes=True)
 
 class ActivityLog(Base):
+    #Done
     __tablename__ = "activity_logs"
 
-    log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False,)
+
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    operator_email: Mapped[str | None] = mapped_column(
-        String(255),
-        ForeignKey("users.email", ondelete="SET NULL")
-    )
+    operator_email: Mapped[str | None] = mapped_column(ForeignKey("users.email", ondelete="SET NULL",))
 
-    log_type: Mapped[str | None] = mapped_column(String(50), server_default=text("'COMMENT'"))
+    log_type: Mapped[str] = mapped_column(String(50), default="COMMENT",)
+
     message: Mapped[str] = mapped_column(Text, nullable=False)
 
-    metadata: Mapped[dict | None] = mapped_column(JSONB)
+    meta_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    operator = relationship("User", back_populates="activity_logs")
-
-
-# =========================
-# ORDER MODULE
-# =========================
+    operator: Mapped["User | None"] = relationship(back_populates="activity_logs")
 
 class OrderHeader(Base):
     __tablename__ = "order_headers"
-
+    #Done
     order_acceptance_id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    order_acceptance_date: Mapped[str] = mapped_column(Date, nullable=False)
-    purchase_order_number: Mapped[str] = mapped_column(String(100), nullable=False)
-    purchase_order_date: Mapped[str] = mapped_column(Date, nullable=False)
 
-    customer_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    order_acceptance_date: Mapped[date]
+
+    purchase_order_number: Mapped[str] = mapped_column(String(100))
+
+    purchase_order_date: Mapped[date]
+
+    customer_code: Mapped[str] = mapped_column(String(50))
+
     payment_terms: Mapped[str | None] = mapped_column(String(100))
 
-    billing_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    billing_address: Mapped[str] = mapped_column(Text, nullable=False)
+    billing_name: Mapped[str] = mapped_column(String(255))
+
+    billing_address: Mapped[str] = mapped_column(Text)
 
     dispatched_through: Mapped[str | None] = mapped_column(String(100))
+
     delivery_terms: Mapped[str | None] = mapped_column(String(100))
 
-    due_date: Mapped[str] = mapped_column(Date, nullable=False)
+    due_date: Mapped[date]
 
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete")
-    bills = relationship("BillHeader", back_populates="order")
+    production_stage: Mapped[str] = mapped_column(String(50), default="PO_SUBMITTED")
 
+    ordered_by: Mapped[str | None] = mapped_column(String(255))
+
+    packing_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+
+    freight_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=18)
+
+    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+
+    bills: Mapped[list["BillHeader"]] = relationship(back_populates="order")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
+    #Done
+    order_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    order_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    order_acceptance_id: Mapped[str] = mapped_column(ForeignKey("order_headers.order_acceptance_id",ondelete="CASCADE"))
 
-    order_acceptance_id: Mapped[str | None] = mapped_column(
-        String(50),
-        ForeignKey("order_headers.order_acceptance_id", ondelete="CASCADE")
-    )
+    item_code: Mapped[str] = mapped_column(ForeignKey("items_master.item_code"))
 
-    item_code: Mapped[str] = mapped_column(String(50), nullable=False)
     um: Mapped[str | None] = mapped_column(String(10))
 
     additional_spec_text: Mapped[str | None] = mapped_column(Text)
-    hsn_code: Mapped[str] = mapped_column(String(8), nullable=False)
 
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    rate: Mapped[float] = mapped_column(Numeric(15, 4), nullable=False)
-    discount_percentage: Mapped[float] = mapped_column(
-        Numeric(5, 2),
-        server_default=text("0.00")
-    )
+    hsn_code: Mapped[str] = mapped_column(String(8))
 
-    amount: Mapped[float] = mapped_column(
-        Numeric(15, 2),
-        server_default=text(
-            "(quantity::numeric * rate * (1 - discount_percentage / 100.0))"
-        )
-    )
+    quantity: Mapped[int] = mapped_column(Integer)
 
-    order = relationship("OrderHeader", back_populates="items")
+    rate: Mapped[Decimal] = mapped_column(Numeric(15, 4))
 
+    discount_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2),default=0,)
 
-# =========================
-# BILLING
-# =========================
+    amount: Mapped[Decimal]  = mapped_column(Numeric(15, 2), Computed("quantity * rate * (1 - discount_percentage / 100)"))
+
+    order: Mapped["OrderHeader"] = relationship(back_populates="items")
+
+    item: Mapped["ItemMaster"] = relationship(back_populates="order_items")
+
+    bill_items: Mapped[list["BillItem"]] = relationship(back_populates="order_item")
 
 class BillHeader(Base):
+    #Done
     __tablename__ = "bill_headers"
 
-    bill_num: Mapped[str] = mapped_column(String(50), primary_key=True)
-    bill_date: Mapped[str] = mapped_column(Date, nullable=False)
+    bill_num: Mapped[str] = mapped_column(String(50), primary_key=True,)
 
-    order_acceptance_id: Mapped[str | None] = mapped_column(
-        String(50),
-        ForeignKey("order_headers.order_acceptance_id")
-    )
+    bill_date: Mapped[date]
 
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+    order_acceptance_id: Mapped[str | None] = mapped_column(ForeignKey("order_headers.order_acceptance_id"))
 
-    order = relationship("OrderHeader", back_populates="bills")
-    items = relationship("BillItem", back_populates="bill", cascade="all, delete")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(),)
 
+    order: Mapped["OrderHeader | None"] = relationship(back_populates="bills")
+
+    items: Mapped[list["BillItem"]] = relationship(back_populates="bill", cascade="all, delete-orphan",)
 
 class BillItem(Base):
     __tablename__ = "bill_items"
+    #Done
+    bill_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    bill_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    bill_num: Mapped[str] = mapped_column(ForeignKey("bill_headers.bill_num",ondelete="CASCADE",))
 
-    bill_num: Mapped[str | None] = mapped_column(
-        String(50),
-        ForeignKey("bill_headers.bill_num", ondelete="CASCADE")
-    )
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.order_item_id"))
 
-    order_item_id: Mapped[int | None] = mapped_column(
-        BigInteger,
-        ForeignKey("order_items.order_item_id")
-    )
+    quantity_shipped: Mapped[int]
 
-    quantity_shipped: Mapped[int] = mapped_column(Integer, nullable=False)
+    bill: Mapped["BillHeader"] = relationship(back_populates="items")
 
-    __table_args__ = (
-        CheckConstraint("quantity_shipped > 0"),
-    )
-
-    bill = relationship("BillHeader", back_populates="items")
-
-
-# =========================
-# CRM
-# =========================
-
-class CRMLead(Base):
-    __tablename__ = "crm_leads"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    designation: Mapped[str | None] = mapped_column(String(100))
-
-    company_name: Mapped[str | None] = mapped_column(String(255))
-    contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone_number: Mapped[str | None] = mapped_column(String(50))
-
-    city_state: Mapped[str] = mapped_column(String(255), nullable=False)
-    product_query: Mapped[str | None] = mapped_column(Text)
-
-    gdpr_consent: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-
-    assigned_region: Mapped[str | None] = mapped_column(String(100))
-    assigned_to: Mapped[str | None] = mapped_column(String(255))
-
-    status: Mapped[str] = mapped_column(String(50), server_default=text("'New'"))
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
-
-
-# =========================
-# TASKS
-# =========================
-
-class Task(Base):
-    __tablename__ = "tasks"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    details: Mapped[str | None] = mapped_column(Text)
-    direction: Mapped[str | None] = mapped_column(String(50))
-
-    is_incomplete: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
-
-    assigned_by: Mapped[str | None] = mapped_column(
-        String(255),
-        ForeignKey("users.email")
-    )
-
-    assigned_to: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
-
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
-
-
-# =========================
-# INVENTORY
-# =========================
+    order_item: Mapped["OrderItem"] = relationship(back_populates="bill_items")
 
 class ItemMaster(Base):
     __tablename__ = "items_master"
+    #Done
+    item_code: Mapped[str] = mapped_column(String(100), primary_key=True,)
 
-    item_code: Mapped[str] = mapped_column(String(100), primary_key=True)
-    item_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    item_name: Mapped[str] = mapped_column(String(255))
 
     item_group: Mapped[str | None] = mapped_column(String(100))
 
-    rate: Mapped[float] = mapped_column(Numeric(15, 2), server_default=text("0.00"))
+    rate: Mapped[Decimal] = mapped_column(Numeric(15, 2),default=0.00,)
 
-    unit_measure: Mapped[str] = mapped_column(String(20), server_default=text("'NOS'"))
+    unit_measure: Mapped[str] = mapped_column(String(20),default="NOS",)
 
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
-    is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(DateTime,server_default=func.now(),)
+
+    is_active: Mapped[bool] = mapped_column(Boolean,default=True,)
 
     additional_spec_text: Mapped[str | None] = mapped_column(Text)
+
     hsn_code: Mapped[str | None] = mapped_column(String(20))
 
-    revision_no: Mapped[str] = mapped_column(String(50), server_default=text("''"))
+    revision_no: Mapped[str] = mapped_column(String(50), default="",)
 
+    available_stock: Mapped[int] = mapped_column(default=0)
 
-class TestItemMaster(Base):
-    __tablename__ = "test_items_master"
+    order_items: Mapped[list["OrderItem"]] = relationship(back_populates="item")
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+class StagingOrderHeader(Base):
+    __tablename__ = "stg_order_headers"
+    #Done
+    staging_id: Mapped[int] = mapped_column(Integer,primary_key=True)
 
-    item_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    item_specification: Mapped[str | None] = mapped_column(Text)
+    order_acceptance_id: Mapped[str | None] = mapped_column(String(100), unique=True)
 
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+    order_acceptance_date: Mapped[date | None] = mapped_column(Date)
 
+    purchase_order_number: Mapped[str | None] = mapped_column(String(100))
 
-# =========================
-# LOGISTICS
-# =========================
+    billing_name: Mapped[str | None] = mapped_column(String(100))
+
+    billing_address: Mapped[str | None] = mapped_column(Text)
+
+    payment_terms: Mapped[str | None] = mapped_column(String(255))
+
+    status: Mapped[str] = mapped_column(String(50),default="PENDING")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime,server_default=func.now())
+    
+    due_date: Mapped[date | None] = mapped_column(Date)
+    
+    items: Mapped[list["StagingOrderItem"]] = relationship(primaryjoin="foreign(StagingOrderItem.order_acceptance_id)==StagingOrderHeader.order_acceptance_id",cascade="all, delete-orphan",)
+
+class StagingOrderItem(Base):
+    __tablename__ = "stg_order_items"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True,)
+
+    order_acceptance_id: Mapped[str | None] = mapped_column(ForeignKey("stg_order_headers.order_acceptance_id", ondelete="CASCADE"))
+
+    item_code: Mapped[str | None] = mapped_column(String(150))
+
+    additional_spec_text: Mapped[str | None] = mapped_column(Text)
+
+    hsn_code: Mapped[str | None] = mapped_column(String(50))
+
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    rate: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
 
 class LogisticsPartner(Base):
     __tablename__ = "logistics_partners"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    cft_factor: Mapped[float] = mapped_column(Numeric(10, 2), server_default=text("10"))
-    minimum_weight: Mapped[float] = mapped_column(Numeric(10, 2), server_default=text("0"))
-    minimum_freight_value: Mapped[float] = mapped_column(Numeric(10, 2), server_default=text("0"))
-    documentation_charge: Mapped[float] = mapped_column(Numeric(10, 2), server_default=text("0"))
+    cft_factor: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=10,)
 
-    fov_percentage: Mapped[float] = mapped_column(Numeric(5, 2), server_default=text("0"))
-    gst_percentage: Mapped[float] = mapped_column(Numeric(5, 2), server_default=text("18"))
+    minimum_weight: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0,)
+
+    minimum_freight_value: Mapped[Decimal] = mapped_column(Numeric(10, 2),default=0)
+
+    documentation_charge: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0,)
+
+    fov_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2),default=0,)
+
+    gst_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=18,)
 
     partner_link: Mapped[str | None] = mapped_column(String(500))
 
-    fuel_matrix = relationship("LogisticsFuelMatrix", back_populates="partner")
-    oda_matrix = relationship("LogisticsODAMatrix", back_populates="partner")
-    zones = relationship("LogisticsZone", back_populates="partner")
-    zone_rates = relationship("LogisticsZoneRate", back_populates="partner")
+    local_loading_cost: Mapped[Decimal] = mapped_column(Numeric, default=0,)
 
+    hub_loading_max_cost: Mapped[Decimal] = mapped_column(Numeric, default=0,)
 
-class LogisticsFuelMatrix(Base):
-    __tablename__ = "logistics_fuel_matrix"
+    zones: Mapped[list["LogisticsZone"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    zone_rates: Mapped[list["LogisticsZoneRate"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
 
-    partner_id: Mapped[int | None] = mapped_column(ForeignKey("logistics_partners.id"))
+    fuel_matrix: Mapped[list["LogisticsFuelMatrix"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
 
-    fuel_price_from: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    fuel_price_to: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    surcharge_percentage: Mapped[float | None] = mapped_column(Numeric(5, 2))
-
-    sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-
-    partner = relationship("LogisticsPartner", back_populates="fuel_matrix")
-
-
-class LogisticsODAMatrix(Base):
-    __tablename__ = "logistics_oda_matrix"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    partner_id: Mapped[int | None] = mapped_column(ForeignKey("logistics_partners.id"))
-
-    km_from: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    km_to: Mapped[float | None] = mapped_column(Numeric(10, 2))
-
-    weight_from: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    weight_to: Mapped[float | None] = mapped_column(Numeric(10, 2))
-
-    oda_charge: Mapped[float | None] = mapped_column(Numeric(10, 2))
-
-    sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-
-    partner = relationship("LogisticsPartner", back_populates="oda_matrix")
-
+    oda_matrix: Mapped[list["LogisticsODAMatrix"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
 
 class LogisticsZone(Base):
     __tablename__ = "logistics_zones"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     partner_id: Mapped[int] = mapped_column(ForeignKey("logistics_partners.id"), nullable=False)
 
-    zone_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    zone_code: Mapped[str] = mapped_column(String(10), nullable=False,)
+
     zone_name: Mapped[str | None] = mapped_column(String(255))
+
     states: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
-    sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    sort_order: Mapped[int] = mapped_column(default=0)
 
-    partner = relationship("LogisticsPartner", back_populates="zones")
-
+    partner: Mapped["LogisticsPartner"] = relationship(back_populates="zones")
 
 class LogisticsZoneRate(Base):
     __tablename__ = "logistics_zone_rates"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    partner_id: Mapped[int] = mapped_column(ForeignKey("logistics_partners.id"), nullable=False)
+    partner_id: Mapped[int] = mapped_column(ForeignKey("logistics_partners.id"), nullable=False,)
 
     destination_zone: Mapped[str | None] = mapped_column(String(10))
-    rate_per_kg: Mapped[float | None] = mapped_column(Numeric(10, 2))
 
-    sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    rate_per_kg: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
 
-    partner = relationship("LogisticsPartner", back_populates="zone_rates")
+    sort_order: Mapped[int] = mapped_column(default=0)
 
+    partner: Mapped["LogisticsPartner"] = relationship(back_populates="zone_rates")
 
-# =========================
-# GRN
-# =========================
+class LogisticsFuelMatrix(Base):
+    __tablename__ = "logistics_fuel_matrix"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    partner_id: Mapped[int | None] = mapped_column(ForeignKey("logistics_partners.id"))
+
+    fuel_price_from: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    fuel_price_to: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    surcharge_percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+
+    sort_order: Mapped[int] = mapped_column(default=0)
+
+    partner: Mapped["LogisticsPartner"] = relationship(back_populates="fuel_matrix")
+
+class LogisticsODAMatrix(Base):
+    __tablename__ = "logistics_oda_matrix"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    partner_id: Mapped[int | None] = mapped_column(ForeignKey("logistics_partners.id"))
+
+    km_from: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    km_to: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    weight_from: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    weight_to: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    oda_charge: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    sort_order: Mapped[int] = mapped_column(default=0)
+
+    partner: Mapped["LogisticsPartner"] = relationship(back_populates="oda_matrix")
+
+class DispatchRecord(Base):
+    __tablename__ = "dispatch_records"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    partner_name: Mapped[str | None] = mapped_column(String(255))
+
+    destination_zone: Mapped[str | None] = mapped_column(String(10))
+
+    chargeable_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    basic_freight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    fuel_charge: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    fov_charge: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    oda_charge: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    hamali_detail: Mapped[str | None] = mapped_column(String(255))
+
+    hamali_cost: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    subtotal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    dispatch_cost_gst: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+
+    operator_email: Mapped[str | None] = mapped_column(ForeignKey("users.email", ondelete="SET NULL",))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(),)
+
+    loading_charge: Mapped[Decimal] = mapped_column(Numeric, default=0,)
+    
+    operator: Mapped["User | None"] = relationship(back_populates="dispatch_records")
+class Task(Base):
+    __tablename__ = "tasks"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    details: Mapped[str | None] = mapped_column(Text)
+
+    direction: Mapped[str | None] = mapped_column(String(50))
+
+    is_incomplete: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    assigned_by: Mapped[str | None] = mapped_column(ForeignKey("users.email"))
+
+    assigned_to: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    attachment_urls: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+
+    deadline: Mapped[datetime | None] = mapped_column(DateTime)
+
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    creator: Mapped["User | None"] = relationship(foreign_keys=[assigned_by])
+
+class CRMLead(Base):
+    __tablename__ = "crm_leads"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    full_name: Mapped[str] = mapped_column(String(255))
+
+    designation: Mapped[str | None] = mapped_column(String(100))
+
+    company_name: Mapped[str | None] = mapped_column(String(255))
+
+    contact_email: Mapped[str] = mapped_column(String(255))
+
+    phone_number: Mapped[str | None] = mapped_column(String(50))
+
+    city_state: Mapped[str] = mapped_column(String(255))
+
+    product_query: Mapped[str | None]
+
+    gdpr_consent: Mapped[bool] = mapped_column(Boolean,default=False)
+
+    assigned_region: Mapped[str | None] = mapped_column(String(100))
+
+    assigned_to: Mapped[str | None] = mapped_column(String(255))
+
+    status: Mapped[str] = mapped_column(String(50), default="New")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+class ClientCompany(Base):
+    __tablename__ = "client_companies"
+    #Done
+    id: Mapped[str] = mapped_column(String(20), primary_key=True)
+
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+
+    address_line_1: Mapped[str] = mapped_column(String(255))
+
+    city: Mapped[str] = mapped_column(String(100))
+
+    state: Mapped[str] = mapped_column(String(100))
+
+    pincode: Mapped[str] = mapped_column(String(10))
+
+    contact_name: Mapped[str] = mapped_column(String(255))
+
+    contact_role: Mapped[str] = mapped_column(String(100))
+
+    contact_phone: Mapped[str] = mapped_column(String(20))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class GRNHeader(Base):
     __tablename__ = "grn_headers"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     grn_number: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
 
     vendor_name: Mapped[str | None] = mapped_column(String(255))
 
-    receipt_date: Mapped[str] = mapped_column(Date, server_default=func.current_date())
-    operator_email: Mapped[str | None] = mapped_column(String(255))
+    receipt_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
 
-    invoice_number: Mapped[str | None] = mapped_column(String(100))
+    operator_email: Mapped[str | None] = mapped_column(ForeignKey("users.email"))
 
-    subtotal: Mapped[float | None] = mapped_column(Numeric(12, 2))
-    cgst: Mapped[float | None] = mapped_column(Numeric(12, 2))
-    sgst: Mapped[float | None] = mapped_column(Numeric(12, 2))
-    grand_total: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+    items: Mapped[list["GRNItem"]] = relationship(back_populates="grn",cascade="all, delete-orphan")
 
-    items = relationship("GRNItem", back_populates="grn", cascade="all, delete")
-
+    operator: Mapped["User | None"] = relationship(back_populates="grn_headers")
 
 class GRNItem(Base):
     __tablename__ = "grn_items"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    grn_id: Mapped[int | None] = mapped_column(ForeignKey("grn_headers.id", ondelete="CASCADE"))
-
-    item_code: Mapped[str | None] = mapped_column(String(100))
-
-    quantity: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    rate: Mapped[float | None] = mapped_column(Numeric(10, 2))
-
-    amount: Mapped[float | None] = mapped_column(
-        Numeric(10, 2),
-        server_default=text("(quantity * rate)")
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
     )
 
-    grn = relationship("GRNHeader", back_populates="items")
+    grn_id: Mapped[int | None] = mapped_column(
+        ForeignKey("grn_headers.id", ondelete="CASCADE")
+    )
+
+    item_code: Mapped[str | None] = mapped_column(String(100),ForeignKey("test_items_master.item_code"))
+
+    quantity: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2)
+    )
+
+    rate: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2)
+    )
+
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        Computed("quantity * rate")
+    )
+
+    grn: Mapped["GRNHeader"] = relationship(
+        back_populates="items"
+    )
+
+    item: Mapped["TestItemMaster"] = relationship(
+        back_populates="grn_items"
+    )
+class LeadTarget(Base):
+    __tablename__ = "lead_targets"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    company_name: Mapped[str] = mapped_column(String(255))
+
+    domain: Mapped[str] = mapped_column(String(255))
+
+    requested_by: Mapped[str] = mapped_column(String(255))
+
+    status: Mapped[str] = mapped_column(String(50), default="Pending")
+    
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    gtm_source: Mapped[str] = mapped_column(String(100), default="Snov.io")
+
+    email_status: Mapped[str] = mapped_column(String(50), default="Not Sent")
+
+    added_date: Mapped[date] = mapped_column(Date, server_default=func.current_date())
+
+    cost_per_credit: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("0.0"))
+
+    emails_found: Mapped[int] = mapped_column(Integer, default=0)
+    
+    snovio_raw_data: Mapped[dict | None] = mapped_column(JSON)
+
+    rejected_reason: Mapped[str] = mapped_column(String(50))
+
+    contacts: Mapped[list["LeadContact"]] = relationship(back_populates="target", cascade="all, delete-orphan")
+    
+class LeadContact(Base):
+    __tablename__ = "lead_contacts"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    target_id: Mapped[int] = mapped_column(ForeignKey("lead_targets.id", ondelete="CASCADE"))
+
+    full_name: Mapped[str] = mapped_column(String(255))
+
+    designation: Mapped[str | None] = mapped_column(String(255))
+
+    email: Mapped[str | None] = mapped_column(String(255))
+
+    phone: Mapped[str | None] = mapped_column(String(50))
+
+    linkedin_url: Mapped[str | None] = mapped_column(String(500))
+
+    is_priority: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    target: Mapped["LeadTarget"] = relationship(back_populates="contacts")
+
+class FAQQuery(Base):
+    __tablename__ = "faq_queries"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+
+    question: Mapped[str] = mapped_column(Text)
+
+    answer: Mapped[str | None] = mapped_column(Text)
+
+    asked_by: Mapped[str] = mapped_column(String(255))
+
+    answered_by: Mapped[str | None] = mapped_column(String(255))
+
+    status: Mapped[str] = mapped_column(String(50), default="Pending")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+class SystemAuditLog(Base):
+    __tablename__ = "system_audit_logs"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    user_email: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    user_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    action_route: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+class SystemErrorLog(Base):
+    __tablename__ = "system_error_logs"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    route_path: Mapped[str | None] = mapped_column(String(255))
+
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    stack_trace: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+class SystemNotification(Base):
+    __tablename__ = "system_notifications"
+    #Done
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    user_email: Mapped[str] = mapped_column(ForeignKey("users.email"), nullable=False)
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    
+class TestItemMaster(Base):
+    __tablename__ = "test_items_master"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
+    )
+
+    item_code: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
+
+    item_specification: Mapped[str | None] = mapped_column(
+        Text
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now()
+    )
+
+    grn_items: Mapped[list["GRNItem"]] = relationship(
+        back_populates="item"
+    )

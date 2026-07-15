@@ -7,8 +7,9 @@ chroma_client = chromadb.PersistentClient(path="./chroma_db")
 faq_collection = chroma_client.get_or_create_collection(name="erp_knowledge_base")
 
 groq_api_key = os.getenv("GROQ_API_KEY", "")
+print(os.getenv("GROQ_API_KEY", "Groq api key not present"))
 if not groq_api_key:
-        raise ValueError(status_code=500, detail="Groq API Key not configured on the server environment variables.")
+        raise ValueError("Groq API Key is not present in ai_generate_email not configured on the server environment variables.")
 
 def generate_mail(payload: dict):
     rag_context = ""

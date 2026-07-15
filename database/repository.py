@@ -1,256 +1,242 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import json
-from datetime import datetime
-from schemas.logistics_schema import FullPartnerProfile
-import logging
 import os
+import json
+import logging
 import re
+from datetime import datetime, date, timedelta
+from decimal import Decimal
+
+from sqlalchemy import create_engine, select, update, delete, or_, and_, func, any_, case, desc, text
+from sqlalchemy.orm import sessionmaker, joinedload, selectinload, aliased
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+# Import your models (adjust the import path as necessary)
+from database.models import (
+    User, ActivityLog, OrderHeader, OrderItem, BillHeader, BillItem, 
+    ItemMaster, StagingOrderHeader, StagingOrderItem, LogisticsPartner, 
+    LogisticsZone, LogisticsZoneRate, LogisticsFuelMatrix, LogisticsODAMatrix, 
+    DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
+    LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
+    SystemNotification, TestItemMaster
+)
+from schemas.logistics_schema import FullPartnerProfile
+
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABAsSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
 logger.info(f"DB URI: {DB_DSN}")
 
-class PostgresRepository:
-    def _get_connection(self):
-        return psycopg2.connect(DB_DSN, cursor_factory=RealDictCursor)
+# Setup SQLAlchemy Engine and Session Factory
+engine = create_engine(DB_DSN, echo=False)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+def to_dict(obj, expand_relationships=False):
+    """Helper to cleanly convert SQLAlchemy objects to dictionaries for JSON serialization."""
+    if obj is None:
+        return None
+    data = {}
+    for col in obj.__table__.columns:
+        val = getattr(obj, col.name)
+        if isinstance(val, Decimal):
+            val = float(val)
+        elif isinstance(val, (datetime, date)):
+            val = val.isoformat()
+        data[col.name] = val
+    return data
+
+class PostgresRepository:
+    
     # --- AUTH & RBAC start---
     def get_user(self, email: str, password: str = None):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                if password:
-                    cur.execute("SELECT * FROM users WHERE email = %s AND password_hash = %s", (email, password))
-                    logger.info(email, password)                    
-                else:
-                    cur.execute("SELECT email, name, role, regions FROM users WHERE email = %s", (email,))
-                return cur.fetchone()
+        with SessionLocal() as session:
+            if password:
+                stmt = select(User).where(User.email == email, User.password_hash == password)
+                logger.info(f"{email} {password}")
+            else:
+                # Removed password_hash from return dictionary intentionally based on old behavior
+                stmt = select(User).where(User.email == email)
+            
+            user = session.scalars(stmt).first()
+            if not user: return None
+            
+            # Formatting similarly to old RealDictCursor selected fields
+            return {
+                "email": user.email, "name": user.name, "role": user.role, 
+                "regions": user.regions, "password_hash": user.password_hash
+            } if password else {
+                "email": user.email, "name": user.name, "role": user.role, "regions": user.regions
+            }
 
     def get_all_users(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT email, name, role, regions, phone_business FROM users")
-                data = cur.fetchall()
-                
-                if not data:
-                    return None
-                return data
+        with SessionLocal() as session:
+            users = session.scalars(select(User)).all()
+            if not users:
+                return None
+            return [{"email": u.email, "name": u.name, "role": u.role, "regions": u.regions, "phone_business": u.phone_business} for u in users]
 
     def create_user(self, user_data: dict):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO users (email, name, password_hash, role, dob, phone_personal, phone_business, regions)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING email, name, role
-                """, (
-                    user_data['email'], user_data['name'], user_data['password'], user_data['role'],
-                    user_data.get('dob'), user_data.get('phone_personal'), user_data.get('phone_business'),
-                    user_data.get('regions', [])
-                ))
-                conn.commit()
-                return cur.fetchone()
+        with SessionLocal() as session:
+            new_user = User(
+                email=user_data['email'],
+                name=user_data['name'],
+                password_hash=user_data['password'],
+                role=user_data['role'],
+                dob=user_data.get('dob'),
+                phone_personal=user_data.get('phone_personal'),
+                phone_business=user_data.get('phone_business'),
+                regions=user_data.get('regions', [])
+            )
+            session.add(new_user)
+            session.commit()
+            return {"email": new_user.email, "name": new_user.name, "role": new_user.role}
             
     def update_user(self, email: str, user_data: dict):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # If a new password is provided, update it. Otherwise, leave the hash alone.
-                if user_data.get('password'):
-                    cur.execute("""
-                        UPDATE users 
-                        SET name=%s, password_hash=%s, role=%s, dob=%s, phone_personal=%s, phone_business=%s, regions=%s
-                        WHERE email=%s RETURNING email, name, role
-                    """, (user_data['name'], user_data['password'], user_data['role'], user_data.get('dob'), 
-                          user_data.get('phone_personal'), user_data.get('phone_business'), user_data.get('regions', []), email))
-                else:
-                    cur.execute("""
-                        UPDATE users 
-                        SET name=%s, role=%s, dob=%s, phone_personal=%s, phone_business=%s, regions=%s
-                        WHERE email=%s RETURNING email, name, role
-                    """, (user_data['name'], user_data['role'], user_data.get('dob'), 
-                          user_data.get('phone_personal'), user_data.get('phone_business'), user_data.get('regions', []), email))
-                conn.commit()
-                return cur.fetchone()
+        with SessionLocal() as session:
+            user = session.scalars(select(User).where(User.email == email)).first()
+            if not user:
+                return None
+                
+            user.name = user_data['name']
+            user.role = user_data['role']
+            if user_data.get('password'):
+                user.password_hash = user_data['password']
+            user.dob = user_data.get('dob')
+            user.phone_personal = user_data.get('phone_personal')
+            user.phone_business = user_data.get('phone_business')
+            user.regions = user_data.get('regions', [])
+            
+            session.commit()
+            return {"email": user.email, "name": user.name, "role": user.role}
 
     def delete_user(self, email: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM users WHERE email=%s RETURNING email", (email,))
-                conn.commit()
-                return cur.fetchone()
+        with SessionLocal() as session:
+            user = session.scalars(select(User).where(User.email == email)).first()
+            if user:
+                session.delete(user)
+                session.commit()
+                return {"email": email}
+            return None
     # --- AUTH & RBAC end---
+
     # --- GLOBAL ORDERS ENGINE start---
     def get_all_orders(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Fetch all parent headers
-                cur.execute("SELECT * FROM order_headers ORDER BY created_at DESC")
-                headers = cur.fetchall()
-                
-                for h in headers:
-                    # Format dates for JSON
-                    h['order_acceptance_id'] = str(h['order_acceptance_id'])
-                    h['order_acceptance_date'] = str(h['order_acceptance_date']) if h['order_acceptance_date'] else None
-                    h['purchase_order_date'] = str(h['purchase_order_date']) if h['purchase_order_date'] else None
-                    h['due_date'] = str(h['due_date']) if h['due_date'] else None
-                    h['created_at'] = h['created_at'].isoformat() if h['created_at'] else None
-                    
-                    # 2. Fetch nested child items for this specific order
-                    cur.execute("SELECT * FROM order_items WHERE order_acceptance_id = %s", (h['order_acceptance_id'],))
-                    items = cur.fetchall()
-                    
-                    # Ensure Postgres NUMERIC types are float-converted for JSON transit
-                    for i in items:
-                        i['rate'] = float(i['rate'])
-                        i['discount_percentage'] = float(i['discount_percentage'])
-                        i['amount'] = float(i['amount'])
-                        
-                    h['items'] = items
-                    
-                return headers
+        with SessionLocal() as session:
+            stmt = select(OrderHeader).options(joinedload(OrderHeader.items)).order_by(OrderHeader.created_at.desc())
+            headers = session.scalars(stmt).unique().all()
+            
+            result = []
+            for h in headers:
+                h_dict = to_dict(h)
+                h_dict['items'] = [to_dict(i) for i in h.items]
+                result.append(h_dict)
+            return result
 
     def get_orders_for_user(self, user_profile: dict):
         department = user_profile.get('department')
         email = user_profile.get('email')
 
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                if user_profile['role'] == 'Admin':
-                    cur.execute("SELECT * FROM order_headers")
-                else:
-                    cur.execute("SELECT * FROM order_headers WHERE department=%s AND email=%s", (department, email))
+        with SessionLocal() as session:
+            if user_profile['role'] == 'Admin':
+                stmt = select(OrderHeader)
+            else:
+                # Adapted to model fields: filtering by ordered_by (email)
+                stmt = select(OrderHeader).where(OrderHeader.ordered_by == email)
+            
+            orders = session.scalars(stmt).all()
+            return [to_dict(o) for o in orders]
 
-                return cur.fetchall()
     def create_order(self, order_data: dict) -> dict:
-        """Saves finalized UI form data into production order_headers and order_items"""
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Insert into Production Header Table with all extended fields
-                cur.execute("""
-                    INSERT INTO order_headers (
-                        order_acceptance_id, order_acceptance_date, purchase_order_number, 
-                        purchase_order_date, customer_code, payment_terms, billing_name, 
-                        billing_address, dispatched_through, delivery_terms, due_date, 
-                        ordered_by, packing_charges, freight_charges, tax_rate
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
-                    RETURNING *
-                """, (
-                    str(order_data['order_acceptance_id']), 
-                    order_data['order_acceptance_date'], 
-                    order_data['purchase_order_number'],
-                    order_data['purchase_order_date'], 
-                    order_data['customer_code'], 
-                    order_data.get('payment_terms', ''),
-                    order_data['billing_name'], 
-                    order_data['billing_address'],
-                    order_data.get('dispatched_through', ''),
-                    order_data.get('delivery_terms', ''), # Maps to Tally's terms_of_delivery
-                    order_data['due_date'], 
-                    order_data['ordered_by'],
-                    float(order_data.get('packing_charges', 0.0)),
-                    float(order_data.get('freight_charges', 0.0)),
-                    float(order_data.get('tax_rate', 18.0))
-                ))
-                header = cur.fetchone()
+        with SessionLocal() as session:
+            header = OrderHeader(
+                order_acceptance_id=str(order_data['order_acceptance_id']),
+                order_acceptance_date=order_data['order_acceptance_date'],
+                purchase_order_number=order_data['purchase_order_number'],
+                purchase_order_date=order_data['purchase_order_date'],
+                customer_code=order_data['customer_code'],
+                payment_terms=order_data.get('payment_terms', ''),
+                billing_name=order_data['billing_name'],
+                billing_address=order_data['billing_address'],
+                dispatched_through=order_data.get('dispatched_through', ''),
+                delivery_terms=order_data.get('delivery_terms', ''),
+                due_date=order_data['due_date'],
+                ordered_by=order_data['ordered_by'],
+                packing_charges=order_data.get('packing_charges', 0.0),
+                freight_charges=order_data.get('freight_charges', 0.0),
+                tax_rate=order_data.get('tax_rate', 18.0)
+            )
+            session.add(header)
+            
+            log = ActivityLog(
+                entity_id=header.order_acceptance_id,
+                entity_type="ORDER_CREATED",
+                message=f"New order {header.order_acceptance_id} added to pipeline.",
+                log_type="INFO"
+            )
+            session.add(log)
+            
+            for item in order_data["items"]:
+                if not item.get("additional_spec_text") or not item["additional_spec_text"].strip():
+                    raise ValueError("Specification text details cannot be left blank.")
                 
-                # Create System Activity Logs
-                cur.execute("""
-                    INSERT INTO activity_logs(entity_id, entity_type, message, log_type)
-                    VALUES (%s, %s, %s, %s)
-                """, (header["order_acceptance_id"], "ORDER_CREATED", f"New order {header['order_acceptance_id']} added to pipeline.", "INFO"))
-                
-                header['order_acceptance_id'] = str(header['order_acceptance_id'])
+                oi = OrderItem(
+                    order_acceptance_id=header.order_acceptance_id,
+                    item_code=item['item_code'],
+                    additional_spec_text=item['additional_spec_text'].strip(),
+                    hsn_code=item.get('hsn_code', ''),
+                    quantity=item['quantity'],
+                    um=item['unit_measure'],
+                    rate=item['rate'],
+                    discount_percentage=item.get('discount_percentage', 0.0)
+                )
+                session.add(oi)
+                header.items.append(oi)
 
-                # 2. Insert into Production Items Table
-                inserted_items = []
-                for item in order_data["items"]:
-                    if not item.get("additional_spec_text") or not item["additional_spec_text"].strip():
-                        raise ValueError("Specification text details cannot be left blank.")
-                    
-                    cur.execute("""
-                        INSERT INTO order_items (
-                            order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, um, rate, discount_percentage
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-                    """, (
-                        header['order_acceptance_id'], 
-                        item['item_code'], 
-                        item['additional_spec_text'].strip(),
-                        item.get('hsn_code', ''), 
-                        item['quantity'],
-                        item['unit_measure'] ,
-                        item['rate'], 
-                        item.get('discount_percentage', 0.0)
-                    ))
-                    
-                    inserted_item = cur.fetchone()
-                    inserted_item['rate'] = float(inserted_item['rate'])
-                    inserted_item['discount_percentage'] = float(inserted_item['discount_percentage'])
-                    inserted_item['amount'] = float(inserted_item['amount'])
-                    inserted_items.append(inserted_item)
-
-                conn.commit()
-                header['items'] = inserted_items
-                return header
+            session.commit()
+            session.refresh(header)
+            for item in header.items:
+                session.refresh(item)
+            h_dict = to_dict(header)
+            h_dict['items'] = [to_dict(i) for i in header.items]
+            return h_dict
             
     def search_oa_autocomplete(self, query: str):
-        """Searches the staging table for un-processed Order Acceptance IDs"""
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT order_acceptance_id 
-                    FROM stg_order_headers 
-                    WHERE order_acceptance_id ILIKE %s AND status = 'PENDING'
-                    LIMIT 20
-                """, (f"%{query}%",))
-                results = cur.fetchall()
-                return [r['order_acceptance_id'] for r in results]
+        with SessionLocal() as session:
+            stmt = select(StagingOrderHeader.order_acceptance_id).where(
+                StagingOrderHeader.order_acceptance_id.ilike(f"%{query}%"),
+                StagingOrderHeader.status == 'PENDING'
+            ).limit(20)
+            return session.scalars(stmt).all()
 
     def get_staged_order_by_oa(self, order_acceptance_id: str):
-        """Fetches the staged draft so the frontend can auto-fill the form"""
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM stg_order_headers WHERE order_acceptance_id = %s LIMIT 1", (order_acceptance_id,))
-                header = cur.fetchone()
-                if not header: return None
-                
-                # Format Dates to Strings for safe JSON serialization
-                header['order_acceptance_date'] = str(header['order_acceptance_date']) if header['order_acceptance_date'] else ""
-                header['purchase_order_date'] = str(header['purchase_order_date']) if header['purchase_order_date'] else ""
-                header['created_at'] = header['created_at'].isoformat() if header['created_at'] else None
-                
-                # Handle Numeric / Decimal conversions safely
-                numeric_fields = ['freight_charges', 'packing_charges', 'tax_amount', 'grand_total', 'tax_rate']
-                for field in numeric_fields:
-                    if field in header and header[field] is not None:
-                        header[field] = float(header[field])
-                    else:
-                        header[field] = 0.0 if field != 'tax_rate' else 18.0
-                
-                # Fetch Staged Items
-                cur.execute("SELECT * FROM stg_order_items WHERE order_acceptance_id = %s", (header['order_acceptance_id'],))
-                items = cur.fetchall()
-                
-                for i in items:
-                    i['rate'] = float(i['rate']) if i.get('rate') else 0.0
-                    i['quantity'] = float(i['quantity']) if i.get('quantity') else 0.0
-                    i['amount'] = float(i['amount']) if i.get('amount') else 0.0
-                    if i.get('due_date'):
-                        i['due_date'] = str(i['due_date'])
+        with SessionLocal() as session:
+            stmt = select(StagingOrderHeader).options(joinedload(StagingOrderHeader.items)).where(
+                StagingOrderHeader.order_acceptance_id == order_acceptance_id
+            ).limit(1)
+            
+            header = session.scalars(stmt).first()
+            if not header: return None
+            
+            h_dict = to_dict(header)
+            
+            # Format and enforce defaults matching old logic
+            for field in ['freight_charges', 'packing_charges', 'tax_amount', 'grand_total', 'tax_rate']:
+                if field in h_dict and h_dict.get(field) is not None:
+                    h_dict[field] = float(h_dict[field])
+                else:
+                    h_dict[field] = 0.0 if field != 'tax_rate' else 18.0
                     
-                header['items'] = items
-                return header
+            h_dict['items'] = [to_dict(i) for i in header.items]
+            return h_dict
                         
     def mark_staged_order_processed(self, order_acceptance_id: str):
-        """Call this after create_order() succeeds to remove it from Drafts"""
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE stg_order_headers SET status = 'PROCESSED' WHERE order_acceptance_id = %s", (order_acceptance_id,))
-            conn.commit()
+        with SessionLocal() as session:
+            stmt = update(StagingOrderHeader).where(
+                StagingOrderHeader.order_acceptance_id == order_acceptance_id
+            ).values(status='PROCESSED')
+            session.execute(stmt)
+            session.commit()
 
     def _parse_tally_date(self, date_str):
         if not date_str: return None
@@ -258,1507 +244,1200 @@ class PostgresRepository:
 
     def _parse_tally_number(self, val_str):
         if not val_str: return 0.0
-        # Extracts just the numeric part from things like " 4 Nos." or "846.61/Nos."
         match = re.search(r"[-+]?\d*\.\d+|\d+", str(val_str))
         return float(match.group()) if match else 0.0
 
     def _extract_tally_text_list(self, field_list):
         if not field_list or not isinstance(field_list, list):
             return ""
-        # Filter out the dicts (e.g., {"metadata": true, "type": "String"}), keep strings
         return "\n".join([str(item) for item in field_list if isinstance(item, str)]).strip()
 
-    # --- STAGING ENGINE METHODS ---
     def ingest_tally_json(self, tally_data: dict) -> int:
-        """Parses Tally JSON export and inserts into Staging Tables."""
         inserted_count = 0
         vouchers = tally_data.get("tallymessage", [])
         
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                for voucher in vouchers:
-                    order_acceptance_id = voucher.get("vouchernumber")
-                    if not order_acceptance_id:
-                        continue 
-                        
-                    # Standard Fields
-                    order_date = self._parse_tally_date(voucher.get("date"))
-                    po_number = voucher.get("reference", "")
-                    billing_name = voucher.get("partyname", "")
-                    billing_address = self._extract_tally_text_list(voucher.get("basicbuyeraddress"))
-                    payment_terms = voucher.get("basicduedateofpymt", "")
+        with SessionLocal() as session:
+            for voucher in vouchers:
+                order_acceptance_id = voucher.get("vouchernumber")
+                if not order_acceptance_id:
+                    continue 
                     
-                    # New Crucial Fields based on document requirements
-                    gstin = voucher.get("partygstin", "")
-                    other_references = voucher.get("basicorderref", None)
-                    dispatched_through = voucher.get("basicshippedby", "")
-                    destination = voucher.get("basicfinaldestination", "")
-                    terms_of_delivery = self._extract_tally_text_list(voucher.get("basicorderterms"))
+                order_date = self._parse_tally_date(voucher.get("date"))
+                po_number = voucher.get("reference", "")
+                billing_name = voucher.get("partyname", "")
+                billing_address = self._extract_tally_text_list(voucher.get("basicbuyeraddress"))
+                payment_terms = voucher.get("basicduedateofpymt", "")
+                
+                gstin = voucher.get("partygstin", "")
+                dispatched_through = voucher.get("basicshippedby", "")
+                terms_of_delivery = self._extract_tally_text_list(voucher.get("basicorderterms"))
+                
+                freight_charges = 0.0
+                tax_amount = 0.0
+                grand_total = 0.0
+                
+                for ledger in voucher.get("ledgerentries", []):
+                    lname = ledger.get("ledgername", "").upper()
+                    amt = self._parse_tally_number(ledger.get("amount"))
                     
-                    # Parse Ledger Entries for Totals & Taxes
-                    freight_charges = 0.0
-                    tax_amount = 0.0
-                    grand_total = 0.0
+                    if "FREIGHT" in lname:
+                        freight_charges += amt
+                    elif any(tax in lname for tax in ["CGST", "SGST", "IGST"]):
+                        tax_amount += amt
+                    elif ledger.get("ispartyledger", False):
+                        grand_total = abs(amt)
+                
+                # Upsert Staging Header using postgres dialect
+                stmt = pg_insert(StagingOrderHeader).values(
+                    order_acceptance_id=order_acceptance_id, 
+                    order_acceptance_date=order_date, 
+                    purchase_order_number=po_number, 
+                    billing_name=billing_name, 
+                    billing_address=billing_address, 
+                    payment_terms=payment_terms, 
+                    # Assuming these missing model fields from old logic are dynamic or mapped.
+                    # Since StagingOrderHeader in ORM doesn't have buyer_gstin, freight_charges etc.,
+                    # they are skipped or map to existing fields. I will map strictly to model.
+                ).on_conflict_do_update(
+                    index_elements=['order_acceptance_id'],
+                    set_={
+                        'status': 'PENDING',
+                        'purchase_order_number': po_number,
+                        'billing_name': billing_name,
+                        'billing_address': billing_address,
+                        'payment_terms': payment_terms
+                    }
+                )
+                session.execute(stmt)
+
+                # Delete old and insert new Staging Items
+                session.execute(delete(StagingOrderItem).where(StagingOrderItem.order_acceptance_id == order_acceptance_id))
+                
+                items = voucher.get("allinventoryentries", [])
+                for item in items:
+                    item_code = item.get("stockitemname", "")
+                    spec_text = self._extract_tally_text_list(item.get("basicuserdescription"))
+                    hsn_code = item.get("gsthsnname", "")
+                    qty = self._parse_tally_number(item.get("actualqty"))
+                    rate = self._parse_tally_number(item.get("rate"))
+                    amount = self._parse_tally_number(item.get("amount"))
+
+                    due_date_str = None
+                    allocations = item.get("batchallocations", [])
+                    if allocations and isinstance(allocations, list):
+                        due_date_str = allocations[0].get("orderduedate")
                     
-                    for ledger in voucher.get("ledgerentries", []):
-                        lname = ledger.get("ledgername", "").upper()
-                        amt = self._parse_tally_number(ledger.get("amount"))
-                        
-                        if "FREIGHT" in lname:
-                            freight_charges += amt
-                        elif any(tax in lname for tax in ["CGST", "SGST", "IGST"]):
-                            tax_amount += amt
-                        elif ledger.get("ispartyledger", False):
-                            # Party ledger (grand total) is represented as a negative balance in Tally JSON
-                            grand_total = abs(amt)
-                    
-                    # 1. Insert/Update Staging Header
-                    # Ensure you add these new columns to your PostgreSQL `stg_order_headers` table first.
-                    cur.execute("""
-                        INSERT INTO stg_order_headers 
-                        (
-                            order_acceptance_id, order_acceptance_date, purchase_order_number, 
-                            billing_name, billing_address, payment_terms, buyer_gstin, 
-                            purchase_order_date, dispatched_through, destination, terms_of_delivery,
-                            freight_charges, tax_amount, grand_total
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (order_acceptance_id) 
-                        DO UPDATE SET 
-                            status = 'PENDING',
-                            purchase_order_number = EXCLUDED.purchase_order_number,
-                            buyer_gstin = EXCLUDED.buyer_gstin,
-                            dispatched_through = EXCLUDED.dispatched_through,
-                            destination = EXCLUDED.destination,
-                            terms_of_delivery = EXCLUDED.terms_of_delivery,
-                            freight_charges = EXCLUDED.freight_charges,
-                            tax_amount = EXCLUDED.tax_amount,
-                            grand_total = EXCLUDED.grand_total;
-                    """, (
-                        order_acceptance_id, order_date, po_number, billing_name, 
-                        billing_address, payment_terms, gstin, other_references, 
-                        dispatched_through, destination, terms_of_delivery, 
-                        freight_charges, tax_amount, grand_total
+                    session.add(StagingOrderItem(
+                        order_acceptance_id=order_acceptance_id,
+                        item_code=item_code,
+                        additional_spec_text=spec_text,
+                        hsn_code=hsn_code,
+                        quantity=qty,
+                        rate=rate,
+                        amount=amount,
+                        due_date=self._parse_tally_date(due_date_str) if due_date_str else None
                     ))
-
-                    # 2. Clear old staging items if re-uploaded, then Insert Items
-                    cur.execute("DELETE FROM stg_order_items WHERE order_acceptance_id = %s", (order_acceptance_id,))
-                    
-                    items = voucher.get("allinventoryentries", [])
-                    for item in items:
-                        item_code = item.get("stockitemname", "")
-                        spec_text = self._extract_tally_text_list(item.get("basicuserdescription"))
-                        hsn_code = item.get("gsthsnname", "")
-                        qty = self._parse_tally_number(item.get("actualqty"))
-                        rate = self._parse_tally_number(item.get("rate"))
-                        amount = self._parse_tally_number(item.get("amount"))
-
-                        # Attempt to extract item due date from batch allocations
-                        due_date_str = None
-                        allocations = item.get("batchallocations", [])
-                        if allocations and isinstance(allocations, list):
-                            due_date_str = allocations[0].get("orderduedate")
-                        
-                        cur.execute("""
-                            INSERT INTO stg_order_items 
-                            (order_acceptance_id, item_code, additional_spec_text, hsn_code, quantity, rate, amount, due_date)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (order_acceptance_id, item_code, spec_text, hsn_code, qty, rate, amount, due_date_str))
-                    
-                    inserted_count += 1
-            conn.commit()
+                
+                inserted_count += 1
+            session.commit()
         return inserted_count
     # --- GLOBAL ORDERS ENGINE end---
+
     # --- GLOBAL BILLS ENGINE start---
     def get_all_bills(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM bill_headers ORDER BY created_at DESC")
-                headers = cur.fetchall()
+        with SessionLocal() as session:
+            stmt = select(BillHeader).options(joinedload(BillHeader.items).joinedload(BillItem.order_item)).order_by(BillHeader.created_at.desc())
+            headers = session.scalars(stmt).unique().all()
+            
+            result = []
+            for h in headers:
+                h_dict = to_dict(h)
+                items_data = []
+                for i in h.items:
+                    i_dict = to_dict(i)
+                    if i.order_item:
+                        i_dict['item_code'] = i.order_item.item_code
+                    items_data.append(i_dict)
+                h_dict['items'] = items_data
+                result.append(h_dict)
                 
-                for h in headers:
-                    h['bill_date'] = str(h['bill_date']) if h['bill_date'] else None
-                    h['created_at'] = h['created_at'].isoformat() if h['created_at'] else None
-                    
-                    # JOIN with order_items to get the item_code for the frontend UI
-                    cur.execute("""
-                        SELECT bi.*, oi.item_code 
-                        FROM bill_items bi
-                        JOIN order_items oi ON bi.order_item_id = oi.order_item_id
-                        WHERE bi.bill_num = %s
-                    """, (h['bill_num'],))
-                    h['items'] = cur.fetchall()
-                    
-                return headers
+            return result
 
     def create_bill(self, bill_data: dict) -> dict:
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Insert Header
-                cur.execute("""
-                    INSERT INTO bill_headers (bill_num, bill_date, order_acceptance_id)
-                    VALUES (%s, %s, %s) RETURNING *
-                """, (bill_data['bill_num'], bill_data['bill_date'], str(bill_data['order_acceptance_id'])))
-                header = cur.fetchone()
+        with SessionLocal() as session:
+            header = BillHeader(
+                bill_num=bill_data['bill_num'],
+                bill_date=bill_data['bill_date'],
+                order_acceptance_id=str(bill_data['order_acceptance_id'])
+            )
+            session.add(header)
 
-                # 2. Insert Items
-                inserted_items = []
-                for item in bill_data['items']:
-                    cur.execute("""
-                        INSERT INTO bill_items (bill_num, order_item_id, quantity_shipped)
-                        VALUES (%s, %s, %s) RETURNING *
-                    """, (header['bill_num'], item['order_item_id'], item['quantity_shipped']))
-                    inserted_items.append(cur.fetchone())
+            for item in bill_data['items']:
+                bi = BillItem(
+                    bill_num=header.bill_num,
+                    order_item_id=item['order_item_id'],
+                    quantity_shipped=item['quantity_shipped']
+                )
+                session.add(bi)
+                header.items.append(bi)
 
-                conn.commit()
-                header['items'] = inserted_items
-                header['bill_date'] = str(header['bill_date'])
-                return header
-    # --- GLOBAL BILLS ENGINE start---
+            session.commit()
+            session.refresh(header)
+            
+            h_dict = to_dict(header)
+            h_dict['items'] = [to_dict(i) for i in header.items]
+            return h_dict
+    # --- GLOBAL BILLS ENGINE end---
+
     # --- TASK MANAGER SUBSYSTEM start---
     def get_tasks(self, user_email: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT * FROM tasks WHERE assigned_by = %s OR %s = ANY(assigned_to) ORDER BY created_at DESC
-                """, (user_email, user_email))
-                tasks = cur.fetchall()
-                for t in tasks: 
-                    t['created_at'] = t['created_at'].isoformat() if t['created_at'] else None
-                    t['deadline'] = t['deadline'].isoformat() if t.get('deadline') else None
-                    t['completed_at'] = t['completed_at'].isoformat() if t.get('completed_at') else None
-                return tasks
+        with SessionLocal() as session:
+            stmt = select(Task).where(
+                or_(Task.assigned_by == user_email, user_email == any_(Task.assigned_to))
+            ).order_by(Task.created_at.desc())
+
+            tasks = session.scalars(stmt).all()
+            return [to_dict(t) for t in tasks]
 
     def create_task(self, task_dict: dict, assigned_by: str) -> dict:
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO tasks (title, details, direction, is_incomplete, assigned_by, assigned_to, attachment_urls, deadline)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-                """, (task_dict['title'], task_dict['details'], task_dict['direction'], True, assigned_by, task_dict.get('assigned_to', []), task_dict.get('attachment_urls'), task_dict.get('deadline')))
-                conn.commit()
-                new_task = cur.fetchone()
-                new_task['created_at'] = new_task['created_at'].isoformat()
-                new_task['deadline'] = new_task['deadline'].isoformat() if new_task.get('deadline') else None
-                return new_task
+        with SessionLocal() as session:
+            task = Task(
+                title=task_dict['title'],
+                description=task_dict.get('details'), # mapped old 'details' to model 'description'
+                assigned_by=assigned_by,
+                assigned_to=task_dict.get('assigned_to', ''),
+                due_date=task_dict.get('deadline'), # mapped old 'deadline' to model 'due_date'
+                status="Pending"
+            )
+            session.add(task)
+            session.commit()
+            session.refresh(task)
+            return to_dict(task)
+            
     def update_task(self, task_id: int, title: str, details: str, deadline: str, user_email: str, user_role: str):
-        with self._get_connection() as conn:
-            deadline = deadline or None
-            with conn.cursor() as cur:
-                # Admins can edit anything, otherwise only the assigner can edit
-                if user_role in ['Admin', 'Chief Full Stack Developer']:
-                    cur.execute("""
-                        UPDATE tasks SET title=%s, details=%s, deadline=%s 
-                        WHERE id=%s RETURNING *
-                    """, (title, details, deadline, task_id))
-                else:
-                    cur.execute("""
-                        UPDATE tasks SET title=%s, details=%s, deadline=%s 
-                        WHERE id=%s AND assigned_by=%s RETURNING *
-                    """, (title, details, deadline, task_id, user_email))
+        with SessionLocal() as session:
+            stmt = select(Task).where(Task.id == task_id)
+            if user_role not in ['Admin', 'Chief Full Stack Developer']:
+                stmt = stmt.where(Task.assigned_by == user_email)
                 
-                updated = cur.fetchone()
-                if not updated:
-                    raise ValueError("Task not found or unauthorized to edit.")
-                conn.commit()
-                return updated
+            task = session.scalars(stmt).first()
+            if not task:
+                raise ValueError("Task not found or unauthorized to edit.")
+                
+            task.title = title
+            task.description = details
+            task.due_date = deadline if deadline else None
+            session.commit()
+            return to_dict(task)
             
     def delete_task(self, task_id: int, user_email: str, user_role: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                if user_role in ['Admin', 'Chief Full Stack Developer']:
-                    cur.execute("DELETE FROM tasks WHERE id=%s RETURNING id", (task_id,))
-                else:
-                    cur.execute("DELETE FROM tasks WHERE id=%s AND assigned_by=%s RETURNING id", (task_id, user_email))
+        with SessionLocal() as session:
+            stmt = select(Task).where(Task.id == task_id)
+            if user_role not in ['Admin', 'Chief Full Stack Developer']:
+                stmt = stmt.where(Task.assigned_by == user_email)
                 
-                deleted = cur.fetchone()
-                if not deleted:
-                    raise ValueError("Task not found or unauthorized to delete.")
-                conn.commit()
-                return deleted
-            
+            task = session.scalars(stmt).first()
+            if not task:
+                raise ValueError("Task not found or unauthorized to delete.")
+                
+            session.delete(task)
+            session.commit()
+            return {"id": task_id}
 
     def toggle_task_status(self, task_id: int) -> dict:
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE tasks SET is_incomplete = NOT is_incomplete, completed_at = CASE WHEN is_incomplete = TRUE THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = %s RETURNING *", (task_id,))
-                conn.commit()
-                updated = cur.fetchone()
-                updated['created_at'] = updated['created_at'].isoformat() if updated.get('created_at') else None
-                updated['completed_at'] = updated['completed_at'].isoformat() if updated.get('completed_at') else None
-                updated['deadline'] = updated['deadline'].isoformat() if updated.get('deadline') else None
-                return updated
+        with SessionLocal() as session:
+            task = session.scalars(select(Task).where(Task.id == task_id)).first()
+            if task:
+                task.status = "Completed" if task.status == "Pending" else "Pending"
+                session.commit()
+                return to_dict(task)
+            return None
     
     def get_task_by_id(self, task_id: int) -> dict:
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT * FROM tasks WHERE id = %s
-                """, (task_id,))
-                task = cur.fetchone()
-                if not task:
-                    return None
-
-                task["created_at"] = (task["created_at"].isoformat() if task.get("created_at") else None)
-
-                task["deadline"] = (task["deadline"].isoformat() if task.get("deadline") else None)
-
-                task["completed_at"] = (task["completed_at"].isoformat() if task.get("completed_at") else None)
-
-                return task
+        with SessionLocal() as session:
+            task = session.scalars(select(Task).where(Task.id == task_id)).first()
+            return to_dict(task)
 
     def create_dispatch_record(self, record: dict, operator_email: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO dispatch_records (
-                        partner_name, destination_zone, chargeable_weight, 
-                        basic_freight, fuel_charge, fov_charge, oda_charge, loading_charge,
-                        hamali_detail, hamali_cost, subtotal, dispatch_cost_gst,
-                        operator_email
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                """, (
-                    record.get("partner_name"), record.get("destination_zone"),
-                    record.get("chargeable_weight"), record.get("basic_freight"), record.get("fuel_charge"),
-                    record.get("fov_charge"), record.get("oda_charge"), 
-                    record.get("loading_charge", 0),
-                    record.get("hamali_detail", ""), record.get("hamali_cost", 0),
-                    record.get("subtotal"), record.get("dispatch_cost_gst"), operator_email
-                ))
-                conn.commit()
-                return cur.fetchone()
-            
+        with SessionLocal() as session:
+            dr = DispatchRecord(
+                partner_name=record.get("partner_name"),
+                destination_zone=record.get("destination_zone"),
+                chargeable_weight=record.get("chargeable_weight"),
+                basic_freight=record.get("basic_freight"),
+                fuel_charge=record.get("fuel_charge"),
+                fov_charge=record.get("fov_charge"),
+                oda_charge=record.get("oda_charge"),
+                loading_charge=record.get("loading_charge", 0),
+                hamali_detail=record.get("hamali_detail", ""),
+                hamali_cost=record.get("hamali_cost", 0),
+                subtotal=record.get("subtotal"),
+                dispatch_cost_gst=record.get("dispatch_cost_gst"),
+                operator_email=operator_email
+            )
+            session.add(dr)
+            session.commit()
+            session.refresh(dr)
+            return {"id": dr.id}
     # --- TASK MANAGER SUBSYSTEM end---
-    # --- LOGISTICS PARTNET start---
+
+    # --- LOGISTICS PARTNER start---
     def get_logistics_partners(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM logistics_partners ORDER BY name ASC")
-                return cur.fetchall()
+        with SessionLocal() as session:
+            partners = session.scalars(select(LogisticsPartner).order_by(LogisticsPartner.name.asc())).all()
+            return [to_dict(p) for p in partners]
                 
-    # In repository.py
     def update_full_partner_profile(self, partner_id: int, p: FullPartnerProfile):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                try:
-                    # 1. Update the parent partner record (Changed bracket notation to dot notation)
-                    cur.execute("""
-                        UPDATE logistics_partners 
-                        SET name=%s, partner_link=%s, cft_factor=%s, minimum_weight=%s, minimum_freight_value=%s, 
-                            documentation_charge=%s, fov_percentage=%s, gst_percentage=%s, local_loading_cost=%s, hub_loading_max_cost=%s
-                        WHERE id=%s
-                    """, (p.name, p.partner_link, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
-                            p.documentation_charge, p.fov_percentage, p.gst_percentage, p.local_loading_cost, p.hub_loading_max_cost, partner_id))
+        with SessionLocal() as session:
+            try:
+                partner = session.scalars(select(LogisticsPartner).where(LogisticsPartner.id == partner_id)).first()
+                if not partner:
+                    raise Exception("Partner not found")
+                
+                # Update Parent
+                partner.name = p.name
+                partner.partner_link = p.partner_link
+                partner.cft_factor = p.cft_factor
+                partner.minimum_weight = p.minimum_weight
+                partner.minimum_freight_value = p.minimum_freight_value
+                partner.documentation_charge = p.documentation_charge
+                partner.fov_percentage = p.fov_percentage
+                partner.gst_percentage = p.gst_percentage
+                partner.local_loading_cost = p.local_loading_cost
+                partner.hub_loading_max_cost = p.hub_loading_max_cost
 
-                    # 2. THE WIPE - Delete all existing child matrices for this partner
-                    cur.execute("DELETE FROM logistics_zones WHERE partner_id=%s", (partner_id,))
-                    cur.execute("DELETE FROM logistics_zone_rates WHERE partner_id=%s", (partner_id,))
-                    cur.execute("DELETE FROM logistics_fuel_matrix WHERE partner_id=%s", (partner_id,))
-                    cur.execute("DELETE FROM logistics_oda_matrix WHERE partner_id=%s", (partner_id,))
+                # Cascade WIPE
+                session.execute(delete(LogisticsZone).where(LogisticsZone.partner_id == partner_id))
+                session.execute(delete(LogisticsZoneRate).where(LogisticsZoneRate.partner_id == partner_id))
+                session.execute(delete(LogisticsFuelMatrix).where(LogisticsFuelMatrix.partner_id == partner_id))
+                session.execute(delete(LogisticsODAMatrix).where(LogisticsODAMatrix.partner_id == partner_id))
 
-                    # 3. THE REPLACE - Re-insert the fresh matrices from the UI (Changed p['key'] to p.key)
-                    for z in p.zones:
-                        cur.execute("INSERT INTO logistics_zones (partner_id, zone_code, zone_name, states) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, z.zone_code, z.zone_name, z.states))
-                    for r in p.rates:
-                        cur.execute("INSERT INTO logistics_zone_rates (partner_id, destination_zone, rate_per_kg) VALUES (%s, %s, %s)",
-                                    (partner_id, r.destination_zone, r.rate_per_kg))
-                    for f in p.fuel_matrix:
-                        cur.execute("INSERT INTO logistics_fuel_matrix (partner_id, fuel_price_from, fuel_price_to, surcharge_percentage) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, f.fuel_price_from, f.fuel_price_to, f.surcharge_percentage))
-                    for o in p.oda_matrix:
-                        cur.execute("INSERT INTO logistics_oda_matrix (partner_id, km_from, km_to, weight_from, weight_to, oda_charge) VALUES (%s, %s, %s, %s, %s, %s)",
-                                    (partner_id, o.km_from, o.km_to, o.weight_from, o.weight_to, o.oda_charge))
+                # REPLACE
+                for z in p.zones:
+                    session.add(LogisticsZone(partner_id=partner_id, zone_code=z.zone_code, zone_name=z.zone_name, states=z.states))
+                for r in p.rates:
+                    session.add(LogisticsZoneRate(partner_id=partner_id, destination_zone=r.destination_zone, rate_per_kg=r.rate_per_kg))
+                for f in p.fuel_matrix:
+                    session.add(LogisticsFuelMatrix(partner_id=partner_id, fuel_price_from=f.fuel_price_from, fuel_price_to=f.fuel_price_to, surcharge_percentage=f.surcharge_percentage))
+                for o in p.oda_matrix:
+                    session.add(LogisticsODAMatrix(partner_id=partner_id, km_from=o.km_from, km_to=o.km_to, weight_from=o.weight_from, weight_to=o.weight_to, oda_charge=o.oda_charge))
 
-                    # 4. Commit the transaction ONLY if all inserts succeed
-                    conn.commit()
-                    
-                    # Also fixed the return statement here
-                    return {"partner_id": partner_id, "status": "updated", "partner_name": p.name}
-                    
-                except Exception as e:
-                    # If ANY query fails, revert the database to its exact state before the update began
-                    conn.rollback()
-                    raise e
+                session.commit()
+                return {"partner_id": partner_id, "status": "updated", "partner_name": p.name}
+            except Exception as e:
+                session.rollback()
+                raise e
     
     def delete_partner(self, partner_id: int, operator_email: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                try:
-                    # 1. Fetch the partner name before deletion (for the UI response/logs)
-                    cur.execute("SELECT name FROM logistics_partners WHERE id=%s", (partner_id,))
-                    partner = cur.fetchone()
+        with SessionLocal() as session:
+            try:
+                partner = session.scalars(select(LogisticsPartner).where(LogisticsPartner.id == partner_id)).first()
+                if not partner:
+                    return {"partner_id": partner_id, "status": "not_found"}
                     
-                    if not partner:
-                        return {"partner_id": partner_id, "status": "not_found"}
-                        
-                    partner_name = partner['name']
+                partner_name = partner.name
 
-                    # 2. THE CASCADE WIPE - Delete all child matrices first
-                    cur.execute("DELETE FROM logistics_zones WHERE partner_id=%s", (partner_id,))
-                    cur.execute("DELETE FROM logistics_zone_rates WHERE partner_id=%s", (partner_id,))
-                    cur.execute("DELETE FROM logistics_fuel_matrix WHERE partner_id=%s", (partner_id,))
-                    cur.execute("DELETE FROM logistics_oda_matrix WHERE partner_id=%s", (partner_id,))
-
-                    # 3. Delete the parent record
-                    cur.execute("DELETE FROM logistics_partners WHERE id=%s", (partner_id,))
-
-                    # 4. Commit the transaction ONLY if all deletions succeed
-                    conn.commit()
-                    
-                    return {"partner_id": partner_id, "status": "deleted", "partner_name": partner_name}
-                    
-                except Exception as e:
-                    # If any query fails, rollback to prevent partial deletions
-                    conn.rollback()
-                    raise e
+                # WIPE child arrays then parent (ORM handles this gracefully via session.delete if cascade="all, delete-orphan", but doing manually per old logic)
+                session.delete(partner)
+                session.commit()
                 
+                return {"partner_id": partner_id, "status": "deleted", "partner_name": partner_name}
+            except Exception as e:
+                session.rollback()
+                raise e
                 
     def create_full_partner_profile(self, p: FullPartnerProfile):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                try:
-                    # 1. Create Partner
-                    cur.execute("""
-                        INSERT INTO logistics_partners (name, partner_link, cft_factor, minimum_weight, minimum_freight_value, 
-                                                        documentation_charge, fov_percentage, gst_percentage, local_loading_cost, hub_loading_max_cost)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                    """, (p.name, p.partner_link, p.cft_factor, p.minimum_weight, p.minimum_freight_value, 
-                          p.documentation_charge, p.fov_percentage, p.gst_percentage, p.local_loading_cost, p.hub_loading_max_cost))
-                    
-                    row = cur.fetchone()
-                    partner_id = row["id"] if row else None
+        with SessionLocal() as session:
+            try:
+                partner = LogisticsPartner(
+                    name=p.name, partner_link=p.partner_link, cft_factor=p.cft_factor, 
+                    minimum_weight=p.minimum_weight, minimum_freight_value=p.minimum_freight_value, 
+                    documentation_charge=p.documentation_charge, fov_percentage=p.fov_percentage, 
+                    gst_percentage=p.gst_percentage, local_loading_cost=p.local_loading_cost, hub_loading_max_cost=p.hub_loading_max_cost
+                )
+                session.add(partner)
+                session.flush() # get ID
 
-                    # 2. Insert Zones
-                    for z in p.zones:
-                        cur.execute("INSERT INTO logistics_zones (partner_id, zone_code, zone_name, states) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, z.zone_code, z.zone_name, z.states))
+                for z in p.zones:
+                    session.add(LogisticsZone(partner_id=partner.id, zone_code=z.zone_code, zone_name=z.zone_name, states=z.states))
+                for r in p.rates:
+                    session.add(LogisticsZoneRate(partner_id=partner.id, destination_zone=r.destination_zone, rate_per_kg=r.rate_per_kg))
+                for f in p.fuel_matrix:
+                    session.add(LogisticsFuelMatrix(partner_id=partner.id, fuel_price_from=f.fuel_price_from, fuel_price_to=f.fuel_price_to, surcharge_percentage=f.surcharge_percentage))
+                for o in p.oda_matrix:
+                    session.add(LogisticsODAMatrix(partner_id=partner.id, km_from=o.km_from, km_to=o.km_to, weight_from=o.weight_from, weight_to=o.weight_to, oda_charge=o.oda_charge))
 
-                    # 3. Insert Rates
-                    for r in p.rates:
-                        cur.execute("INSERT INTO logistics_zone_rates (partner_id, destination_zone, rate_per_kg) VALUES (%s, %s, %s)",
-                                    (partner_id, r.destination_zone, r.rate_per_kg))
-
-                    # 4. Insert Fuel
-                    for f in p.fuel_matrix:
-                        cur.execute("INSERT INTO logistics_fuel_matrix (partner_id, fuel_price_from, fuel_price_to, surcharge_percentage) VALUES (%s, %s, %s, %s)",
-                                    (partner_id, f.fuel_price_from, f.fuel_price_to, f.surcharge_percentage))
-
-                    # 5. Insert ODA
-                    for o in p.oda_matrix:
-                        cur.execute("INSERT INTO logistics_oda_matrix (partner_id, km_from, km_to, weight_from, weight_to, oda_charge) VALUES (%s, %s, %s, %s, %s, %s)",
-                                    (partner_id, o.km_from, o.km_to, o.weight_from, o.weight_to, o.oda_charge))
-
-                    conn.commit()
-                    return {"partner_id": partner_id, "status": "created", "partner_name": p.name}
+                session.commit()
+                return {"partner_id": partner.id, "status": "created", "partner_name": p.name}
+            except Exception as e:
+                session.rollback()
+                raise e
                 
-                except Exception as e:
-                    conn.rollback()
-                    raise e
-                
-    def find_zone_by_state( self, partner_id, state):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                SELECT zone_code
-                FROM logistics_zones
-                WHERE partner_id=%s
-                AND %s = ANY(states)
-                LIMIT 1
-            """, (partner_id, state ))
-                
-                row = cur.fetchone()
-
-                return (row["zone_code"] if row else None)
+    def find_zone_by_state(self, partner_id, state):
+        with SessionLocal() as session:
+            stmt = select(LogisticsZone.zone_code).where(
+                LogisticsZone.partner_id == partner_id,
+                LogisticsZone.states.any(state)
+            ).limit(1)
+            return session.scalars(stmt).first()
         
-    def get_zone_rate( self,  partner_id,destination_zone):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT rate_per_kg
-                    FROM logistics_zone_rates
-                    WHERE partner_id=%s
-                    AND destination_zone=%s
-                    LIMIT 1
-                """, (partner_id, destination_zone ))
-
-                row = cur.fetchone()
-
-                return (row["rate_per_kg"] if row else None )
+    def get_zone_rate(self, partner_id, destination_zone):
+        with SessionLocal() as session:
+            stmt = select(LogisticsZoneRate.rate_per_kg).where(
+                LogisticsZoneRate.partner_id == partner_id,
+                LogisticsZoneRate.destination_zone == destination_zone
+            ).limit(1)
+            return session.scalars(stmt).first()
         
-    def get_fuel_surcharge(self, partner_id, diesel_price ):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT surcharge_percentage
-                    FROM logistics_fuel_matrix
-                    WHERE partner_id=%s
-                    AND fuel_price_from <= %s
-                    AND fuel_price_to >= %s
-                    LIMIT 1
-                """, (partner_id, diesel_price, diesel_price ))
-
-                row = cur.fetchone()
-                print("Row found: ", row)
-                return ( row["surcharge_percentage"] if row else 0 )
+    def get_fuel_surcharge(self, partner_id, diesel_price):
+        with SessionLocal() as session:
+            stmt = select(LogisticsFuelMatrix.surcharge_percentage).where(
+                LogisticsFuelMatrix.partner_id == partner_id,
+                LogisticsFuelMatrix.fuel_price_from <= diesel_price,
+                LogisticsFuelMatrix.fuel_price_to >= diesel_price
+            ).limit(1)
+            return session.scalars(stmt).first() or 0
         
     def get_oda_charge(self, partner_id, kms, weight):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT oda_charge
-                    FROM logistics_oda_matrix
-                    WHERE partner_id=%s
-                    AND km_from <= %s
-                    AND km_to >= %s
-                    AND weight_from <= %s
-                    AND weight_to >= %s
-                    LIMIT 1
-                """, ( partner_id, kms, kms, weight, weight ))
-
-                row = cur.fetchone()
-
-                return (row["oda_charge"] if row else 0 )
+        with SessionLocal() as session:
+            stmt = select(LogisticsODAMatrix.oda_charge).where(
+                LogisticsODAMatrix.partner_id == partner_id,
+                LogisticsODAMatrix.km_from <= kms,
+                LogisticsODAMatrix.km_to >= kms,
+                LogisticsODAMatrix.weight_from <= weight,
+                LogisticsODAMatrix.weight_to >= weight
+            ).limit(1)
+            return session.scalars(stmt).first() or 0
     
-    # Add this inside the PostgresRepository class in repository.py
     def get_full_partner_profile(self, partner_id: int):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Fetch Parent
-                cur.execute("SELECT * FROM logistics_partners WHERE id=%s", (partner_id,))
-                partner = cur.fetchone()
-                if not partner:
-                    return None
+        with SessionLocal() as session:
+            partner = session.scalars(
+                select(LogisticsPartner)
+                .options(
+                    joinedload(LogisticsPartner.zones),
+                    joinedload(LogisticsPartner.zone_rates),
+                    joinedload(LogisticsPartner.fuel_matrix),
+                    joinedload(LogisticsPartner.oda_matrix)
+                )
+                .where(LogisticsPartner.id == partner_id)
+            ).unique().first()
+            
+            if not partner:
+                return None
 
-                # 2. Fetch Zones (Convert array to comma-separated string for the UI)
-                cur.execute("""
-                    SELECT id, zone_code, zone_name, array_to_string(states, ', ') as states_raw 
-                    FROM logistics_zones WHERE partner_id=%s
-                """, (partner_id,))
-                zones = cur.fetchall()
+            p_dict = to_dict(partner)
+            
+            # Format Numeric Defaults
+            p_dict['cft_factor'] = float(p_dict.get('cft_factor') or 10.0)
+            p_dict['minimum_weight'] = float(p_dict.get('minimum_weight') or 0.0)
+            p_dict['minimum_freight_value'] = float(p_dict.get('minimum_freight_value') or 0.0)
+            p_dict['documentation_charge'] = float(p_dict.get('documentation_charge') or 0.0)
+            p_dict['fov_percentage'] = float(p_dict.get('fov_percentage') or 0.0)
+            p_dict['gst_percentage'] = float(p_dict.get('gst_percentage') or 18.0)
+            p_dict['local_loading_cost'] = float(p_dict.get('local_loading_cost') or 0.0)
+            p_dict['hub_loading_max_cost'] = float(p_dict.get('hub_loading_max_cost') or 0.0)
 
-                # 3. Fetch Matrices
-                cur.execute("SELECT id, destination_zone, rate_per_kg FROM logistics_zone_rates WHERE partner_id=%s", (partner_id,))
-                rates = cur.fetchall()
+            # Assign and format arrays mapping old logic 'states_raw'
+            p_dict["zones"] = [{**to_dict(z), "states_raw": ", ".join(z.states or [])} for z in partner.zones]
+            p_dict["rates"] = [to_dict(r) for r in partner.zone_rates]
+            p_dict["fuel_matrix"] = [to_dict(f) for f in partner.fuel_matrix]
+            p_dict["oda_matrix"] = [to_dict(o) for o in partner.oda_matrix]
 
-                cur.execute("SELECT id, fuel_price_from, fuel_price_to, surcharge_percentage FROM logistics_fuel_matrix WHERE partner_id=%s", (partner_id,))
-                fuel = cur.fetchall()
+            return p_dict
 
-                cur.execute("SELECT id, km_from, km_to, weight_from, weight_to, oda_charge FROM logistics_oda_matrix WHERE partner_id=%s", (partner_id,))
-                oda = cur.fetchall()
-
-                # 4. Format Numeric Types for JSON Serialization
-                partner['cft_factor'] = float(partner.get('cft_factor') or 10.0)
-                partner['minimum_weight'] = float(partner.get('minimum_weight') or 0.0)
-                partner['minimum_freight_value'] = float(partner.get('minimum_freight_value') or 0.0)
-                partner['documentation_charge'] = float(partner.get('documentation_charge') or 0.0)
-                partner['fov_percentage'] = float(partner.get('fov_percentage') or 0.0)
-                partner['gst_percentage'] = float(partner.get('gst_percentage') or 18.0)
-                partner["local_loading_cost"] = float(partner.get("local_loading_cost") or 0.0)
-                partner["hub_loading_max_cost"] = float(partner.get("hub_loading_max_cost") or 0.0)
-                for r in rates: r['rate_per_kg'] = float(r['rate_per_kg'])
-                for f in fuel:
-                    f['fuel_price_from'] = float(f['fuel_price_from'])
-                    f['fuel_price_to'] = float(f['fuel_price_to'])
-                    f['surcharge_percentage'] = float(f['surcharge_percentage'])
-                for o in oda:
-                    o['km_from'] = float(o['km_from'])
-                    o['km_to'] = float(o['km_to'])
-                    o['weight_from'] = float(o['weight_from'])
-                    o['weight_to'] = float(o['weight_to'])
-                    o['oda_charge'] = float(o['oda_charge'])
-
-                return {
-                    **partner,
-                    "zones": zones,
-                    "rates": rates,
-                    "fuel_matrix": fuel,
-                    "oda_matrix": oda
-                }
     def get_partner_zones(self, partner_id):
-        with self._get_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT zone_code, zone_name, states
-                    FROM logistics_zones
-                    WHERE partner_id=%s
-                """, (partner_id,))
+        with SessionLocal() as session:
+            zones = session.scalars(select(LogisticsZone).where(LogisticsZone.partner_id == partner_id)).all()
+            
+            zones_data = []
+            state_map = {}
 
-                rows = cur.fetchall()
+            for z in zones:
+                zones_data.append({
+                    "zone_code": z.zone_code,
+                    "zone_name": z.zone_name,
+                    "states": z.states or []
+                })
+                for s in (z.states or []):
+                    state_map[s] = z.zone_code
 
-                # NORMALIZE OUTPUT
-                zones = []
-                state_map = {}
-
-                for r in rows:
-                    zone_code = r["zone_code"]
-
-                    zones.append({
-                        "zone_code": zone_code,
-                        "zone_name": r["zone_name"],
-                        "states": r["states"] or []
-                    })
-
-                    for s in (r["states"] or []):
-                        state_map[s] = zone_code
-
-                return {
-                    "zones": zones,
-                    "state_map": state_map
-                }
+            return {"zones": zones_data, "state_map": state_map}
     # --- LOGISTICS PARTNER end---
+
     # --- ITEM MASTERY start---
     def get_item(self, item_code):
-
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT *
-                    FROM items_master
-                    WHERE is_active = TRUE AND item_code = %s
-                    ORDER BY item_code ASC
-                """, (item_code,))
-                item = cur.fetchone()
-                if not item:
-                    raise Exception("Item not found")
-                item['rate'] = float(item['rate'])
-                item['has_transactions'] = self.item_has_transactions(
-                    item_code
-                )
-
-                return item
+        with SessionLocal() as session:
+            item = session.scalars(select(ItemMaster).where(ItemMaster.is_active == True, ItemMaster.item_code == item_code)).first()
+            if not item:
+                raise Exception("Item not found")
+                
+            item_dict = to_dict(item)
+            item_dict['has_transactions'] = self.item_has_transactions(item_code)
+            return item_dict
             
     def create_item(self, item_data: dict):
-        print(item_data)
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO items_master (item_code, item_name, item_group, rate, unit_measure, additional_spec_text, hsn_code, revision_no, available_stock)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-                """, (
-                    item_data['item_code'].strip(), 
-                    item_data['item_name'].strip(), 
-                    item_data['item_group'].strip(), 
-                    item_data['rate'], 
-                    item_data['unit_measure'].strip(),
-                    item_data['additional_spec_text'].strip(),
-                    item_data['hsn_code'].strip(),
-                    item_data['revision_no'].strip(),
-                    int(item_data['available_stock'])
-                ))
-                conn.commit()
-                res = cur.fetchone()
-                res['rate'] = float(res['rate'])
-                return res
+        with SessionLocal() as session:
+            new_item = ItemMaster(
+                item_code=item_data['item_code'].strip(),
+                item_name=item_data['item_name'].strip(),
+                item_group=item_data['item_group'].strip(),
+                rate=item_data['rate'],
+                unit_measure=item_data['unit_measure'].strip(),
+                additional_spec_text=item_data['additional_spec_text'].strip(),
+                hsn_code=item_data['hsn_code'].strip(),
+                revision_no=item_data['revision_no'].strip(),
+                available_stock=int(item_data['available_stock'])
+            )
+            session.add(new_item)
+            session.commit()
+            session.refresh(new_item)
+            return to_dict(new_item)
     
     def update_item(self, item_code, data):
-
         used = self.item_has_transactions(item_code)
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
+        with SessionLocal() as session:
+            item = session.scalars(select(ItemMaster).where(ItemMaster.item_code == item_code)).first()
+            if item:
                 if used:
-                    cur.execute("""
-                        UPDATE items_master
-                        SET
-                            rate=%s,
-                            additional_spec_text=%s,
-                            revision_no=%s
-                        WHERE item_code=%s
-                        RETURNING *
-                    """, (
-                        data.get("rate"),
-                        data.get("additional_spec_text"),
-                        data.get("revision_no"),
-                        item_code
-                    ))
+                    item.rate = data.get("rate")
+                    item.additional_spec_text = data.get("additional_spec_text")
+                    item.revision_no = data.get("revision_no")
                 else:
-                    cur.execute("""
-                        UPDATE items_master
-                        SET
-                            item_name=%s,
-                            item_group=%s,
-                            rate=%s,
-                            unit_measure=%s,
-                            hsn_code=%s,
-                            additional_spec_text=%s,
-                            revision_no=%s,
-                            available_stock=%s
-                        WHERE item_code=%s
-                        RETURNING *
-                    """, (
-                        data.get("item_name"),
-                        data.get("item_group"),
-                        data.get("rate"),
-                        data.get("unit_measure"),
-                        data.get("hsn_code"),
-                        data.get("additional_spec_text"),
-                        data.get("revision_no"),
-                        data.get("available_stock"),
-                        item_code
-                    ))
-
-                conn.commit()
-                item = cur.fetchone()
-                item["rate"] = float(item["rate"])
-
-                return item
+                    item.item_name = data.get("item_name")
+                    item.item_group = data.get("item_group")
+                    item.rate = data.get("rate")
+                    item.unit_measure = data.get("unit_measure")
+                    item.hsn_code = data.get("hsn_code")
+                    item.additional_spec_text = data.get("additional_spec_text")
+                    item.revision_no = data.get("revision_no")
+                    item.available_stock = data.get("available_stock")
+                session.commit()
+            return to_dict(item)
         
     def disable_item(self, item_code):
-
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    UPDATE items_master
-                    SET is_active = FALSE
-                    WHERE item_code=%s
-                    RETURNING item_code
-                """, (item_code,))
-
-                conn.commit()
-
-                return {
-                    "success": True
-                }    
+        with SessionLocal() as session:
+            item = session.scalars(select(ItemMaster).where(ItemMaster.item_code == item_code)).first()
+            if item:
+                item.is_active = False
+                session.commit()
+            return {"success": True}    
     
     def item_has_transactions(self, item_code):
-
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT EXISTS(
-                        SELECT 1
-                        FROM order_items
-                        WHERE item_code=%s
-                    )
-                """, (item_code,))
-
-            return cur.fetchone()['exists']
+        with SessionLocal() as session:
+            stmt = select(select(OrderItem).where(OrderItem.item_code == item_code).exists())
+            return session.scalar(stmt)
     
     def get_all_items(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(""" SELECT * FROM items_master """)
-                data = cur.fetchall()
-                return data
-            
+        with SessionLocal() as session:
+            items = session.scalars(select(ItemMaster)).all()
+            return [to_dict(i) for i in items]
     # --- ITEM MASTERY end---
     
     # --- CONTEXTUAL ACCOUNTABILITY HUB (ACTIVITY LOGS) start---
     def get_activity_logs(self, entity_type: str, entity_id: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                
-                cur.execute("""
-                            SELECT a.*, u.name as operator_name
-                            FROM activity_logs a
-                            LEFT JOIN users u ON a.operator_email = u.email
-                            WHERE a.entity_type = %s AND a.entity_id = %s
-                            ORDER BY a.created_at ASC
-                            """, (entity_type, str(entity_id)))
-                logs = cur.fetchall()
+        with SessionLocal() as session:
+            stmt = select(ActivityLog, User.name.label("operator_name"))\
+                .outerjoin(User, ActivityLog.operator_email == User.email)\
+                .where(ActivityLog.entity_type == entity_type, ActivityLog.entity_id == str(entity_id))\
+                .order_by(ActivityLog.created_at.asc())
             
-                for log in logs:
-                    log['created_at'] = log['created_at'].isoformat() if log['created_at'] else None
-                return logs
+            results = session.execute(stmt).all()
+            
+            logs = []
+            for log, operator_name in results:
+                log_dict = to_dict(log)
+                log_dict['operator_name'] = operator_name
+                logs.append(log_dict)
+            return logs
+
     def add_manual_activity_log(self, order_id: str, message: str, operator_email: str, operator_name: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO activity_logs (order_acceptance_id, log_type, message, operator_email, operator_name)
-                    VALUES (%s, 'MANUAL_ENTRY', %s, %s, %s) RETURNING *
-                """, (order_id, message, operator_email, operator_name))
-                conn.commit()
-                return cur.fetchone()
+        with SessionLocal() as session:
+            log = ActivityLog(
+                entity_id=order_id,
+                entity_type="ORDER", # Presumed contextual type
+                log_type="MANUAL_ENTRY",
+                message=message,
+                operator_email=operator_email
+            )
+            session.add(log)
+            session.commit()
+            session.refresh(log)
+            
+            log_dict = to_dict(log)
+            log_dict['operator_name'] = operator_name
+            return log_dict
 
     def delete_activity_log(self, log_id: int, user_role: str):
-        # Strict restriction: Only Admins can delete audit logs
         if user_role not in ['Admin', 'Chief Full Stack Developer']:
             raise ValueError("Only System Administrators can alter the audit trail.")
             
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM activity_logs WHERE log_id=%s RETURNING log_id", (log_id,))
-                conn.commit()
-                return True
-    def create_activity_log(self, entity_type: str, entity_id: str, operator_email: str, log_type: str, message: str, metadata: dict = None):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                meta_json = json.dumps(metadata) if metadata else None
-                cur.execute("""
-                        INSERT INTO activity_logs(entity_type, entity_id, opeartor_email, log_type, message, metadata)
-                        VALUES(%s, %s, %s, %s, %s, %s)
-                        RETURNING log_id, created_at
-                    """, (entity_type, str(entity_id), operator_email, log_type, message, meta_json))
-                
-                inserted = cur.fetchone()
-                conn.commit()
+        with SessionLocal() as session:
+            log = session.scalars(select(ActivityLog).where(ActivityLog.log_id == log_id)).first()
+            if log:
+                session.delete(log)
+                session.commit()
+            return True
 
-                return {
-                    "log_id": inserted['log_id'],
-                    "entity_type": entity_type,
-                    "entity_id": str(entity_id),
-                    "operator_email": operator_email,
-                    "log_type": log_type,
-                    "message": message,
-                    "metadata": metadata,
-                    "created_at": inserted['created_at'].isoformat()
-                }
+    def create_activity_log(self, entity_type: str, entity_id: str, operator_email: str, log_type: str, message: str, metadata: dict = None):
+        with SessionLocal() as session:
+            log = ActivityLog(
+                entity_type=entity_type,
+                entity_id=str(entity_id),
+                operator_email=operator_email,
+                log_type=log_type,
+                message=message,
+                metadata=metadata
+            )
+            session.add(log)
+            session.commit()
+            session.refresh(log)
+            return to_dict(log)
     
     def get_dashboard_activity_tree(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT
-                        order_acceptance_id,
-                        billing_name,
-                        due_date,
-                        CASE
-                            WHEN due_date < CURRENT_DATE THEN 'past'
-                            WHEN order_acceptance_date > CURRENT_DATE THEN 'future'
-                            ELSE 'ongoing'
-                        END AS status_category
-                    FROM order_headers
-                    ORDER BY due_date ASC
-                """)
-                orders = cur.fetchall()
+        with SessionLocal() as session:
+            # Load Orders
+            orders = session.scalars(select(OrderHeader).order_by(OrderHeader.due_date.asc())).all()
+            
+            # Load Logs with users
+            stmt = select(ActivityLog, User.name.label("operator_name"))\
+                .outerjoin(User, ActivityLog.operator_email == User.email)\
+                .where(ActivityLog.entity_type == 'ORDER')\
+                .order_by(ActivityLog.created_at.desc())
+            
+            log_results = session.execute(stmt).all()
+            
+            logs_by_order = {}
+            for log, operator_name in log_results:
+                log_dict = to_dict(log)
+                log_dict['operator_name'] = operator_name
+                eid = log.entity_id
+                if eid not in logs_by_order:
+                    logs_by_order[eid] = []
+                logs_by_order[eid].append(log_dict)
 
-                cur.execute("""
-                            SELECT a.*, u.name as operator_name 
-                    FROM activity_logs a
-                    LEFT JOIN users u ON a.operator_email = u.email
-                    WHERE a.entity_type = 'ORDER'
-                    ORDER BY a.created_at DESC
-                            """)
-                logs = cur.fetchall()
+            dashboard_tree = {"past": [], "ongoing": [], "future": []}
+            today = date.today()
 
-                dashboard_tree = {"past": [], "ongoing": [], "future": []}
+            for order in orders:
+                order_dict = to_dict(order)
+                oid = str(order.order_acceptance_id)
+                order_dict['logs'] = logs_by_order.get(oid, [])
 
-                logs_by_order = {}
-                for log in logs:
-                    eid = log['entity_id']
-                    if eid not in logs_by_order:
-                        logs_by_order[eid] = []
-                    log['created_at'] = log['created_at'].isoformat()
-                    logs_by_order[eid].append(log)
+                due = order.due_date
+                acc = order.order_acceptance_date
+                
+                if due and due < today:
+                    cat = 'past'
+                elif acc and acc > today:
+                    cat = 'future'
+                else:
+                    cat = 'ongoing'
+                    
+                dashboard_tree[cat].append(order_dict)
 
-                for order in orders:
-                    oid = str(order['order_acceptance_id'])
-                    order['order_acceptance_id'] = oid
-                    order['due_date'] = str(order(['due_date']))
-                    order['logs'] = logs_by_order.get(oid, [])
-
-                    cat = order.pop('status_category')
-                    dashboard_tree[cat].append(order)
-
-                return dashboard_tree
+            return dashboard_tree
     # --- CONTEXTUAL ACCOUNTABILITY HUB (ACTIVITY LOGS) end---
+
     # --- CRM SUBSYSTEM start ---
     def get_crm_leads(self, user_profile: dict):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # Admins see everything, Sales Reps only see leads assigned to their email
-                if user_profile['role'] in ['Admin', 'Chief Full Stack Developer']:
-                    cur.execute("SELECT * FROM crm_leads ORDER BY created_at DESC")
-                else:
-                    cur.execute("SELECT * FROM crm_leads WHERE assigned_to = %s ORDER BY created_at DESC", (user_profile['email'],))
-                
-                leads = cur.fetchall()
-                for l in leads:
-                    l['created_at'] = l['created_at'].isoformat() if l['created_at'] else None
-                return leads
+        with SessionLocal() as session:
+            if user_profile['role'] in ['Admin', 'Chief Full Stack Developer']:
+                stmt = select(CRMLead).order_by(CRMLead.created_at.desc())
+            else:
+                stmt = select(CRMLead).where(CRMLead.assigned_to == user_profile['email']).order_by(CRMLead.created_at.desc())
+            
+            leads = session.scalars(stmt).all()
+            return [to_dict(l) for l in leads]
 
     def update_crm_lead_status(self, lead_id: int, status: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE crm_leads SET status = %s WHERE id = %s RETURNING id", (status, lead_id))
-                conn.commit()
-                return cur.fetchone()
+        with SessionLocal() as session:
+            lead = session.scalars(select(CRMLead).where(CRMLead.id == lead_id)).first()
+            if lead:
+                lead.status = status
+                session.commit()
+                return {"id": lead.id}
+            return None
 
     def create_crm_lead(self, lead_data: dict):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO crm_leads (
-                        full_name, designation, company_name, contact_email,
-                        phone_number, city_state, product_query, gdpr_consent,
-                        assigned_region, assigned_to
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                """, (
-                    lead_data['full_name'], lead_data.get('designation'), lead_data.get('company_name'),
-                    lead_data['contact_email'], lead_data.get('phone_number'), lead_data['city_state'],
-                    lead_data.get('product_query'), lead_data.get('gdpr_consent', False),
-                    lead_data.get('assigned_region'), lead_data.get('assigned_to')
-                ))
-                conn.commit()
-                return cur.fetchone()['id']
+        with SessionLocal() as session:
+            lead = CRMLead(
+                full_name=lead_data['full_name'],
+                designation=lead_data.get('designation'),
+                company_name=lead_data.get('company_name'),
+                contact_email=lead_data['contact_email'],
+                phone_number=lead_data.get('phone_number'),
+                city_state=lead_data['city_state'],
+                product_query=lead_data.get('product_query'),
+                gdpr_consent=lead_data.get('gdpr_consent', False),
+                assigned_region=lead_data.get('assigned_region'),
+                assigned_to=lead_data.get('assigned_to')
+            )
+            session.add(lead)
+            session.commit()
+            return lead.id
 
     def get_sales_regions(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # UNNEST flattens the arrays into individual rows, DISTINCT removes duplicates
-                cur.execute("""
-                    SELECT DISTINCT unnest(regions) AS region_name 
-                    FROM users 
-                    WHERE regions IS NOT NULL AND array_length(regions, 1) > 0
-                """)
-                rows = cur.fetchall()
-                
-                # Format into the dictionary structure expected by classify_city_zone
-                return [{"zone_code": r["region_name"], "zone_name": r["region_name"]} for r in rows]
+        with SessionLocal() as session:
+            # Querying distinct unnested array fields in SQLAlchemy directly mapping to Postgres functionality
+            stmt = select(func.unnest(User.regions).label("region_name")).distinct()
+            regions = session.scalars(stmt).all()
+            return [{"zone_code": r, "zone_name": r} for r in regions if r]
     # --- CRM SUBSYSTEM end ---
+
     # --- GRN SUBSYSTEM start ---
     def create_grn(self, grn_data: dict, operator_email: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
+        with SessionLocal() as session:
+            header = GRNHeader(
+                grn_number=grn_data["grn_number"],
+                vendor_name=grn_data.get("vendor_name"),
+                operator_email=operator_email
+            )
+            session.add(header)
+            session.flush() # get id
 
-                cur.execute("""
-                    INSERT INTO grn_headers
-                    (
-                        grn_number,
-                        vendor_name,
-                        operator_email
-                    )
-                    VALUES (%s,%s,%s)
-                    RETURNING id, grn_number
-                """, (
-                    grn_data["grn_number"],
-                    grn_data["vendor_name"],
-                    operator_email
-                ))
+            for item in grn_data["items"]:
+                gi = GRNItem(
+                    grn_id=header.id,
+                    item_code=item["item_code"],
+                    quantity=item["quantity"],
+                    rate=item["rate"],
+                    amount=float(item["quantity"]) * float(item["rate"])
+                )
+                session.add(gi)
+                header.items.append(gi)
 
-                header = cur.fetchone()
-                grn_id = header["id"]
+            session.commit()
+            return {"grn_id": header.id, "grn_number": header.grn_number}
 
-                for item in grn_data["items"]:
-
-                    cur.execute("""
-                        INSERT INTO grn_items
-                        (
-                            grn_id,
-                            item_code,
-                            quantity,
-                            rate
-                        )
-                        VALUES (%s,%s,%s,%s)
-                    """, (
-                        grn_id,
-                        item["item_code"],
-                        item["quantity"],
-                        item["rate"]
-                    ))
-
-                conn.commit()
-
-                return {
-                    "grn_id": grn_id,
-                    "grn_number": header["grn_number"]
-                }
     def get_grn_by_id(self, grn_id: int):
+        with SessionLocal() as session:
+            header = session.scalars(select(GRNHeader).options(joinedload(GRNHeader.items)).where(GRNHeader.id == grn_id)).unique().first()
+            
+            if not header:
+                return None
 
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT *
-                    FROM grn_headers
-                    WHERE id=%s
-                """, (grn_id,))
-
-                header = cur.fetchone()
-
-                if not header:
-                    return None
-
-                cur.execute("""
-                    SELECT *
-                    FROM grn_items
-                    WHERE grn_id=%s
-                    ORDER BY id
-                """, (grn_id,))
-
-                items = cur.fetchall()
-
-                for item in items:
-                    item["quantity"] = float(item["quantity"])
-                    item["rate"] = float(item["rate"])
-                    item["amount"] = float(item["amount"])
-
-                subtotal = sum(i["amount"] for i in items)
-
-                return {
-                    "id": header["id"],
-                    "grn_number": header["grn_number"],
-                    "vendor_name": header["vendor_name"],
-                    "invoice_date": str(header["receipt_date"]),
-                    "items": items,
-                    "subtotal": subtotal
-                }
-    #Testing
+            h_dict = to_dict(header)
+            items = []
+            subtotal = 0.0
+            
+            for i in header.items:
+                i_dict = to_dict(i)
+                subtotal += i_dict.get('amount', 0.0)
+                items.append(i_dict)
+                
+            return {
+                "id": header.id,
+                "grn_number": header.grn_number,
+                "vendor_name": header.vendor_name,
+                "invoice_date": str(header.receipt_date),
+                "items": items,
+                "subtotal": subtotal
+            }
+    # --- GRN SUBSYSTEM end ---
+    
+    # --- Testing START ---
     def seed_test_items(self, items_list: list):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # We use ON CONFLICT DO NOTHING so you can safely run the CSV upload 
-                # multiple times without throwing duplicate key errors.
-                cur.executemany("""
-                    INSERT INTO test_items_master (item_code, item_specification)
-                    VALUES (%s, %s)
-                    ON CONFLICT (item_code) DO NOTHING
-                """, [(item['item_code'], item['item_specification']) for item in items_list])
-                conn.commit()
+        with SessionLocal() as session:
+            for item in items_list:
+                # Assuming additional_spec_text maps to item_specification from dicts
+                stmt = pg_insert(TestItemMaster).values(
+                    item_code=item['item_code'],
+                    additional_spec_text=item.get('item_specification')
+                ).on_conflict_do_nothing(index_elements=['item_code'])
+                session.execute(stmt)
+            session.commit()
     
     def get_test_items(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT
-                        item_code,
-                        item_specification
-                    FROM test_items_master
-                """)
-
-                return cur.fetchall()
+        with SessionLocal() as session:
+            items = session.scalars(select(TestItemMaster)).all()
+            return [to_dict(i) for i in items]
     
     def get_test_item_by_code(self, item_code: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
+        with SessionLocal() as session:
+            item = session.scalars(select(TestItemMaster).where(TestItemMaster.item_code == item_code)).first()
+            return to_dict(item)
+    # --- Testing END ---
 
-                cur.execute("""
-                    SELECT
-                        item_code,
-                        item_specification
-                    FROM test_items_master
-                    WHERE item_code=%s
-                """, (item_code,))
-                row = cur.fetchone()
-                print(row)
-                if not row:
-                    return None
-                
-                return dict(row)
     # --- Companies START ---
     def get_all_companies(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT *
-                    FROM client_companies
-                    ORDER BY name
-                """)
-
-                return cur.fetchall()
+        with SessionLocal() as session:
+            comps = session.scalars(select(ClientCompany).order_by(ClientCompany.name)).all()
+            return [to_dict(c) for c in comps]
     
     def get_company(self, company_id: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
+        with SessionLocal() as session:
+            comp = session.scalars(select(ClientCompany).where(ClientCompany.id == company_id)).first()
+            return to_dict(comp)
 
-                cur.execute("""
-                    SELECT *
-                    FROM client_companies
-                    WHERE id = %s
-                """, (company_id,))
-
-                return cur.fetchone()
     def create_company(self, company_data: dict):
+        with SessionLocal() as session:
+            total = session.scalar(select(func.count()).select_from(ClientCompany))
+            company_id = f"C{str(total + 1).zfill(3)}"
 
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
+            comp = ClientCompany(
+                id=company_id,
+                name=company_data["name"].strip(),
+                address_line_1=company_data["address_line_1"].strip(),
+                city=company_data["city"],
+                state=company_data["state"],
+                pincode=company_data["pincode"],
+                contact_name=company_data["contact_name"].strip(),
+                contact_role=company_data["contact_role"],
+                contact_phone=company_data["contact_phone"]
+            )
+            session.add(comp)
+            session.commit()
+            session.refresh(comp)
+            return to_dict(comp)
 
-                cur.execute("""SELECT COUNT(*) AS total FROM client_companies""")
-
-                total = cur.fetchone()["total"]
-
-                company_id = f"C{str(total + 1).zfill(3)}"
-
-                cur.execute("""INSERT INTO client_companies (id, name, address_line_1, city, state, pincode, contact_name, contact_role, contact_phone)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    RETURNING *
-                """, (company_id, company_data["name"].strip(), company_data["address_line_1"].strip(), company_data["city"], company_data["state"], company_data["pincode"], company_data["contact_name"].strip(), company_data["contact_role"], company_data["contact_phone"]))
-
-                company = cur.fetchone()
-
-                conn.commit()
-
-                return company
     def update_company(self, company_id: str, company_data: dict):
-        updates = []
-        values = []
-
-        for field, value in company_data.items():
-            if value is not None:
-                updates.append(f"{field} = %s")
-                values.append(value)
-
-        if not updates:
-            return self.get_company(company_id)
-
-        updates.append("updated_at = NOW()")
-
-        values.append(company_id)
-
-        query = f"""UPDATE client_companies SET {", ".join(updates)} WHERE id = %s RETURNING *"""
-
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, tuple(values))
-                company = cur.fetchone()
-                conn.commit()
-                return company
+        with SessionLocal() as session:
+            comp = session.scalars(select(ClientCompany).where(ClientCompany.id == company_id)).first()
+            if comp:
+                for field, value in company_data.items():
+                    if value is not None and hasattr(comp, field):
+                        setattr(comp, field, value)
+                comp.updated_at = func.now()
+                session.commit()
+            return to_dict(comp)
             
     def delete_company(self, company_id: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""DELETE FROM client_companies WHERE id = %s RETURNING *""", (company_id,))
-                company = cur.fetchone()
-                conn.commit()
-                return company
+        with SessionLocal() as session:
+            comp = session.scalars(select(ClientCompany).where(ClientCompany.id == company_id)).first()
+            if comp:
+                session.delete(comp)
+                session.commit()
+            return to_dict(comp)
             
     def search_companies(self, q: str):
-
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-
-                search = f"%{q}%"
-
-                cur.execute("""SELECT * FROM client_companies WHERE LOWER(name) LIKE LOWER(%s) OR LOWER(id) LIKE LOWER(%s) ORDER BY name LIMIT 10 """, (search, search))
-
-                return cur.fetchall()
+        with SessionLocal() as session:
+            search = f"%{q}%"
+            stmt = select(ClientCompany).where(
+                or_(
+                    ClientCompany.name.ilike(search),
+                    ClientCompany.id.ilike(search)
+                )
+            ).order_by(ClientCompany.name).limit(10)
+            comps = session.scalars(stmt).all()
+            return [to_dict(c) for c in comps]
     # --- Companies END ---
+
     # --- LEAD GENERATOR ENGINE start ---
     def request_lead_target(self, company_name: str, domain: str, operator_email: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                safe_domain = domain.strip().lower() if domain else ""
-                cur.execute("""
-                    INSERT INTO lead_targets (company_name, domain, requested_by)
-                    VALUES (%s, %s, %s) RETURNING *
-                """, (company_name.strip(), safe_domain, operator_email))
-                conn.commit()
-                
-                target = cur.fetchone()
-                target['created_at'] = target['created_at'].isoformat()
-                return target
+        with SessionLocal() as session:
+            safe_domain = domain.strip().lower() if domain else ""
+            target = LeadTarget(
+                company_name=company_name.strip(),
+                domain=safe_domain,
+                requested_by=operator_email
+            )
+            session.add(target)
+            session.commit()
+            session.refresh(target)
+            return to_dict(target)
 
     def get_lead_targets(self, operator_email: str = None, role: str = "Admin"):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # Admins see all targets, Sales reps see their own
-                if role in ["Admin", "Chief Full Stack Developer"]:
-                    cur.execute("SELECT * FROM lead_targets ORDER BY created_at DESC")
-                else:
-                    cur.execute("SELECT * FROM lead_targets WHERE requested_by = %s AND status <> 'Inactives' ORDER BY created_at DESC", (operator_email,))
-                
-                targets = cur.fetchall()
-                for t in targets:
-                    t['created_at'] = t['created_at'].isoformat()
-                return targets
+        with SessionLocal() as session:
+            if role in ["Admin", "Chief Full Stack Developer"]:
+                stmt = select(LeadTarget).order_by(LeadTarget.created_at.desc())
+            else:
+                stmt = select(LeadTarget).where(
+                    LeadTarget.requested_by == operator_email,
+                    LeadTarget.status != 'Inactives'
+                ).order_by(LeadTarget.created_at.desc())
+            
+            targets = session.scalars(stmt).all()
+            return [to_dict(t) for t in targets]
 
     def get_lead_contacts(self, target_id: int):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # Prioritize roles logically during retrieval
-                cur.execute("""
-                    SELECT * FROM lead_contacts
-                    WHERE target_id = %s
-                    ORDER BY is_priority DESC, full_name ASC
-                """, (target_id,))
-                
-                contacts = cur.fetchall()
-                for c in contacts:
-                    c['created_at'] = c['created_at'].isoformat()
-                return contacts
+        with SessionLocal() as session:
+            stmt = select(LeadContact).where(LeadContact.target_id == target_id).order_by(
+                LeadContact.is_priority.desc(), LeadContact.full_name.asc()
+            )
+            contacts = session.scalars(stmt).all()
+            return [to_dict(c) for c in contacts]
 
     def mock_overnight_sync(self, target_id: int):
-        """MOCKS the overnight API fetch. In production, an external script calls an API and inserts here."""
         import random
-        
         roles = [
             ("Purchase Manager", True), ("QA/QC Head", True), ("Production Supervisor", True), 
             ("Procurement Executive", True), ("Marketing Associate", False), ("HR Manager", False), 
             ("Software Engineer", False), ("Accounts Payable", False)
         ]
         
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # Update status to completed
-                cur.execute("UPDATE lead_targets SET status = 'Completed' WHERE id = %s RETURNING company_name, domain", (target_id,))
-                target = cur.fetchone()
+        with SessionLocal() as session:
+            target = session.scalars(select(LeadTarget).where(LeadTarget.id == target_id)).first()
+            if not target: return False
+            
+            target.status = 'Completed'
+            domain = target.domain
+            
+            for i in range(random.randint(3, 8)):
+                role, is_priority = random.choice(roles)
+                contact = LeadContact(
+                    target_id=target_id,
+                    full_name=f"Mock User {i+1}",
+                    designation=role,
+                    email=f"user{i+1}@{domain}",
+                    is_priority=is_priority
+                )
+                session.add(contact)
                 
-                if not target: return False
-                
-                domain = target['domain']
-                
-                # Generate 3 to 8 mock contacts
-                for i in range(random.randint(3, 8)):
-                    role, is_priority = random.choice(roles)
-                    cur.execute("""
-                        INSERT INTO lead_contacts (target_id, full_name, designation, email, is_priority)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        target_id, 
-                        f"Mock User {i+1}", 
-                        role, 
-                        f"user{i+1}@{domain}", 
-                        is_priority
-                    ))
-                conn.commit()
-                return True
-    def bulk_insert_targets(self, dataframe, operator_email):
+            session.commit()
+            return True
 
+    def bulk_insert_targets(self, dataframe, operator_email):
         inserted = 0
         failed = []
 
-        with self._get_connection() as conn:
-
-            with conn.cursor() as cur:
-
-                for index,row in dataframe.iterrows():
-
-                    company = str(row["Company Name"]).strip()
-
-                    domain = str(row["Domain"]).strip().lower()
-
-                    try:
-
-                        cur.execute("""INSERT INTO lead_targets(company_name, domain, requested_by)
-                            VALUES (%s,%s,%s)""",
-                            (company, domain, operator_email)
-                        )
-
-                        inserted += 1
-
-                    except Exception as e:
-
-                        failed.append({"row": index + 2, "company": company, "reason": str(e)})
-
-                conn.commit()
+        with SessionLocal() as session:
+            for index, row in dataframe.iterrows():
+                company = str(row["Company Name"]).strip()
+                domain = str(row["Domain"]).strip().lower()
+                
+                try:
+                    target = LeadTarget(
+                        company_name=company,
+                        domain=domain,
+                        requested_by=operator_email
+                    )
+                    session.add(target)
+                    session.commit()
+                    inserted += 1
+                except Exception as e:
+                    session.rollback()
+                    failed.append({"row": index + 2, "company": company, "reason": str(e)})
 
         return {"inserted": inserted, "failed": failed, "total": len(dataframe)}
     
     def update_lead_target(self, target_id: int, company_name: str, domain: str, user_email: str, user_role: str):
-            with self._get_connection() as conn:
-                with conn.cursor() as cur:
-                    safe_domain = domain.strip().lower() if domain else ""
-                    if user_role in ['Admin', 'Chief Full Stack Developer']:
-                        cur.execute("UPDATE lead_targets SET company_name=%s, domain=%s WHERE id=%s RETURNING *", 
-                                    (company_name.strip(), safe_domain, target_id))
-                    else:
-                        cur.execute("UPDATE lead_targets SET company_name=%s, domain=%s WHERE id=%s AND requested_by=%s RETURNING *", 
-                                    (company_name.strip(), safe_domain, target_id, user_email))
-                    
-                    updated = cur.fetchone()
-                    if not updated:
-                        raise ValueError("Target not found or unauthorized.")
-                    conn.commit()
-                    return updated
+        with SessionLocal() as session:
+            stmt = select(LeadTarget).where(LeadTarget.id == target_id)
+            if user_role not in ['Admin', 'Chief Full Stack Developer']:
+                stmt = stmt.where(LeadTarget.requested_by == user_email)
+                
+            target = session.scalars(stmt).first()
+            if not target:
+                raise ValueError("Target not found or unauthorized.")
+                
+            target.company_name = company_name.strip()
+            target.domain = domain.strip().lower() if domain else ""
+            session.commit()
+            return to_dict(target)
                 
     def delete_lead_target(self, target_id: int, user_role: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                if user_role in ['Admin', 'Chief Full Stack Developer']:
-                    cur.execute("DELETE FROM lead_targets WHERE id=%s RETURNING id", (target_id,))
-                else:
-                    raise ValueError("Unauthorized action.")
+        if user_role not in ['Admin', 'Chief Full Stack Developer']:
+            raise ValueError("Unauthorized action.")
+            
+        with SessionLocal() as session:
+            target = session.scalars(select(LeadTarget).where(LeadTarget.id == target_id)).first()
+            if not target:
+                raise ValueError("Target not found or unauthorized.")
                 
-                deleted = cur.fetchone()
-                if not deleted:
-                    raise ValueError("Target not found or unauthorized.")
-                conn.commit()
-                return deleted
+            session.delete(target)
+            session.commit()
+            return {"id": target_id}
+
     def deactivate_lead_target(self, target_id: int, user_email: str, user_role: str):
-        # SOFT DELETE: Updates status to 'Inactive' instead of dropping the row
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE lead_targets SET status='Inactivates' WHERE id=%s AND requested_by=%s RETURNING id", (target_id, user_email))
+        with SessionLocal() as session:
+            target = session.scalars(select(LeadTarget).where(LeadTarget.id == target_id, LeadTarget.requested_by == user_email)).first()
+            if not target:
+                raise ValueError("Target not found or unauthorized.")
                 
-                deactivated = cur.fetchone()
-                if not deactivated:
-                    raise ValueError("Target not found or unauthorized.")
-                conn.commit()
-                return deactivated
+            target.status = 'Inactivates'
+            session.commit()
+            return {"id": target.id}
     
     def reject_lead_target(self, target_id: int, rejected_reason: str = None):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""UPDATE lead_targets SET status='Rejected', rejected_reason=%s WHERE id=%s RETURNING id""", (rejected_reason, target_id))
-                row = cur.fetchone()
-                if not row:
-                    raise ValueError("Target not found.")
+        with SessionLocal() as session:
+            target = session.scalars(select(LeadTarget).where(LeadTarget.id == target_id)).first()
+            if not target:
+                raise ValueError("Target not found.")
                 
-                conn.commit()
-                return row
-            
+            target.status = 'Rejected'
+            # Assuming 'rejected_reason' might be handled in a different field or schema since it's missing in the provided LeadTarget model.
+            # You can map it into a metadata field or text column if needed.
+            session.commit()
+            return {"id": target.id}
     # --- LEAD GENERATOR ENGINE end ---
+    # --- GLOBAL PRODUCTION PULSE start ---
+    def get_global_production_pulse(self):
+        with SessionLocal() as session:
+            stmt = (select(OrderHeader).options(selectinload(OrderHeader.items)).order_by(OrderHeader.due_date.asc()))
+
+            orders = session.scalars(stmt).all()
+
+            result = []
+
+            for order in orders:
+                result.append({
+                    "order_acceptance_id": order.order_acceptance_id,
+                    "billing_name": order.billing_name,
+                    "due_date": (
+                        order.due_date.isoformat()
+                        if order.due_date
+                        else None
+                    ),
+                    "production_stage": order.production_stage,
+                    "items": [
+                        {
+                            "item_code": item.item_code,
+                            "quantity": item.quantity
+                        }
+                        for item in order.items
+                    ]
+                })
+
+            return result
+    def update_order_stage(self, order_id: str, new_stage: str):
+        logger.warning(f"order id: {order_id}")
+        with SessionLocal() as session:
+            stmt = (update(OrderHeader).where(OrderHeader.order_acceptance_id == str(order_id)).values(production_stage=new_stage).returning(OrderHeader))
+
+            order = session.execute(stmt).scalar_one_or_none()
+
+            session.commit()
+
+            return to_dict(order)
+    # --- GLOBAL PRODUCTION PULSE end ---
     # --- SYSTEM AUDIT start ---
-    def log_system_action(self, email: str, name: str, route: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO system_audit_logs (user_email, user_name, action_route)
-                    VALUES (%s, %s, %s)
-                """, (email, name, route))
-                conn.commit()
+    def log_system_action(self, user_email: str, user_name: str, route_path: str):
+        with SessionLocal() as session:
+            log = SystemAuditLog(user_email=user_email, user_name=user_name, action_route=route_path)
+            session.add(log)
+            session.commit()
     # --- SYSTEM AUDIT end ---
     # --- FAQ Engine start ---
     def create_faq_query(self, question: str, asked_by: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO faq_queries (question, asked_by)
-                    VALUES (%s, %s) RETURNING *
-                """, (question.strip(), asked_by))
-                conn.commit()
-                res = cur.fetchone()
-                res['created_at'] = res['created_at'].isoformat()
-                res['updated_at'] = res['updated_at'].isoformat()
-                return res
+        with SessionLocal() as session:
+            faq = FAQQuery(question=question.strip(), asked_by=asked_by)
 
-    def get_faq_queries(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM faq_queries ORDER BY created_at DESC")
-                data = cur.fetchall()
-                for d in data:
-                    d['created_at'] = d['created_at'].isoformat()
-                    d['updated_at'] = d['updated_at'].isoformat()
-                return data
+            session.add(faq)
+            session.commit()
+            session.refresh(faq)
 
-    def answer_faq_query(self, faq_id: int, answer: str, answered_by: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE faq_queries 
-                    SET answer=%s, answered_by=%s, status='Answered', updated_at=CURRENT_TIMESTAMP
-                    WHERE id=%s RETURNING *
-                """, (answer.strip(), answered_by, faq_id))
-                updated = cur.fetchone()
-                if not updated:
-                    raise ValueError("FAQ not found.")
-                conn.commit()
-                updated['created_at'] = updated['created_at'].isoformat()
-                updated['updated_at'] = updated['updated_at'].isoformat()
-                return updated
-    # --- FAQ Engine end ---                
-    # --- SALES ANALYTICS & KPIs start ---
-    def get_sales_kpis(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # Replaced 'dispatches_logged' with 'actions_logged' targeting the new Audit table
-                cur.execute("""
-                            SELECT u.email, u.name, u.role, u.quarterly_order_value_target,
-                            (SELECT COALESCE(SUM(lt.cost_per_credit), 0) FROM lead_targets lt WHERE lt.requested_by=u.email) AS total_spend,
-                            (SELECT COUNT(*) FROM lead_targets lt WHERE lt.requested_by = u.email AND lt.status <> 'Inactive' ) AS targets_queued,
-                            (SELECT COALESCE(SUM(oi.quantity *oi.rate *(1 - oi.discount_percentage / 100.0)),0)
-                                FROM order_headers oh
-                                JOIN order_items oi ON oi.order_acceptance_id = oh.order_acceptance_id
-                                WHERE oh.ordered_by = u.email AND DATE_TRUNC('month', oh.created_at) = DATE_TRUNC('month', CURRENT_DATE)) AS monthly_order_value,
-
-                            (SELECT COUNT(*) FROM lead_targets lt WHERE lt.requested_by=u.email AND lt.status='Rejected' ) AS rejected,
-
-                            (SELECT COUNT(*) FROM lead_targets lt WHERE lt.requested_by=u.email AND lt.status='Inactive') AS inactive,
-
-                            (SELECT COUNT(*) FROM crm_leads c WHERE c.assigned_to=u.email ) AS total_crm_leads,
-
-                            (SELECT COUNT(*) FROM faq_queries f WHERE f.asked_by=u.email) AS faqs_asked,
-
-                            (SELECT COUNT(*) FROM dispatch_records d WHERE d.operator_email=u.email ) AS dispatches_logged,
-
-                            (SELECT COUNT(*) FROM system_audit_logs a WHERE a.user_email=u.email ) AS actions_logged,
-
-                            (COALESCE((SELECT SUM(oi.quantity * oi.rate * (1-oi.discount_percentage/100.0))
-                                FROM order_headers oh JOIN order_items oi ON oi.order_acceptance_id=oh.order_acceptance_id
-                                WHERE oh.ordered_by=u.email AND DATE_TRUNC('month',oh.created_at) = DATE_TRUNC('month',CURRENT_DATE)),0)/1000
-                                +
-                                (SELECT COUNT(*) FROM crm_leads WHERE assigned_to=u.email)*10
-                                +
-                                ( SELECT COUNT(*) FROM dispatch_records WHERE operator_email=u.email)*8
-                                +
-                                (SELECT COUNT(*) FROM faq_queries WHERE asked_by=u.email)*3
-                                +
-                                (SELECT COUNT(*) FROM system_audit_logs WHERE user_email=u.email)
-
-                            ) AS performance_score
-
-                        FROM users u
-                        WHERE u.role='Sales Representative'
-                        ORDER BY performance_score DESC;
-                    """)
-                return cur.fetchall()
+            return to_dict(faq)
     
-    def get_rnd_kpis(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # New metric to track R&D performance
-                cur.execute("""
-                    SELECT 
-                        u.email, 
-                        u.name,
-                        u.role,
-                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email) AS faqs_answered,
-                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email AND status='Answered') AS resolved,
-                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email=u.email) AS actions_logged,
-                        ((SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email)*15 + 
-                        (SELECT COUNT(*) FROM faq_queries WHERE answered_by=u.email AND status='Answered') * 25 +
-                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email=u.email)) AS knowledge_score
-                        FROM users u
-                        WHERE u.role='R&D Engineer'
-                        ORDER BY knowledge_score DESC;
-                """)
-                """(SELECT COUNT(*) FROM faq_queries WHERE answered_by = u.email) as faqs_answered,
-                        (SELECT COUNT(*) FROM system_audit_logs WHERE user_email = u.email) as actions_logged"""
-                return cur.fetchall()
+    def get_faq_queries(self):
+        with SessionLocal() as session:
+            stmt = select(FAQQuery).order_by(FAQQuery.created_at.desc())
 
-    def get_transport_kpis(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Get Total Active Partners
-                cur.execute("SELECT COUNT(id) as total_partners FROM logistics_partners")
-                total_partners = cur.fetchone()['total_partners']
-                
-                # 2. Get Monthly Spend Grouped by Month/Year
-                cur.execute("""
-                    SELECT 
-                        TO_CHAR(created_at, 'YYYY-MM') as month_period,
-                        COUNT(id) as total_dispatches,
-                        SUM(dispatch_cost_gst) as total_cost
-                    FROM dispatch_records
-                    GROUP BY TO_CHAR(created_at, 'YYYY-MM')
-                    ORDER BY month_period DESC
-                """)
-                monthly_costs = cur.fetchall()
-                
-                # Ensure JSON float serialization
-                for row in monthly_costs:
-                    row['total_cost'] = float(row['total_cost'] or 0.0)
+            faqs = session.scalars(stmt).all()
 
-                return {
-                    "total_partners": total_partners,
-                    "monthly_costs": monthly_costs
-                }        
-    def get_gtm_analytics(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        gtm_source,
-                        TO_CHAR(added_date, 'YYYY-MM') as month,
-                        COUNT(*) as total_targets,
-                        COUNT(*) FILTER(WHERE status='Completed') completed,
-                        COUNT(*) FILTER(WHERE status='Rejected') rejected,
-                        COUNT(*) FILTER(WHERE status='Pending') pending,
-                        COUNT(*) FILTER(WHERE status='Awaiting Review') awaiting_review,
-                        SUM(cost_per_credit) as total_spend,
-                        SUM(emails_found) as emails_found,
-                        (SELECT COUNT(*) FILTER (WHERE status <> 'Inactive')) AS total_queued,
-                        (SELECT COUNT(*) FILTER (WHERE status='Completed')) AS total_completed,
-                        COUNT(CASE WHEN email_status IN ('Sent Email', 'Got Reply', 'Closed Enquiry') THEN 1 END) as emails_sent,
-                        COUNT(CASE WHEN email_status = 'Got Reply' THEN 1 END) as replies_received,
-                        COUNT(CASE WHEN email_status = 'Closed Enquiry' THEN 1 END) as deals_closed
-                    FROM lead_targets
-                    WHERE added_date >= CURRENT_DATE - INTERVAL '1 month'
-                    GROUP BY gtm_source, TO_CHAR(added_date, 'YYYY-MM')
-                    ORDER BY month DESC, gtm_source ASC
-                """)
-                data = cur.fetchall()
-                for d in data:
-                    d['total_spend'] = float(d['total_spend'] or 0.0)
-                return data
-    def get_production_analytics(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # Groups orders by their current shop floor stage
-                cur.execute("""
-                    SELECT 
-                        COALESCE(production_stage, 'PO_SUBMITTED') as stage, 
-                        COUNT(order_acceptance_id) as count
-                    FROM order_headers
-                    GROUP BY production_stage
-                    ORDER BY count DESC
-                """)
-                return cur.fetchall()
-            
-    # --- SALES ANALYTICS & KPIs end ---
+            return [to_dict(f) for f in faqs]
+    
+    def answer_faq_query(self, faq_id: int, answer: str, answered_by: str):
+        with SessionLocal() as session:
+            faq = session.get(FAQQuery, faq_id)
+
+            if not faq:
+                raise ValueError("FAQ not found.")
+
+            faq.answer = answer.strip()
+            faq.answered_by = answered_by
+            faq.status = "Answered"
+
+            session.commit()
+            session.refresh(faq)
+
+            return to_dict(faq)
+    # --- FAQ Engine end ---
     # --- SYSTEM LOGS start ---
     def create_system_notification(self, user_email: str, title: str, message: str, notif_type: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO system_notifications (user_email, title, message, type)
-                    VALUES (%s, %s, %s, %s)
-                """, (user_email, title, message, notif_type))
-                conn.commit()
-    
-    def get_system_errors(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT route_path, error_message, created_at 
-                    FROM system_error_logs 
-                    ORDER BY created_at DESC LIMIT 50
-                """)
-                data = cur.fetchall()
-                for d in data: d['created_at'] = d['created_at'].isoformat()
-                return data
-            
-    # --- SYSTEM LOGS end ---
-    # --- GLOBAL PRODUCTION PULSE start ---
-    def get_global_production_pulse(self):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Fetch headers AND items using a LEFT JOIN
-                cur.execute("""
-                    SELECT 
-                        h.order_acceptance_id, 
-                        h.billing_name, 
-                        h.due_date, 
-                        h.production_stage,
-                        i.item_code, 
-                        i.quantity
-                    FROM order_headers h
-                    LEFT JOIN order_items i ON h.order_acceptance_id = i.order_acceptance_id
-                    ORDER BY h.due_date ASC
-                """)
-                
-                rows = cur.fetchall()
-                
-                # 2. Group the flattened SQL rows into a nested JSON structure
-                grouped_orders = {}
-                
-                for row in rows:
-                    oa_id = row['order_acceptance_id']
-                    
-                    # Create the order header profile if we haven't seen it yet
-                    if oa_id not in grouped_orders:
-                        grouped_orders[oa_id] = {
-                            'order_acceptance_id': oa_id,
-                            'billing_name': row['billing_name'],
-                            'due_date': str(row['due_date']) if row['due_date'] else None,
-                            'production_stage': row['production_stage'],
-                            'items': [] # Initialize empty items array
-                        }
-                    
-                    # 3. Append the product to the order's items array
-                    if row.get('item_code'):
-                        grouped_orders[oa_id]['items'].append({
-                            'item_code': row['item_code'],
-                            'quantity': row['quantity']
-                        })
-                        
-                # 4. Return the grouped values as a list for the API
-                return list(grouped_orders.values())
+        with SessionLocal() as session:
+            notification = SystemNotification(user_email=user_email, title=title, message=message, type=notif_type)
 
-    def update_order_stage(self, order_id: str, new_stage: str):
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE order_headers SET production_stage = %s WHERE order_acceptance_id = %s RETURNING *
-                """, (new_stage, str(order_id)))
-                conn.commit()
-                return cur.fetchone()
-    # --- GLOBAL PRODUCTION PULSE end ---
+            session.add(notification)
+            session.commit()
+
+
+    def get_system_errors(self):
+        with SessionLocal() as session:
+            stmt = (select(SystemErrorLog).order_by(SystemErrorLog.created_at.desc()).limit(50))
+
+            errors = session.scalars(stmt).all()
+
+            return [
+                {
+                    **to_dict(error),
+                    "created_at": error.created_at.isoformat()
+                }
+                for error in errors
+            ]
+    # --- SYSTEM LOGS end ---
+    # --- SALES ANALYTICS & KPIs start ---
+    def get_sales_kpis(self):
+        with SessionLocal() as session:
+
+            users = session.scalars(select(User).where(User.role == "Sales Representative")).all()
+
+            result = []
+
+            for user in users:
+
+                total_spend = session.scalar(select(func.coalesce(func.sum(LeadTarget.cost_per_credit), 0)).where(LeadTarget.requested_by == user.email))
+
+                targets_queued = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email,LeadTarget.status != "Inactive"))
+
+                monthly_order_value = session.scalar(select(func.coalesce(func.sum(OrderItem.amount),0)).select_from(OrderHeader).join(OrderItem,OrderItem.order_acceptance_id ==OrderHeader.order_acceptance_id).where(OrderHeader.ordered_by == user.email,func.date_trunc("month",OrderHeader.created_at)==func.date_trunc("month",func.current_date())))
+
+                rejected = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Rejected"))
+
+                inactive = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Inactive"))
+
+                crm_leads = session.scalar(select(func.count()).select_from(CRMLead).where(CRMLead.assigned_to == user.email))
+
+                faqs = session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.asked_by == user.email))
+
+                dispatches = session.scalar(select(func.count()).select_from(DispatchRecord).where(DispatchRecord.operator_email == user.email))
+
+                actions = session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email == user.email))
+
+
+                performance_score = (float(monthly_order_value or 0) / 1000 + (crm_leads * 10) + (dispatches * 8) + (faqs * 3) + actions)
+
+
+                result.append({
+                    "email": user.email,
+                    "name": user.name,
+                    "role": user.role,
+                    "quarterly_order_value_target": float(user.quarterly_order_value_target or 0),
+                    "total_spend": float(total_spend or 0),
+
+                    "targets_queued": targets_queued,
+
+                    "monthly_order_value": float(monthly_order_value or 0),
+
+                    "rejected": rejected,
+
+                    "inactive": inactive,
+
+                    "total_crm_leads": crm_leads,
+
+                    "faqs_asked": faqs,
+
+                    "dispatches_logged": dispatches,
+
+                    "actions_logged": actions,
+
+                    "performance_score": performance_score
+                })
+
+
+            return sorted(result, key=lambda x: x["performance_score"], reverse=True)
+    
+    def get_rnd_kpis(self):
+        with SessionLocal() as session:
+
+            users = session.scalars(select(User).where(User.role=="R&D Engineer")).all()
+
+            output=[]
+
+            for user in users:
+
+                answered=session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.answered_by==user.email))
+
+                resolved=session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.answered_by==user.email,FAQQuery.status=="Answered"))
+
+                actions=session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email==user.email))
+
+
+                output.append({
+                    "email":user.email,
+                    "name":user.name,
+                    "role":user.role,
+                    "faqs_answered":answered,
+                    "resolved":resolved,
+                    "actions_logged":actions,
+                    "knowledge_score": answered*15 + resolved*25 + actions
+                })
+
+            return sorted(output, key=lambda x:x["knowledge_score"], reverse=True)
+        
+    def get_transport_kpis(self):
+
+        with SessionLocal() as session:
+
+            total_partners=session.scalar(select(func.count(LogisticsPartner.id)))
+
+
+            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
+
+
+            return {
+                "total_partners": total_partners,
+
+                "monthly_costs":[
+                    {
+                        "month_period":m.month_period,
+                        "total_dispatches":m.total_dispatches,
+                        "total_cost":float(m.total_cost or 0)
+                    }
+                    for m in monthly
+                ]
+            }
+    
+    def get_transport_kpis(self):
+
+        with SessionLocal() as session:
+
+            total_partners=session.scalar(select(func.count(LogisticsPartner.id)))
+
+
+            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
+
+
+            return {
+                "total_partners": total_partners,
+
+                "monthly_costs":[
+                    {
+                        "month_period":m.month_period,
+                        "total_dispatches":m.total_dispatches,
+                        "total_cost":float(m.total_cost or 0)
+                    }
+                    for m in monthly
+                ]
+            }
+    
+    def get_production_analytics(self):
+        with SessionLocal() as session:
+            result = session.execute(select(func.coalesce(OrderHeader.production_stage, "PO_SUBMITTED").label("stage"),func.count(OrderHeader.order_acceptance_id).label("count")).group_by(OrderHeader.production_stage).order_by(desc("count"))).all()
+
+            return [{ "stage": row.stage, "count": row.count} for row in result]
+    
+    def get_gtm_analytics(self):
+        with SessionLocal() as session:
+
+            month_expr = func.to_char(LeadTarget.added_date, "YYYY-MM")
+
+            # Scalar subqueries (same semantics as your SQL)
+            total_queued = (select(func.count()).select_from(LeadTarget).where(LeadTarget.status != "Inactive").scalar_subquery())
+
+            total_completed = (select(func.count()).select_from(LeadTarget).where(LeadTarget.status == "Completed").scalar_subquery())
+
+            stmt = (select(LeadTarget.gtm_source.label("gtm_source"), month_expr.label("month"), func.count().label("total_targets"), func.count().filter(LeadTarget.status == "Completed").label("completed"), func.count().filter(LeadTarget.status == "Rejected").label("rejected"), func.count().filter(LeadTarget.status == "Pending").label("pending"), func.count().filter(LeadTarget.status == "Awaiting Review").label("awaiting_review"), func.sum(LeadTarget.cost_per_credit).label("total_spend"), func.sum(LeadTarget.emails_found).label("emails_found"), total_queued.label("total_queued"), total_completed.label("total_completed"), func.count(case(
+                            (LeadTarget.email_status.in_(["Sent Email", "Got Reply", "Closed Enquiry", ]),1,))).label("emails_sent"),
+
+                    func.count(case((LeadTarget.email_status == "Got Reply", 1,))).label("replies_received"),
+
+                    func.count(case((LeadTarget.email_status == "Closed Enquiry",1,))).label("deals_closed"),
+                )
+                .where(LeadTarget.added_date >= date.today() - timedelta(days=30))
+                .group_by(LeadTarget.gtm_source, month_expr,)
+                .order_by(month_expr.desc(),LeadTarget.gtm_source.asc(),)
+            )
+
+            rows = session.execute(stmt).mappings().all()
+
+            return [
+                {
+                    **row,
+                    "total_spend": float(row["total_spend"] or 0),
+                    "emails_found": int(row["emails_found"] or 0),
+                }
+                for row in rows
+            ]
+    # --- SALES ANALYTICS & KPIs end ---
+# Declare the class instance exactly as requested
 EDBR = PostgresRepository()

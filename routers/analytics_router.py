@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from database.repository import EDBR
+from database.repository import EDBR, SessionLocal
 from security import verify_bearer_token
 from schemas.analytics_schema import SetTargetPayload
 from .dependencies import check_department
+from database.models import User
+from sqlalchemy import update
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics & KPIs"])
 
@@ -58,12 +60,14 @@ def get_production_kpis(user: dict = Depends(verify_bearer_token)):
     
 @router.patch("/admin/users/{email}/target", dependencies=[Depends(check_department("Admin"))])
 def update_user_target(email: str, payload: SetTargetPayload, user: dict = Depends(verify_bearer_token)):
-    with EDBR._get_connection() as conn:
-        with conn.cursor() as cur:
-            # Updated column to reflect quarterly total order value
-            cur.execute(
-                "UPDATE users SET quarterly_order_value_target = %s WHERE email = %s", 
-                (payload.target, email)
-            )
-            conn.commit()
+    with SessionLocal() as session:
+        user = session.get(User, email)
+
+        if user:
+            user.quarterly_order_value_target = payload.target
+            session.commit()
+        
+        else:
+            raise ValueError("User not found")
+
     return {"status": "success", "message": f"Quarterly target updated for {email}"}
