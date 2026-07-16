@@ -12,6 +12,7 @@ export default function useTasks({sessionToken, user, setAlertMessage, setIsAler
         setLoadingTasks(true);
 
         try {
+            console.log("Token:", sessionToken);
             const data = await API.fetchTasks(sessionToken);
             console.log("Tasks fetched: ", data);
             setTasks(Array.isArray(data) ? data : []);

@@ -66,7 +66,8 @@ export default function useERPState() {
 
         setErrorModalOpen(true);
     };
-    
+    const allowedRoles = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"];
+
     const dispatchSystemNotification = (title, message) => {
         setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
         setIsAlertOpen(true);
@@ -86,10 +87,10 @@ export default function useERPState() {
     };
 
     const taskState = useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification}); //Tasks subsystem
-    const dispatchState = useDispatchHub({sessionToken, showErrorModal, addToast}); //Dispatch & transport state
+    //const dispatchState = useDispatchHub({sessionToken, showErrorModal, addToast}); //Dispatch & transport state
     
     const refreshTaskHub = useCallback(async () => {
-        if (!user?.access_token && (user?.role !== 'Shop Floor Administrator' || user?.role !== 'Admin' || user?.role !== 'Chief Full Stack Developer')) return;
+        if (!user?.access_token || !allowedRoles.includes(user.role)) return;
 
         try {
             await taskState.loadTasks();
@@ -100,7 +101,7 @@ export default function useERPState() {
     
     useEffect(() => {
         if (!user) return;
-
+        console.log("User changed to: ", user);
         refreshTaskHub();
     }, [user]);
 
@@ -530,6 +531,6 @@ export default function useERPState() {
         ...taskState, refreshTaskHub, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
         isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems,
-        setIsEditingCompany, ...dispatchState
+        setIsEditingCompany, //...dispatchState
     };
 }
