@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import API from "../api/api";
 
 export default function useTransportPartners({sessionToken, showErrorModal, addToast}) {
@@ -13,7 +13,7 @@ export default function useTransportPartners({sessionToken, showErrorModal, addT
     const [partnerForm, setPartnerForm] = useState(defaultPartner);
 
     const [loadingPartners, setLoadingPartners] = useState(false);
-
+    
     const loadPartners = useCallback(async () => {
         if (!sessionToken) return;
         setLoadingPartners(true);
@@ -28,6 +28,10 @@ export default function useTransportPartners({sessionToken, showErrorModal, addT
             setLoadingPartners(false);
         }
     }, [sessionToken, showErrorModal]);
+
+    useEffect(() => {
+        if(sessionToken) {loadPartners();}
+    }, [sessionToken]);
 
     const createPartner = useCallback(async payload => {
 

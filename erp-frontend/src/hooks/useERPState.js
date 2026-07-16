@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import API from "../api/api";
 import useTasks from "./useTasks";
 import useDispatchHub from "./useDispatchHub";
+import useLogisticsHub from "./useLogisticsHub";
 
 const API_HOST = window.location.hostname;
 
@@ -87,8 +88,15 @@ export default function useERPState() {
     };
 
     const taskState = useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification}); //Tasks subsystem
-    //const dispatchState = useDispatchHub({sessionToken, showErrorModal, addToast}); //Dispatch & transport state
     
+    const dispatchState = useDispatchHub({sessionToken, showErrorModal, addToast}); //Dispatch & transport state
+    
+    const logisticsState = useLogisticsHub({state: {user}, setModalAlert: ({title, message, isError}) => {
+        if(isError) showErrorModal(title, message);
+        else {setAlertMessage(message); setIsAlertOpen(true);}
+    }});
+
+
     const refreshTaskHub = useCallback(async () => {
         if (!user?.access_token || !allowedRoles.includes(user.role)) return;
 
@@ -531,6 +539,6 @@ export default function useERPState() {
         ...taskState, refreshTaskHub, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
         showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
         isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems,
-        setIsEditingCompany, //...dispatchState
+        setIsEditingCompany, dispatchState, logisticsState
     };
 }
