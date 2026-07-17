@@ -1,17 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import API from "../api/api";
 import { FiExternalLink, FiTruck } from "react-icons/fi";
-import useTruckCanvas from "../hooks/useTruckCanvas";
+import useTruckCanvas from "../hooks/dispatch/useTruckCanvas";
 import IndianCurrencyInput from "../components/shared/IndianCurrencyInput";
 
 export default function DispatchPlannerView({ state }) {
-    const {products, unit, dim, resultsData, selectedTransport, partnerDistances, partners, modalAlert,
-        updateProduct, addProduct, removeProduct, handleEvaluate, confirmTransport,
-        setDim, setUnit, setPartnerDistances, setSelectedTransport, setModalAlert, 
-        truckDim, setTruckDim, packedBoxes
-    } = state.dispatchState;
-    
-    const canvasRef = useTruckCanvas(packedBoxes, truckDim);
+       
+    const canvasRef = useTruckCanvas(state.packedBoxes, state.truckDim);
 
     return (
         <div className="frappe-card">  
@@ -21,7 +16,7 @@ export default function DispatchPlannerView({ state }) {
                      <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Contract Rate Comparison</p>
                 </div>
             </div>
-            <form onSubmit={handleEvaluate} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "20px", border: "1px solid var(--border-light)" }}>
+            <form onSubmit={state.handleEvaluate} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "20px", border: "1px solid var(--border-light)" }}>
                 
                 {/* ROW 1: Multi-Product Cart */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -29,45 +24,45 @@ export default function DispatchPlannerView({ state }) {
                     
                     {/* Unit Toggle Switch */}
                     <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: '20px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-                        <button type="button" onClick={() => setUnit('cm')} style={{ padding: '4px 12px', border: 'none', background: unit === 'cm' ? 'var(--brand-accent)' : 'transparent', color: unit === 'cm' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: unit === 'cm' ? '600' : 'normal', transition: 'all 0.2s' }}>
+                        <button type="button" onClick={() => state.setUnit('cm')} style={{ padding: '4px 12px', border: 'none', background: state.unit === 'cm' ? 'var(--brand-accent)' : 'transparent', color: state.unit === 'cm' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state.unit === 'cm' ? '600' : 'normal', transition: 'all 0.2s' }}>
                             Centimeters (cm)
                         </button>
-                        <button type="button" onClick={() => setUnit('in')} style={{ padding: '4px 12px', border: 'none', background: unit === 'in' ? 'var(--brand-accent)' : 'transparent', color: unit === 'in' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: unit === 'in' ? '600' : 'normal', transition: 'all 0.2s' }}>
+                        <button type="button" onClick={() => state.setUnit('in')} style={{ padding: '4px 12px', border: 'none', background: state.unit === 'in' ? 'var(--brand-accent)' : 'transparent', color: state.unit === 'in' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state.unit === 'in' ? '600' : 'normal', transition: 'all 0.2s' }}>
                             Inches (in)
                         </button>
                     </div>
                 </div>
 
-                {products.map((p, idx) => (
+                {state.products.map((p, idx) => (
                     <div key={idx} style={{ background: 'var(--bg-surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '10px', position: 'relative' }}>
                         
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>PRODUCT PACKAGING {idx + 1}</div>
                             {idx > 0 && (
-                                <button type="button" onClick={() => removeProduct(idx)} className="btn-text-danger" style={{ fontSize: '14px', padding: 0 }}>✕ Remove</button>
+                                <button type="button" onClick={() => state.removeProduct(idx)} className="btn-text-danger" style={{ fontSize: '14px', padding: 0 }}>✕ Remove</button>
                             )}
                         </div>
 
                         <div className="form-grid-layout" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                             <div>
-                                <label className="input-label">Width ({unit})</label>
-                                <input type="number" step="0.01" min="0" required className="form-input" value={p.width} onChange={(e) => updateProduct(idx, 'width', e.target.value)} />
+                                <label className="input-label">Width ({state.unit})</label>
+                                <input type="number" step="0.01" min="0" required className="form-input" value={p.width} onChange={(e) => state.updateProduct(idx, 'width', e.target.value)} />
                             </div>
                             <div>
-                                <label className="input-label">Depth ({unit})</label>
-                                <input type="number" step="0.01" min="0" required className="form-input" value={p.depth} onChange={(e) => updateProduct(idx, 'depth', e.target.value)} />
+                                <label className="input-label">Depth ({state.unit})</label>
+                                <input type="number" step="0.01" min="0" required className="form-input" value={p.depth} onChange={(e) => state.updateProduct(idx, 'depth', e.target.value)} />
                             </div>
                             <div>
-                                <label className="input-label">Height ({unit})</label>
-                                <input type="number" step="0.01" min="0" required className="form-input" value={p.height} onChange={(e) => updateProduct(idx, 'height', e.target.value)} />
+                                <label className="input-label">Height ({state.unit})</label>
+                                <input type="number" step="0.01" min="0" required className="form-input" value={p.height} onChange={(e) => state.updateProduct(idx, 'height', e.target.value)} />
                             </div>
                         </div>
                     </div>
                 ))}
 
-                {products.length < 5 && (
-                    <button type="button" onClick={addProduct} style={{ width: '100%', padding: '10px', border: '1px dashed var(--brand-accent)', background: 'transparent', color: 'var(--brand-accent)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '25px', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = '#f0f7ff'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
-                        + Add Another Package ({products.length}/5)
+                {state.products.length < 5 && (
+                    <button type="button" onClick={state.addProduct} style={{ width: '100%', padding: '10px', border: '1px dashed var(--brand-accent)', background: 'transparent', color: 'var(--brand-accent)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '25px', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = '#f0f7ff'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                        + Add Another Package ({state.products.length}/5)
                     </button>
                 )}
 
@@ -75,15 +70,15 @@ export default function DispatchPlannerView({ state }) {
                 <div className="form-grid-layout" style={{gridTemplateColumns: "repeat(3, 1fr)", marginBottom: '25px'}}>
                     <div>
                         <label className="input-label">Total Invoice Value (₹)</label>
-                        <IndianCurrencyInput className="form-input" value={dim.invoice_value === 0 ? '' : dim.invoice_value} onChange={(raw) => setDim({ ...dim, invoice_value: raw })} />
+                        <IndianCurrencyInput className="form-input" value={state.dim.invoice_value === 0 ? '' : state.dim.invoice_value} onChange={(raw) => state.setDim({ ...state.dim, invoice_value: raw })} />
                     </div>
                     <div>
                         <label className="input-label">Destination City <strong>(CITY ONLY!)</strong></label>
-                        <input type="text" required className="form-input" value={dim.destination_city} onChange={(e) => setDim({ ...dim, destination_city: e.target.value })} />
+                        <input type="text" required className="form-input" value={state.dim.destination_city} onChange={(e) => state.setDim({ ...state.dim, destination_city: e.target.value })} />
                     </div>
                     <div>
                         <label className="input-label">Current Diesel Price (₹)</label>
-                        <input type="number" min="0" step="0.01" required className="form-input" value={dim.diesel_price} onChange={(e) => setDim({ ...dim, diesel_price: +e.target.value })} />
+                        <input type="number" min="0" step="0.01" required className="form-input" value={state.dim.diesel_price} onChange={(e) => state.setDim({ ...state.dim, diesel_price: +e.target.value })} />
                     </div>
                 </div>
 
@@ -96,18 +91,18 @@ export default function DispatchPlannerView({ state }) {
                         <label className="input-label" style={{ marginBottom: '10px', display: 'block' }}>Loading Method Setup</label>
                         
                         <div style={{ display: 'flex', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-light)', overflow: 'hidden', width: 'fit-content' }}>
-                            <button type="button" onClick={() => setDim({...dim, loading_type: 'local'})} style={{ padding: '6px 14px', border: 'none', background: dim.loading_type === 'local' ? 'var(--brand-accent)' : 'transparent', color: dim.loading_type === 'local' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: dim.loading_type === 'local' ? '600' : 'normal', transition: 'all 0.2s' }}>
+                            <button type="button" onClick={() => state.setDim({...state.dim, loading_type: 'local'})} style={{ padding: '6px 14px', border: 'none', background: state.dim.loading_type === 'local' ? 'var(--brand-accent)' : 'transparent', color: state.dim.loading_type === 'local' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state.dim.loading_type === 'local' ? '600' : 'normal', transition: 'all 0.2s' }}>
                                 📍 Local (Fixed)
                             </button>
-                            <button type="button" onClick={() => setDim({...dim, loading_type: 'hub'})} style={{ padding: '6px 14px', border: 'none', background: dim.loading_type === 'hub' ? 'var(--brand-accent)' : 'transparent', color: dim.loading_type === 'hub' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: dim.loading_type === 'hub' ? '600' : 'normal', transition: 'all 0.2s' }}>
+                            <button type="button" onClick={() => state.setDim({...state.dim, loading_type: 'hub'})} style={{ padding: '6px 14px', border: 'none', background: state.dim.loading_type === 'hub' ? 'var(--brand-accent)' : 'transparent', color: state.dim.loading_type === 'hub' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state.dim.loading_type === 'hub' ? '600' : 'normal', transition: 'all 0.2s' }}>
                                 🏢 Hub (Variable)
                             </button>
                         </div>
 
-                        {dim.loading_type === 'hub' && (
+                        {state.dim.loading_type === 'hub' && (
                             <div style={{ marginTop: '15px' }}>
                                 <label className="input-label" style={{ fontSize: '11px', color: 'var(--brand-danger)' }}>Enter Hub Amount (₹)</label>
-                                <input className="form-input" type="number" required value={dim.hub_loading_input} onChange={e => setDim({...dim, hub_loading_input: +e.target.value})} />
+                                <input className="form-input" type="number" required value={state.dim.hub_loading_input} onChange={e => state.setDim({...state.dim, hub_loading_input: +e.target.value})} />
                                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>*Will be capped by partner max threshold if defined</span>
                             </div>
                         )}
@@ -118,40 +113,40 @@ export default function DispatchPlannerView({ state }) {
                         <label className="input-label" style={{ marginBottom: '10px', display: 'block' }}>Final Delivery Type</label>
                         
                         <div style={{ display: 'flex', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-light)', overflow: 'hidden', width: 'fit-content' }}>
-                            <button type="button" onClick={() => setDim({...dim, delivery_type: 'door'})} style={{ padding: '6px 14px', border: 'none', background: dim.delivery_type === 'door' ? 'var(--brand-accent)' : 'transparent', color: dim.delivery_type === 'door' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: dim.delivery_type === 'door' ? '600' : 'normal', transition: 'all 0.2s' }}>
+                            <button type="button" onClick={() => state.setDim({...state.dim, delivery_type: 'door'})} style={{ padding: '6px 14px', border: 'none', background: state.dim.delivery_type === 'door' ? 'var(--brand-accent)' : 'transparent', color: state.dim.delivery_type === 'door' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state.dim.delivery_type === 'door' ? '600' : 'normal', transition: 'all 0.2s' }}>
                                 🚪 Door
                             </button>
-                            <button type="button" onClick={() => setDim({...dim, delivery_type: 'godown'})} style={{ padding: '6px 14px', border: 'none', background: dim.delivery_type === 'godown' ? 'var(--brand-accent)' : 'transparent', color: dim.delivery_type === 'godown' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: dim.delivery_type === 'godown' ? '600' : 'normal', transition: 'all 0.2s' }}>
+                            <button type="button" onClick={() => state.setDim({...state.dim, delivery_type: 'godown'})} style={{ padding: '6px 14px', border: 'none', background: state.dim.delivery_type === 'godown' ? 'var(--brand-accent)' : 'transparent', color: state.dim.delivery_type === 'godown' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state.dim.delivery_type === 'godown' ? '600' : 'normal', transition: 'all 0.2s' }}>
                                 🏭 Godown Hub
                             </button>
                         </div>
                         
-                        <div style={{ fontSize: '11px', color: dim.delivery_type === 'door' ? 'var(--text-primary)' : 'var(--text-muted)', marginTop: '15px' }}>
-                            {dim.delivery_type === 'door' ? "Requires manual distance mapping below." : "Distance mapping disabled. No ODA charges will apply."}
+                        <div style={{ fontSize: '11px', color: state.dim.delivery_type === 'door' ? 'var(--text-primary)' : 'var(--text-muted)', marginTop: '15px' }}>
+                            {state.dim.delivery_type === 'door' ? "Requires manual distance mapping below." : "Distance mapping disabled. No ODA charges will apply."}
                         </div>
                     </div>
 
                     <div style={{ background: 'var(--bg-surface)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--brand-accent)' }}>
                         <label className="input-label" style={{ color: 'var(--brand-accent)' }}>Extra Hamali Adjustments</label>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                             <div><label className="input-label" style={{ fontSize: "11px" }}>Detail</label><input className="form-input" placeholder="e.g., Unloading" value={dim.hamali_detail} onChange={(e) => setDim({ ...dim, hamali_detail: e.target.value })} /></div>
-                            <div><label className="input-label" style={{ fontSize: "11px" }}>Cost (₹)</label><input className="form-input" type="number" value={dim.hamali_cost} onChange={(e) => setDim({ ...dim, hamali_cost: +e.target.value })} /></div>
+                             <div><label className="input-label" style={{ fontSize: "11px" }}>Detail</label><input className="form-input" placeholder="e.g., Unloading" value={state.dim.hamali_detail} onChange={(e) => state.setDim({ ...state.dim, hamali_detail: e.target.value })} /></div>
+                            <div><label className="input-label" style={{ fontSize: "11px" }}>Cost (₹)</label><input className="form-input" type="number" value={state.dim.hamali_cost} onChange={(e) => state.setDim({ ...state.dim, hamali_cost: +e.target.value })} /></div>
                         </div>
                     </div>
                 </div>
 
-                {dim.delivery_type === 'door' && (
+                {state.dim.delivery_type === 'door' && (
                     <>
                         <h4 style={{ marginTop: 25, borderTop: "1px solid var(--border-light)", paddingTop: "15px" }}>Transporter Distance Mapping (Door Delivery)</h4>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: "15px", marginTop: "10px" }}>
-                            {partners.map((partner) => ( 
+                            {state.partners.map((partner) => ( 
                                 <div key={partner.id} style={{ border: "1px solid var(--border-light)", borderRadius: "8px", padding: "15px", background: "var(--bg-surface)" }}>
                                     <h4 style={{ margin: 0 }}>{partner.name}</h4>
                                     <p style={{ marginTop: "4px", fontSize: "12px", color: "var(--text-muted)"}}>
                                         {partner.partner_link && (<a href={partner.partner_link} style={{color: 'var(--text-primary)'}} target="_blank" rel="noopener noreferrer" title="Open Partner Website">Find distance calculator here <FiExternalLink size={14} /></a>)}
                                     </p>
                                     <label className="input-label">Distance from Hub (KM)</label>
-                                    <input type="number" min={1} className="form-input" value={partnerDistances[partner.id] || 0} onChange={(e) => setPartnerDistances({ ...partnerDistances, [partner.id]: Number(e.target.value) }) } />
+                                    <input type="number" min={1} className="form-input" value={state.partnerDistances[partner.id] || 0} onChange={(e) => state.setPartnerDistances({ ...state.partnerDistances, [partner.id]: Number(e.target.value) }) } />
                                 </div>
                             ))}
                         </div>
@@ -164,8 +159,8 @@ export default function DispatchPlannerView({ state }) {
                         <div style={{ padding: '20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-light)' }}>
                             <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}><FiTruck /> Dynamic Truck Spatial Visualizer</h4>
                             <div style={{ display: 'flex', gap: '15px' }}>
-                                <div><label className="input-label">Truck Length (inches)</label><input type="number" className="form-input" value={truckDim.length || ''} onChange={e => setTruckDim({...truckDim, length: +e.target.value || 0})} /></div>
-                                <div><label className="input-label">Truck Width (inches)</label><input type="number" className="form-input" value={truckDim.width || ''} onChange={e => setTruckDim({...truckDim, width: +e.target.value || 0})} /></div>
+                                <div><label className="input-label">Truck Length (inches)</label><input type="number" className="form-input" value={state.truckDim.length || ''} onChange={e => state.setTruckDim({...state.truckDim, length: +e.target.value || 0})} /></div>
+                                <div><label className="input-label">Truck Width (inches)</label><input type="number" className="form-input" value={state.truckDim.width || ''} onChange={e => state.setTruckDim({...state.truckDim, width: +e.target.value || 0})} /></div>
                             </div>
                         </div>
 
@@ -174,7 +169,7 @@ export default function DispatchPlannerView({ state }) {
                             <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
                         </div>
 
-                        {packedBoxes.boxes.some(b => !b.fits) && (
+                        {state.packedBoxes.boxes.some(b => !b.fits) && (
                             <div style={{ background: 'var(--brand-danger)', color: '#fff', padding: '10px 20px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
                                 ⚠️ OVERFLOW ALERT: Cargo layout exceeds available footprint dimensions!
                             </div>
@@ -182,12 +177,12 @@ export default function DispatchPlannerView({ state }) {
                     </div>
                 )}
 
-            {resultsData?.options?.length > 0 && (
+            {state.resultsData?.options?.length > 0 && (
                 <div>
-                     <h4>Total Options: {resultsData.options.length}</h4>
+                     <h4>Total Options: {state.resultsData.options.length}</h4>
                     <div style={{ display: "flex", gap: 15, overflowX: "auto" }}>
-                        {resultsData.options.map((opt, idx) => {
-                            const isBest = selectedTransport?.partner_name === opt.partner_name;
+                        {state.resultsData.options.map((opt, idx) => {
+                            const isBest = state.selectedTransport?.partner_name === opt.partner_name;
                             return (
                                  <div key={idx} style={{ minWidth: 280, padding: 15, border: isBest ? "2px solid var(--brand-success)" : "1px solid var(--border-subtle)", background: isBest ? "#eaffea" : "var(--bg-surface)" }}>
                                     <strong style={{ color: "var(--brand-accent)" }}>Partners Evaluation:</strong>
@@ -209,7 +204,7 @@ export default function DispatchPlannerView({ state }) {
                                             <span>Total Cost after Taxes</span><strong>₹{opt.dispatch_cost_gst}</strong>
                                         </div>
                                     </details>
-                                      <button className="btn btn-success" onClick={() => confirmTransport(opt)} style={{ marginTop: '10px', width: '100%' }}>Select</button>
+                                      <button className="btn btn-success" onClick={() => state.confirmTransport(opt)} style={{ marginTop: '10px', width: '100%' }}>Select</button>
                                 </div>
                             );
                         })}
@@ -217,27 +212,27 @@ export default function DispatchPlannerView({ state }) {
                 </div>
             )}
 
-            {selectedTransport && (
+            {state.selectedTransport && (
                 <div className="modal-overlay">
                     <div className="modal-box">
                           <h3>Confirmed Transport</h3>
-                        <p>{selectedTransport.partner_name}</p>
-                        <p>Final Cost: ₹{selectedTransport.dispatch_cost_gst}</p>
-                        <button className="btn btn-primary" onClick={() => confirmTransport(selectedTransport)}>Print Invoice</button>
+                        <p>{state.selectedTransport.partner_name}</p>
+                        <p>Final Cost: ₹{state.selectedTransport.dispatch_cost_gst}</p>
+                        <button className="btn btn-primary" onClick={() => state.confirmTransport(state.selectedTransport)}>Print Invoice</button>
                         {" or "}
-                        <button className="btn btn-secondary" onClick={() => setSelectedTransport(null)}>Close</button>
+                        <button className="btn btn-secondary" onClick={() => state.setSelectedTransport(null)}>Close</button>
                     </div>
                 </div>
             )}
             
-            {modalAlert.isOpen && (
+            {state.modalAlert.isOpen && (
                 <div className="modal-overlay">
-                    <div className="modal-box" style={{ borderTop: `4px solid ${modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
-                        <h3 style={{ color: modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)" }}>
-                            {modalAlert.title}
+                    <div className="modal-box" style={{ borderTop: `4px solid ${state.modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
+                        <h3 style={{ color: state.modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)" }}>
+                            {state.modalAlert.title}
                         </h3>
-                        <p style={{ margin: "15px 0" }}>{modalAlert.message}</p>
-                        <button className="btn btn-secondary" onClick={() => setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
+                        <p style={{ margin: "15px 0" }}>{state.modalAlert.message}</p>
+                        <button className="btn btn-secondary" onClick={() => state.setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
                     </div>
                 </div>
             )}

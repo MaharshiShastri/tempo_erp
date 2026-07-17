@@ -1,161 +1,71 @@
 import { useState, useEffect, useCallback } from "react";
 import API from "../api/api";
-import useTasks from "./useTasks";
-import useDispatchHub from "./useDispatchHub";
-import useLogisticsHub from "./useLogisticsHub";
+import useTasks from "./tasks/useTasks";
+import useDispatchHub from "./dispatch/useDispatchHub";
+import useLogisticsHub from "./logistics/useLogisticsHub";
+import useCompanyMaster from "./company/useCompanyMaster";
+import useItemMaster from "./items/useItemMaster";
+import useOrders from "./orders/useOrders";
+import useBilling from "./billing/useBilling";
+import useCore from "./useCore";
 
 const API_HOST = window.location.hostname;
 
 export default function useERPState() {
-    const [user, setUser] = useState(() => {
-        const cache = localStorage.getItem('tempo_erp_user');
-        return cache ? JSON.parse(cache) : null;
-    });
-
-    const [activeTab, setActiveTab] = useState('global-pulse');
-    const [orders, setOrders] = useState([]);
-    const [bills, setBills] = useState([]);
-
-    const [toasts, setToasts] = useState([]);
-    const [dashboardData, setDashboardData] = useState({ past: [], ongoing: [], future: [] });
-    const [systemUsers, setSystemUsers] = useState([]);
-    const [dispatch, setDispatch] = useState([]);
-    const [companiesMaster, setCompaniesMaster] = useState([]);
-    const [itemsMaster, setItemsMaster] = useState([]);
-    const [errorModalOpen, setErrorModalOpen] = useState(false);
-    const [isEditingCompany, setIsEditingCompany] = useState(false);
-    const [selectedCompanyId, setSelectedCompanyId] = useState(null);
-    const [errorModal, setErrorModal] = useState({title: "", message: "" });
-    const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const [alertMessage, setAlertMessage] = useState('');
-    const [errorMessage, setErrorMessage] = useState('');
-
-    const [isServerLive, setIsServerLive] = useState(true);
+    
     const [notifications, setNotifications] = useState([]);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-    const [loginEmail, setLoginEmail] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-
-    const [isBillingSameAsCustomer, setIsBillingSameAsCustomer] = useState(true);
-
-    const defaultOrderHeader = { order_acceptance_id: '', order_acceptance_date: '', purchase_order_number: '', purchase_order_date: '', customer_code: '', payment_terms: '', billing_name: '', billing_address: '', due_date: '' };
-    const defaultOrderItem = { item_code: '', additional_spec_text: '', hsn_code: '', quantity: 1, unit_measure: 'NOS', rate: 0.00, discount_percentage: 0.00 };
-    const defaultCompanyForm = { name: '', address_line_1: '', city: '', state: '', pincode: '', contact_name: '', contact_role: '', contact_phone: '' };
-    const defaultItemForm = { item_code: '', item_name: '', item_group: '', rate: 0, unit_measure: 'in', additional_spec_text: '', hsn_code: '', revision_no: '', drawing_no: '' };
-
-    const [orderHeader, setOrderHeader] = useState({ ...defaultOrderHeader });
-    const [orderItems, setOrderItems] = useState([{ ...defaultOrderItem }]);
-    const [companyForm, setCompanyForm] = useState({ ...defaultCompanyForm });
+    const [isServerLive, setIsServerLive] = useState(true);
     
-    const [billHeader, setBillHeader] = useState({ bill_num: '', bill_date: '', order_acceptance_id: '' });
-    const [billItems, setBillItems] = useState([]);
+    const factoryRoles = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"];
+    const salesRoles = ["Sales Representative", "Admin", "Chief Full Stack Developer"];
+    const transportRoles = ["Dispatch Engineer", "Admin", "Chief Full Stack Developer"];
 
-    const [activePrintJob, setActivePrintJob] = useState(null);
-    const [printType, setPrintType] = useState(null);
-    const [itemForm, setItemForm] = useState({ ...defaultItemForm });
-    const [selectedItem, setSelectedItem] = useState(null);
-    const [itemDetail, setItemDetail] = useState(null);
-    const [isEditingItem, setIsEditingItem] = useState(false);
+    const core = useCore();
     
-    const sessionToken = user ? user.access_token : null;
-    const showErrorModal = ( title, message) => {
-        setErrorModal({
-            title,
-            message
-        });
-
-        setErrorModalOpen(true);
-    };
-    const allowedRoles = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"];
-
     const dispatchSystemNotification = (title, message) => {
-        setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
-        setIsAlertOpen(true);
+        core.setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
+        core.setIsAlertOpen(true);
+
         if ("Notification" in window && Notification.permission === "granted") {
             new Notification(title, { body: message });
         }
     };
-    const clearNotifications = () => {
-        setNotifications([])
-    }
-    const addToast = (message, type="info") => {
-        const id = Date.now();
-        setToasts(prev => [...prev, {id, message, type}]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id));   
-        }, 5000);
-    };
-
-    const taskState = useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification}); //Tasks subsystem
+    //Division of states into different hooks
     
-    const dispatchState = useDispatchHub({sessionToken, showErrorModal, addToast}); //Dispatch & transport state
-    
-    const logisticsState = useLogisticsHub({state: {user}, setModalAlert: ({title, message, isError}) => {
-        if(isError) showErrorModal(title, message);
-        else {setAlertMessage(message); setIsAlertOpen(true);}
-    }});
+    //const master = useMasterData({sessionToken: sessionToken, user: user});
+    const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const dispatch = useDispatchHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
+    const logistics = useLogisticsHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
+    const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
+    const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const orders = useOrders({sessionToken: core.sessionToken, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
+    const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
 
-
-    const refreshTaskHub = useCallback(async () => {
-        if (!user?.access_token || !allowedRoles.includes(user.role)) return;
-
-        try {
-            await taskState.loadTasks();
-        } catch (err) {
-            console.error(err);
+    useEffect(() => {
+        if (!core.user || !core.sessionToken) return;
+        items.refreshItems();
+        if (salesRoles.includes(core.user.role)) {
+            companies.refreshCompanies();
+            orders.loadOrders();
+            billing.loadBills();
         }
-    }, [user, taskState.loadTasks]);
-    
-    useEffect(() => {
-        if (!user) return;
-        console.log("User changed to: ", user);
-        refreshTaskHub();
-    }, [user]);
 
-    useEffect(() => {
-        if ("Notification" in window && Notification.permission === "default") {
-            Notification.requestPermission();
+        if (transportRoles.includes(core.user.role)) {
+            dispatch.loadPartners();
         }
-    }, []);
 
-    useEffect(() => {
-        if (!user?.access_token) return;
-
-        try {
-            const payload = JSON.parse(
-                atob(user.access_token.split('.')[1])
-            );
-
-            const expiresAt = payload.exp * 1000;
-            const remaining = expiresAt - Date.now();
-
-            if (remaining <= 0) {
-                localStorage.removeItem("tempo_erp_user");
-                setUser(null);
-                return;
-            }
-
-            const timer = setTimeout(() => {
-                localStorage.removeItem("tempo_erp_user");
-                setUser(null);
-
-                alert("Your session has expired. Please login again.");
-            }, remaining);
-
-            return () => clearTimeout(timer);
-
-        } catch {
-            localStorage.removeItem("tempo_erp_user");
-            setUser(null);
+        if (factoryRoles.includes(core.user.role)) {
+            tasks.loadTasks();
         }
-    }, [user]);
+    }, [core.user, core.sessionToken]);
 
     useEffect(() => {
-        if (!sessionToken) return;
+        if (!core.sessionToken) return;
         
         // Connect to the unified stream router
-        const eventSource = new EventSource(`/api/v1/stream/events?token=${sessionToken}`);
+        const eventSource = new EventSource(`/api/v1/stream/events?token=${core.sessionToken}`);
         
         let timeoutTimer;
 
@@ -180,7 +90,7 @@ export default function useERPState() {
                 if (data.type === 'TASK' || data.type === 'FAQ' || data.type === 'ORDER_STAGE') {
                     setNotifications(prev => [{...data, read: false}, ...prev]);
                     setUnreadNotifCount(prev => prev + 1);
-                    addToast(`${data.title}`, 'info');
+                    core.addToast(`${data.title}`, 'info');
 
                 }
             } catch(e) {
@@ -190,7 +100,6 @@ export default function useERPState() {
 
         eventSource.onerror = (error) => {
             setIsServerLive(false);
-            console.log("SSE Connection dropped. Server might be restarting.");
         };
 
         resetPulseTimer(); // Start the initial timer
@@ -201,344 +110,15 @@ export default function useERPState() {
                 eventSource.close();
             }
         };
-    }, [sessionToken]);
+    }, [core.sessionToken]);
 
     const markAllNotifsRead = () => {
         setUnreadNotifCount(0);
         setNotifications(prev => prev.map(n => ({...n, read: true})));
     };
 
-    const triggerNewCompany = () => {
-        setCompanyForm({ ...defaultCompanyForm });
-        setIsEditingCompany(false);
-        setSelectedCompanyId(null);
-        setActiveTab('company-new');
-    };
-
-    const triggerEditCompany = async (companyId) => {
-        try {
-            const companyData = await API.fetchCompany(companyId, sessionToken);
-            setCompanyForm({
-                name: companyData.name || '',
-                address_line_1: companyData.address_line_1 || '',
-                city: companyData.city || '',
-                state: companyData.state || '',
-                pincode: companyData.pincode || '',
-                contact_name: companyData.contact_name || '',
-                contact_role: companyData.contact_role || '',
-                contact_phone: companyData.contact_phone || ''
-            });
-            setIsEditingCompany(true);
-            setSelectedCompanyId(companyId);
-            setActiveTab('company-new');
-        } catch (err) {
-            setAlertMessage("Failed to load company details: " + err.message);
-            setIsAlertOpen(true);
-        }
-    };
-
-    const deleteCompany = async (companyId) => {
-        const confirm = window.confirm("Are you sure you want to permanently delete this corporate account?");
-        if (!confirm) return;
-        
-        try {
-            await API.deleteCompany(companyId, sessionToken);
-            setAlertMessage("Company profile deleted successfully.");
-            setIsAlertOpen(true);
-            await refreshDataHub();
-            if (activeTab === 'company-new') setActiveTab('companies-list');
-        } catch (err) {
-            setAlertMessage(err.message);
-            setIsAlertOpen(true);
-        }
-    };
-
-    useEffect(() => {
-        if (sessionToken) refreshDataHub();
-    }, [sessionToken]);
-
-    useEffect(() => {
-        const handleGlobalKeyDown = (e) => {
-            // Ignore keystrokes if the user isn't logged in or a modal is open
-            if (!sessionToken || isAlertOpen) return;
-
-            // Prevent default browser behavior for our specific shortcuts
-            const isAltShortcut = e.altKey && ['c', 'i', 'o', 'b', 't', 'n'].includes(e.key.toLowerCase());
-            const isCtrlS = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's';
-            
-            if (isAltShortcut || isCtrlS) {
-                e.preventDefault();
-            }
-
-            // 1. Contextual Save (Ctrl + S)
-            if (isCtrlS) {
-                // Find the active form's submit button and click it to preserve HTML5 validation
-                const activeSubmitBtn = document.querySelector('form button[type="submit"]');
-                if (activeSubmitBtn) activeSubmitBtn.click();
-                return;
-            }
-
-            // 2. Global Navigation (Alt + Key)
-            if (e.altKey) {
-                switch (e.key.toLowerCase()) {
-                    case 'c': setActiveTab('companies-list'); break;
-                    case 'i': setActiveTab('items-master'); break;
-                    case 'o': setActiveTab('orders-list'); break;
-                    case 'b': setActiveTab('bills-list'); break;
-                    case 't': setActiveTab('tasks-workspace'); break;
-                    case 'd': setActiveTab('dispatch-planner'); break;
-                    case 'p': setActiveTab('accountability-hub'); break;
-                    case 'l': setActiveTab('partner-new'); break;
-                    case 'm': setActiveTab('admin-users'); break;
-                    case 'w': setActiveTab('crm-workspace'); break;
-                    case 'g': setActiveTab('grn-workspace'); break;
-                    case 'e': setActiveTab('lead-generation'); break;
-                    case 'r': setActiveTab('grn-workspace'); break;
-                    case 'f': setActiveTab('tally-sync'); break;
-                    case 'n': // Contextual New Record
-                        if (activeTab.includes('company')) setActiveTab('company-new');
-                        else if (activeTab.includes('order')) triggerNewOrderInitialization();
-                        else if (activeTab.includes('bill')) setActiveTab('bill-new');
-                        break;
-                }
-                return;
-            }
-
-            // 3. Escape to Discard / Go Back
-            if (e.key === 'Escape') {
-                if (activeTab === 'company-new') setActiveTab('companies-list');
-                else if (activeTab === 'order-new') setActiveTab('orders-list');
-                else if (activeTab === 'bill-new') setActiveTab('bills-list');
-            }
-        };
-
-        // Attach listener to window
-        window.addEventListener('keydown', handleGlobalKeyDown);
-        
-        // Cleanup loop to prevent memory leaks
-        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [sessionToken, activeTab, isAlertOpen]);
-
-    useEffect(() => {
-        if (!isBillingSameAsCustomer && orderHeader.customer_code) {
-            const matched = companiesMaster.find(c => c.id === orderHeader.customer_code);
-            if (matched) {
-                setOrderHeader(prev => ({
-                    ...prev,
-                    billing_name: prev.billing_name === matched.name ? "" : prev.billing_name,
-                    billing_address: prev.billing_address === matched.address ? "" : prev.billing_address
-                }));
-            }
-        } else if (isBillingSameAsCustomer && orderHeader.customer_code) {
-            const matched = companiesMaster.find(c => c.id === orderHeader.customer_code);
-            if (matched) {
-                setOrderHeader(prev => ({ ...prev, billing_name: matched.name, billing_address: matched.address }));
-            }
-        }
-    }, [isBillingSameAsCustomer, orderHeader.customer_code, companiesMaster]);
-
-    const refreshDataHub = async () => {
-        try {
-            const [ord, bl, comp, usersData, dispatchData, itemList] = await Promise.all([
-                API.fetchOrders(sessionToken),
-                API.fetchBills(sessionToken),
-                API.fetchCompaniesMaster(sessionToken),
-                fetch('/api/v1/auth/users', {headers: {'Authorization': `Bearer ${sessionToken}`}}).then(r => r.json()),
-                API.getPartners(sessionToken).then(r => r.data),
-                API.fetchItemMaster(sessionToken),
-            ]);
-            setOrders(ord); setBills(bl); setCompaniesMaster(comp); setSystemUsers(usersData); setDispatch(dispatchData); setItemsMaster(itemList);
-        } catch (e) {
-            setErrorMessage('Network transmission failure across Postgres nodes.');
-        }
-    };
-
-    const refreshDashboard = async () => {
-        try {
-            const data = await API.fetchActivityTree(sessionToken);
-            setDashboardData(data);
-            refreshTaskHub();
-        } catch (err) {
-            setAlertMessage("Failed to sync Production Pulse: " + err.message);
-            setIsAlertOpen(true);
-        }
-    };
-
-    const evaluateDispatch = async (payload) => {
-        try {
-            const res = await API.evaluateDispatch(payload, user?.sessionToken);
-            return res;
-        } catch (err) {
-            setAlertMessage(err.message);
-            setIsAlertOpen(true);
-            throw err;
-        }
-    };
-
-    const saveDispatchPartner = async (payload) => {
-        try {
-            const res = await API.saveDispatchPartner(payload, sessionToken);
-            await refreshDataHub();
-            return res;
-        } catch (err) {
-            setAlertMessage(err.message);
-            setIsAlertOpen(true);
-            throw err;
-        }
-    };
-    const triggerNewOrderInitialization = () => {
-        setIsBillingSameAsCustomer(true);
-        setOrderHeader({ ...defaultOrderHeader, order_acceptance_id: '', order_acceptance_date: new Date().toISOString().split('T')[0] });
-        setOrderItems([{ ...defaultOrderItem }]);
-        setActiveTab('order-new');
-    };
-
-    const handleCustomerMasterSelection = (custCode) => {
-        if (custCode === "TRIGGER_ERR_UNAUTHORIZED_CLIENT" || (custCode && !companiesMaster.find(c => c.id === custCode))) {
-            setAlertMessage("The chosen corporate entity does not exist within the customer master data tables.");
-            setIsAlertOpen(true);
-            setOrderHeader({ ...orderHeader, customer_code: '', billing_name: '', billing_address: '' });
-            return;
-        }
-        const matched = companiesMaster.find(c => c.id === custCode);
-        if (matched) setOrderHeader({ ...orderHeader, customer_code: custCode, billing_name: isBillingSameAsCustomer ? matched.name : '', billing_address: isBillingSameAsCustomer ? matched.address : '' });
-        else setOrderHeader({ ...orderHeader, customer_code: '', billing_name: '', billing_address: '' });
-    };
-
-    const handleItemMasterSelection = (index, itemCode) => {
-        if (itemCode === "TRIGGER_ERR_UNREGISTERED_PART" || (itemCode && !itemsMaster.find(i => i.item_code === itemCode))) {
-            setAlertMessage("Item missing from master logs."); setIsAlertOpen(true); updateOrderItemField(index, 'item_code', ''); return;
-        }
-        const matched = itemsMaster.find(i => i.item_code === itemCode);
-        if (matched) {
-            const items = [...orderItems];
-            items[index] = { ...items[index], item_code: itemCode, additional_spec_text: matched.additional_spec_text || '', hsn_code: matched.hsn_code || '', rate: matched.rate || 0.00, unit_measure: matched.unit_measure || 'NOS', discount_percentage: 0.00 };
-            setOrderItems(items);
-        }
-    };
-
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        try {
-            setErrorMessage('');
-            const data = await API.login(loginEmail, loginPassword);
-            localStorage.setItem('tempo_erp_user', JSON.stringify(data));
-            setUser(data);
-            await refreshTaskHub();
-        } catch (err) { setErrorMessage('Access denied. Invalid signature parameters.'); }
-    };
-
-    const handleLogout = () => { localStorage.removeItem('tempo_erp_user'); setUser(null); };
-    const appendOrderItemRow = () => setOrderItems([...orderItems, { ...defaultOrderItem }]);
-    const popOrderItemRow = (idx) => setOrderItems(orderItems.filter((_, i) => i !== idx));
-    const updateOrderItemField = (idx, field, val) => {
-        const items = [...orderItems];
-        items[idx][field] = val;
-        setOrderItems(items);
-    };
-
-    // Change the parameters to accept the header and items being passed from the component
-    const commitOrderSubmit = async (passedHeader, passedItems) => {
-        // 1. Remove e.preventDefault() completely. 
-
-        // 2. Validate using the passed payload, or fallback to state if needed
-        const headerToSubmit = passedHeader || orderHeader;
-        const itemsToSubmit = passedItems || orderItems;
-
-        if (!headerToSubmit.customer_code || !headerToSubmit.billing_name.trim() || !headerToSubmit.billing_address.trim()) {
-            setAlertMessage("Customer Code, Billing Name, and Address are strictly required."); 
-            setIsAlertOpen(true); 
-            return;
-        }
-
-        try {
-            const payloadItems = itemsToSubmit.map(item => ({ 
-                ...item, 
-                amount: Math.round(((item.quantity || 0) * (item.rate || 0) * (1.0 - ((item.discount_percentage || 0) / 100.0))) * 100) / 100 
-            }));
-
-            const savedData = await API.saveOrder({ ...headerToSubmit, items: payloadItems }, sessionToken);
-            
-            setAlertMessage("Order successfully shared to factory.");
-            /*executePrintWorkflow(savedData, 'order');*/
-            setOrderHeader({ ...defaultOrderHeader }); 
-            setOrderItems([{ ...defaultOrderItem }]); 
-            refreshDashboard();
-            
-            await refreshDataHub(); 
-            setActiveTab('orders-list');
-        } catch (err) { 
-            alert(err.message); 
-        }
-    };
-
-    const commitCompanySubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (isEditingCompany) {
-                await API.updateCompany(selectedCompanyId, companyForm, sessionToken);
-                setAlertMessage("Customer profile updated successfully.");
-            } else {
-                await API.saveCompanyMaster(companyForm, sessionToken);
-                setAlertMessage("Customer profile created successfully.");
-            }
-            setCompanyForm({ ...defaultCompanyForm });
-            setIsEditingCompany(false);
-            setSelectedCompanyId(null);
-            setIsAlertOpen(true);
-            await refreshDataHub(); 
-            setActiveTab('companies-list');
-        } catch (err) { 
-            setAlertMessage(err.message); 
-            setIsAlertOpen(true); 
-        }
-    };
-
-    const triggerInvoiceSetupForOrder = (oaId) => {
-        const targetOrder = orders.find(o => o.order_acceptance_id === oaId);
-        if (!targetOrder) return;
-        setBillHeader({ bill_num: `INV-${Date.now().toString().slice(-4)}`, bill_date: new Date().toISOString().split('T')[0], order_acceptance_id: oaId });
-        setBillItems(targetOrder.items.map(item => ({ order_item_id: item.order_item_id, item_code: item.item_code, quantity_ordered: item.quantity, quantity_shipped: item.quantity })));
-        setActiveTab('bill-new');
-    };
-
-    const commitBillSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const savedBill = await API.saveBill({ bill_num: billHeader.bill_num, bill_date: billHeader.bill_date, order_acceptance_id: billHeader.order_acceptance_id, items: billItems.map(b => ({ order_item_id: b.order_item_id, quantity_shipped: parseInt(b.quantity_shipped) })) }, sessionToken);
-            executePrintWorkflow(savedBill, "invoice");
-            setBillHeader({ bill_num: '', bill_date: '', order_acceptance_id: '' }); setBillItems([]);
-            await refreshDataHub(); setActiveTab('bills-list');
-        } catch (err) { alert(err.message); }
-    };
-
-    const commitItemSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            await API.saveItemMaster(itemForm, sessionToken);
-            setItemForm({ ...defaultItemForm });
-            await refreshDataHub(); // Refreshes itemsMaster array globally
-            setAlertMessage("Product successfully added to Item Master.");
-            setIsAlertOpen(true);
-        } catch (err) {
-            setAlertMessage(err.message || 'Validation rejected creating item profile.');
-            setIsAlertOpen(true);
-        }
-    };
-    
-    const executePrintWorkflow = (data, type) => {
-        setActivePrintJob(data); setPrintType(type);
-        setTimeout(() => { window.print(); setActivePrintJob(null); setPrintType(null); }, 300);
-    };
-
     return {
-        systemUsers, user, setUser, activeTab, setActiveTab, orders, bills, companiesMaster, itemsMaster, isAlertOpen, setIsAlertOpen, alertMessage, errorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword,
-        orderHeader, setOrderHeader, orderItems, appendOrderItemRow, popOrderItemRow, updateOrderItemField, commitOrderSubmit, handleCustomerMasterSelection, handleItemMasterSelection, triggerNewOrderInitialization,
-        billHeader, setBillHeader, billItems, setBillItems, triggerInvoiceSetupForOrder, commitBillSubmit, handleLogin, handleLogout,
-        isBillingSameAsCustomer, setIsBillingSameAsCustomer, companyForm, setCompanyForm, commitCompanySubmit,
-        ...taskState, refreshTaskHub, executePrintWorkflow, activePrintJob, printType, itemForm, setItemForm, commitItemSubmit, selectedItem, itemDetail, isEditingItem, dashboardData, refreshDashboard,
-        showErrorModal, errorModal, errorModalOpen, setErrorModalOpen, triggerNewCompany, triggerEditCompany, deleteCompany, isEditingCompany, selectedCompanyId, setAlertMessage,
-        isServerLive, notifications, unreadNotifCount, markAllNotifsRead, toasts, clearNotifications, addToast, setOrderItems,
-        setIsEditingCompany, dispatchState, logisticsState
+        ...core, ...tasks, ...dispatch, ...logistics, ...companies, ...items, ...orders,
+        ...billing, notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }

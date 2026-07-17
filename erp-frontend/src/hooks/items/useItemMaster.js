@@ -1,0 +1,38 @@
+import { useState } from "react";
+import API from "../../api/api";
+
+export default function useItemMaster({sessionToken, setAlertMessage, setIsAlertOpen}){
+    const defaultItemForm = { item_code: '', item_name: '', item_group: '', rate: 0, unit_measure: 'in', additional_spec_text: '', hsn_code: '', revision_no: '', drawing_no: '' };
+
+    const [itemsMaster, setItemsMaster] = useState([]);
+    const [itemForm, setItemForm] = useState({ ...defaultItemForm });
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [itemDetail, setItemDetail] = useState(null);
+    const [isEditingItem, setIsEditingItem] = useState(false);
+    
+    const refreshItems = async() =>{
+        try{
+            const items = await API.fetchItemMaster(sessionToken);
+            if (!items) {setAlertMessage("Failed to load Items from DB"); setIsAlertOpen(true);}
+            else setItemsMaster(Array.isArray(items) ? items : []);
+        }catch(err){
+            setAlertMessage("Error occured while loading items: ", err.message);
+            setIsAlertOpen(true);
+        }
+    }
+
+    const commitItemSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            await API.saveItemMaster(itemForm, sessionToken);
+            setItemForm({ ...defaultItemForm });
+            await refreshDataHub(); // Refreshes itemsMaster array globally
+            setAlertMessage("Product successfully added to Item Master.");
+            setIsAlertOpen(true);
+        } catch (err) {
+            setAlertMessage(err.message || 'Validation rejected creating item profile.');
+            setIsAlertOpen(true);
+        }
+    };
+    return {itemsMaster, refreshItems, commitItemSubmit};
+}

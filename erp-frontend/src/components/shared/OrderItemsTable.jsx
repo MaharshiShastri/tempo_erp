@@ -6,6 +6,7 @@ export default function OrderItemsTable({ items }) {
                 <thead>
                     <tr>
                         <th>Item Code</th>
+                        //Insert item production stage here?
                         <th>Specifications Description</th>
                         <th>HSN</th>
                         <th>Vol</th>

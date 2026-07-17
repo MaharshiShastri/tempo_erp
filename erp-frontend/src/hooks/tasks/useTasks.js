@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import API from "../api/api";
+import API from "../../api/api";
 
-export default function useTasks({sessionToken, user, setAlertMessage, setIsAlertOpen, showErrorModal, addToast, dispatchSystemNotification}) {
+export default function useTasks({sessionToken, user, showErrorModal, addToast, dispatchSystemNotification, setAlertMessage, setIsAlertOpen}) {
     const [tasks, setTasks] = useState([]);
     const [loadingTasks, setLoadingTasks] = useState(false);
 
@@ -12,12 +12,9 @@ export default function useTasks({sessionToken, user, setAlertMessage, setIsAler
         setLoadingTasks(true);
 
         try {
-            console.log("Token:", sessionToken);
             const data = await API.fetchTasks(sessionToken);
-            console.log("Tasks fetched: ", data);
             setTasks(Array.isArray(data) ? data : []);
         } catch (err) {
-            console.error(err);
             showErrorModal?.("Task Synchronization Failed", err.message || "Unable to load task workspace.");
         } finally {
             setLoadingTasks(false);

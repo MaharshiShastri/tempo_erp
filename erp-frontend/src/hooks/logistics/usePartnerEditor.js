@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import API from "../api/api";
+import API from "../../api/api";
 
-export default function usePartnerEditor({state, setModalAlert, zones, setZones, fuelMatrix, setFuelMatrix, odaDistances, setOdaDistances, odaWeights, setOdaWeights, odaCharges, setOdaCharges}){
+export default function usePartnerEditor({sessionToken, showErrorModal, addToast, zones, setZones, fuelMatrix, setFuelMatrix, odaDistances, setOdaDistances, odaWeights, setOdaWeights, odaCharges, setOdaCharges}){
     const defaultPartner = {name: "", partner_link: "", cft_factor: 10, minimum_weight: 0, minimum_freight_value: 0, documentation_charge: 0,
     fov_percentage: 0, gst_percentage: 18, local_loading_cost: 0, hub_loading_max_cost: 0};
 
@@ -11,14 +11,14 @@ export default function usePartnerEditor({state, setModalAlert, zones, setZones,
     const [originalPayloadString, setOriginalPayloadString] = useState("{}");
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => { loadPartnersList(); }, []);
+    useEffect(() => { if(sessionToken) loadPartnersList(); }, [sessionToken]);
 
     const loadPartnersList = async () => {
         try {
-            const data = await API.getPartners(state.user.access_token);
+            const data = await API.getPartners(sessionToken);
             setAvailablePartners(data || []);
         } catch (err) {
-            setModalAlert({ isOpen: true, title: "Fetch Error", message: "Failed to load partners list.", isError: true });
+            showErrorModal("Fetch Error", "Failed to load partners list.");
         }
     };
 
@@ -28,7 +28,7 @@ export default function usePartnerEditor({state, setModalAlert, zones, setZones,
         if (!id) { populateState(defaultPartner); return; }
 
         try {
-            const profile = await API.getPartnerProfile(id, state.user.access_token);
+            const profile = await API.getPartnerProfile(id, sessionToken);
             populateState(profile);
         } catch (err) {
             setModalAlert({ isOpen: true, title: "Fetch Error", message: "Failed to load partner profile.", isError: true });
@@ -46,7 +46,7 @@ export default function usePartnerEditor({state, setModalAlert, zones, setZones,
         try {
             const response = await fetch(`/api/v1/logistics/config/partners/${selectedPartnerId}`, {
                 method: "DELETE",
-                headers: { "Authorization": `Bearer ${state.user.access_token}` }
+                headers: { "Authorization": `Bearer ${sessionToken}` }
             });
 
             if (!response.ok) {
@@ -56,14 +56,14 @@ export default function usePartnerEditor({state, setModalAlert, zones, setZones,
 
             const result = await response.json();
                 
-            setModalAlert({ isOpen: true, title: "Partner Deleted", message: `🗑️ ${result.partner_name || "Logistics Partner"} was successfully removed from the system.`, isError: false });
+            showErrorModal("Partner Deleted", "Partner deleted successfully.");
                 
             setSelectedPartnerId("");
             populateState(defaultPartner);
             loadPartnersList(); 
                 
         } catch (err) {
-            setModalAlert({ isOpen: true, title: "Deletion Failed", message: err.message, isError: true });
+            showErrorModal("Unsuccessful partner delete", "Error in deleting partner.");
         } finally {
             setIsDeleting(false);
         }
@@ -74,16 +74,16 @@ export default function usePartnerEditor({state, setModalAlert, zones, setZones,
         const payload = buildCurrentPayload();
         try {
             let backendResponse;
-            if (selectedPartnerId) { backendResponse = await API.updateDispatchPartner(selectedPartnerId, payload, state.user.access_token); } 
-            else { backendResponse = await API.saveDispatchPartner(payload, state.user.access_token); setSelectedPartnerId(""); }
+            if (selectedPartnerId) { backendResponse = await API.updateDispatchPartner(selectedPartnerId, payload, sessionToken); } 
+            else { backendResponse = await API.saveDispatchPartner(payload, sessionToken); setSelectedPartnerId(""); }
                 
             const actionStatus = backendResponse.status || "processed";
             const partnerName = backendResponse.partner_name || payload.name;
-            setModalAlert({ isOpen: true, title: "Database Synced", message: `🚚 Logistics Partner "${partnerName}" was successfully ${actionStatus}.`, isError: false });
+            addToast("Database Synced"`🚚 Logistics Partner "${partnerName}" was successfully ${actionStatus}.`);
             setOriginalPayloadString(JSON.stringify(payload));
             loadPartnersList(); 
         } catch (err) {
-            setModalAlert({ isOpen: true, title: "Sync Failure", message: err.message, isError: true });
+            showErrorModal("Sync Failure", err.message);
         }
     };
 

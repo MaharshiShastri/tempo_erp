@@ -6,17 +6,11 @@ class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
 
-        this.state = {
-            hasError: false,
-            error: null
-        };
+        this.state = {hasError: false, error: null};
     }
 
     static getDerivedStateFromError(error) {
-        return {
-            hasError: true,
-            error
-        };
+        return {hasError: true, error};
     }
 
     componentDidCatch(error, errorInfo) {
@@ -30,11 +24,7 @@ class ErrorBoundary extends React.Component {
                     <h2>Application Error</h2>
                     <p>{this.state.error?.message}</p>
 
-                    <button
-                        onClick={() => window.location.reload()}
-                    >
-                        Reload Application
-                    </button>
+                    <button onClick={() => window.location.reload()} >⚠️ Reload Application</button>
                 </div>
             );
         }

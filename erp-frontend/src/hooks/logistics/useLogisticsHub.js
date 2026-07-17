@@ -3,15 +3,15 @@ import usePartnerEditor from "./usePartnerEditor";
 import useZoneMatrix from "./useZoneMatrix";
 import useOdaMatrix from "./useOdaMatrix";
 
-export default function useLogisticsHub(props){
+export default function useLogisticsHub({sessionToken, showErrorModal, addToast}){
 
     const matrices = useZoneMatrix();
 
     const oda = useOdaMatrix();
 
-    const editor = usePartnerEditor({...props, ...matrices, ...oda});
+    const editor = usePartnerEditor({sessionToken, showErrorModal, addToast, ...matrices, ...oda});
     
-    const extraction = useContractExtraction({...props, populateState: editor.populateState, setSelectedPartnerId: editor.setSelectedPartnerId});
+    const extraction = useContractExtraction({sessionToken, showErrorModal, addToast, populateState: editor.populateState, setSelectedPartnerId: editor.setSelectedPartnerId});
         
     return {...editor, ...matrices, ...oda, ...extraction};
 }

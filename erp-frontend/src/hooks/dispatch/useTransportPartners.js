@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import API from "../api/api";
+import API from "../../api/api";
 
 export default function useTransportPartners({sessionToken, showErrorModal, addToast}) {
 
@@ -22,7 +22,8 @@ export default function useTransportPartners({sessionToken, showErrorModal, addT
             setPartners(Array.isArray(data) ? data : []);
         }
         catch (err) {
-            showErrorModal?.("Transport Partners", err.message);
+            console.error("Error: ", err.message);
+            showErrorModal("Transport Partners", err.message);
         }
         finally {
             setLoadingPartners(false);

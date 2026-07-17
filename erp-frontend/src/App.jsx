@@ -66,7 +66,6 @@ function App() {
         state.setUser(null);
     };
 
-    console.log("USER:", state.user);
     if (!state.user) return (<LoginView state={state} />);
 
     const pendingTasksCount = (state.tasks || []).filter(t => t.is_incomplete && t.direction === 'received').length;

@@ -9,13 +9,9 @@ export default function OrderCard({ order, state}) {
                 </h3>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-                    <button className="btn btn-secondary" onClick={() => state.executePrintWorkflow(order, 'order')}>
-                        🖨️ Print Order
-                    </button>
+                    <button className="btn btn-secondary" onClick={() => state.executePrintWorkflow(order, 'order')}>🖨️ Print Order</button>
 
-                    <button className="btn btn-success" onClick={() => state.triggerInvoiceSetupForOrder(order.order_acceptance_id)}>
-                        Generate Commercial Invoice
-                    </button>
+                    <button className="btn btn-success" onClick={() => state.triggerInvoiceSetupForOrder(order.order_acceptance_id)}>Generate Commercial Invoice</button>
                 </div>
             </div>
 
@@ -26,7 +22,6 @@ export default function OrderCard({ order, state}) {
                 <div><strong>PO Reference:</strong> {order.purchase_order_number}</div>
 
                 <div><strong>Billing Entity Name:</strong> {order.billing_name}</div>
-
                 <div><strong>Billing Target Address:</strong> {order.billing_address}</div>
             </div>
 
