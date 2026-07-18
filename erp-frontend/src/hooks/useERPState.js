@@ -12,6 +12,7 @@ import useActivityHub from "./activitydashboard/useActivityDashboardHub";
 import useAdminHub from "./admin/useAdminHub";
 import useCRMHub from "./CRM/useCRMHub";
 import useFAQHub from "./faq/useFAQHub";
+import useProductionHub from "./production/useProductionHub";
 
 const API_HOST = window.location.hostname;
 
@@ -42,7 +43,8 @@ export default function useERPState() {
     //Global business state
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-    
+    const production = useProductionHub({sessionToken: core.sessionToken, user: core.user, addToast: core.addToast, showErrorModal: core.showErrorModal})    ;
+
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
 
@@ -65,6 +67,7 @@ export default function useERPState() {
         //Global Modules
         items.refreshItems?.(); 
         faq.loadFaqs?.();
+        production.loadPulse?.();
 
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies?.();
@@ -147,7 +150,7 @@ export default function useERPState() {
         ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, //Sales Business states unwinding
         ...tasks, ...activity, //Shop floor business states
         ...admin, //Admin business states
-        ...faq, ...items, //Global business states
+        ...faq, ...items, ...production, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }

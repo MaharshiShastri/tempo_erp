@@ -1,51 +1,7 @@
-import React, { useState, useEffect } from "react";
-import API from "../api/api";
 import { FiActivity, FiArrowRight } from "react-icons/fi";
 
-const STAGES = [
-    { key: "PO_SUBMITTED", label: "PO Submitted", color: "var(--text-muted)", bg: "var(--bg-main)" },
-    { key: "RAW_MATERIAL_ASSEMBLY", label: "Material Assembly", color: "var(--brand-accent)", bg: "#f0f7ff" },
-    { key: "PRODUCTION_IN_PROGRESS", label: "In Production", color: "#e67e22", bg: "#fff8f0" },
-    { key: "READY_TO_DISPATCH", label: "Ready for Dispatch", color: "var(--brand-success)", bg: "#eaffea" },
-    { key: "DISPATCHED", label: "Dispatched & Invoiced", color: "#8e44ad", bg: "#f5eef8" }
-];
-
 export default function GlobalProductionPulseView({ state }) {
-    const [orders, setOrders] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const isFactory = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"].includes(state.user.role);
-
-    useEffect(() => { loadPulse(); }, []);
-
-    const loadPulse = async () => {
-        try {
-            const data = await API.fetchProductionPulse(state.user.access_token);
-            setOrders(data);
-        } catch (err) { state.showErrorModal("Error", err.message); }
-        finally { setIsLoading(false); }
-    };
-
-    const handleMoveStage = async (orderId, currentStage) => {
-        if (!isFactory) return;
-        
-        const currentIndex = STAGES.findIndex(s => s.key === currentStage);
-        if (currentIndex === -1 || currentIndex === STAGES.length - 1) return;
-
-        const nextStage = STAGES[currentIndex + 1].key;
-        
-        // Optimistic UI Update: Updates the parent order, which naturally moves all its child items
-        setOrders(prev => prev.map(o => o.order_acceptance_id === orderId ? { ...o, production_stage: nextStage } : o));
-
-        try {
-            await API.updateOrderStage(orderId, nextStage, state.user.access_token);
-            state.addToast(`Order ${orderId} moved to ${STAGES[currentIndex + 1].label}`, "success");
-        } catch (err) {
-            // Revert on failure
-            await loadPulse();
-            state.showErrorModal("Update Failed", err.message);
-        }
-    };
+    const {STAGES, orders, isLoading, isFactory, loadPulse, handleMoveStage} = state;
 
     if (isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Factory Floor...</div>;
 
