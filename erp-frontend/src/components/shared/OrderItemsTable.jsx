@@ -20,7 +20,7 @@ export default function OrderItemsTable({ items }) {
                 </thead>
 
                 <tbody>
-                    {items.map((item, idx) => (<OrderItemRow key={idx} item={item}/>))}
+                    {(items ?? []).map((item, idx) => (<OrderItemRow key={idx} item={item}/>))}
                 </tbody>
             </table>
         </div>
