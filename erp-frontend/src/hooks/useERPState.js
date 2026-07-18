@@ -14,6 +14,7 @@ import useCRMHub from "./CRM/useCRMHub";
 import useFAQHub from "./faq/useFAQHub";
 import useProductionHub from "./production/useProductionHub";
 import useGRN from "./grn/useGRN";
+import useLeadGenerator from "./leads/useLeadGenerator";
 
 const API_HOST = window.location.hostname;
 
@@ -28,7 +29,7 @@ export default function useERPState() {
     const salesRoles = ["Sales Representative", "Admin", "Chief Full Stack Developer"];
     const transportRoles = ["Dispatch Engineer", "Admin", "Chief Full Stack Developer"];
     const adminRoles = ["Admin", "Chief Full Stack Developer"];
-
+    //const rndRoles = [""]
     const core = useCore();
     
     const dispatchSystemNotification = (title, message) => {
@@ -52,7 +53,7 @@ export default function useERPState() {
     //All the shop floor business states
     const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-    const grn = useGRN({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const grn = useGRN({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, itemsMaster: items.itemsMaster});
 
 
     //all the sales business state
@@ -62,6 +63,7 @@ export default function useERPState() {
     const orders = useOrders({sessionToken: core.sessionToken, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
+    const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
 
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
@@ -76,6 +78,8 @@ export default function useERPState() {
             orders.loadOrders?.();
             billing.loadBills?.();
             crm.loadLeads?.();
+            leadTargets.loadTargets?.();
+
         }
 
         if (transportRoles.includes(core.user.role)) { //Transport module refresh
@@ -149,7 +153,7 @@ export default function useERPState() {
     };
 
     return {
-        ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, //Sales Business states unwinding
+        ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, //Admin business states
         ...faq, ...items, ...production, //Global business states
