@@ -15,6 +15,7 @@ import useFAQHub from "./faq/useFAQHub";
 import useProductionHub from "./production/useProductionHub";
 import useGRN from "./grn/useGRN";
 import useLeadGenerator from "./leads/useLeadGenerator";
+import useLogin from "./useLogin";
 
 const API_HOST = window.location.hostname;
 
@@ -31,6 +32,7 @@ export default function useERPState() {
     const adminRoles = ["Admin", "Chief Full Stack Developer"];
     //const rndRoles = [""]
     const core = useCore();
+    const login = useLogin(core);
     
     const dispatchSystemNotification = (title, message) => {
         core.setAlertMessage(`[SYSTEM ALERT] ${title}: ${message}`);
@@ -156,7 +158,7 @@ export default function useERPState() {
         ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, //Admin business states
-        ...faq, ...items, ...production, //Global business states
+        ...faq, ...items, ...production, ...login, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }

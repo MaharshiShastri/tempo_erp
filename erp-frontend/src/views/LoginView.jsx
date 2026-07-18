@@ -2,56 +2,9 @@ import { useState } from "react";
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 
 export default function LoginView({ state }) {
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "" });
-
-  const handleLogin = async (e) => {
-  e.preventDefault();
-  if(!email.trim() || !password.trim()){
-    setModalAlert({
-      isOpen: true,
-      title: "Incomplete Credentials",
-      message: "Please Enter both your credentials to login."
-    });
-    return;
-  }
-  
-  setLoading(true);
-
-  try {
-    const res = await fetch("/api/v1/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-
-    if (!res.ok) {
-      throw new Error("Invalid credentials");
-    }
-
-    const data = await res.json();
-
-    const userData = {
-      email: data.email,
-      name: data.name,
-      role: data.role,
-      access_token: data.access_token
-    };
-
-    localStorage.setItem("tempo_erp_user", JSON.stringify(userData));
-    state.setUser(userData);
-    
-    } catch (err) {
-      setModalAlert({ isOpen: true, title: "Authentication Failed", message: err.message });
-      console.error(err);
-    } finally{
-      setLoading(false);
-    }
-  };
-
+  const {loading, showPassword, setShowPassword, modalAlert, setModalAlert, handleLogin, loginEmail, setLoginEmail, 
+    loginPassword, setLoginPassword, 
+  } = state;
   return (
     <div className="auth-fallback-viewport">
       <div className="login-brand">
@@ -71,7 +24,7 @@ export default function LoginView({ state }) {
           <h2>Tempo ERP</h2>
           <div className="form-group">
             <label className="input-label">Enter Email</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" className="form-input"/>
+            <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="email" className="form-input"/>
           </div>
 
           <div className="form-group">
@@ -79,8 +32,8 @@ export default function LoginView({ state }) {
             <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
               <input 
                 type={showPassword ? "text" : "password"} 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
+                value={loginPassword} 
+                onChange={(e) => setLoginPassword(e.target.value)} 
                 placeholder="password" 
                 className="form-input"
                 style={{ width: "100%", paddingRight: "60px" }}
