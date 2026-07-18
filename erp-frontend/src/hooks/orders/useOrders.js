@@ -17,7 +17,6 @@ export default function useOrders({sessionToken, companiesMaster, itemsMaster, s
             const ord = await API.fetchOrders(sessionToken);
             if (!ord){setAlertMessage("Failed to load orders from DB"); setIsAlertOpen(true);}
             else setOrders(Array.isArray(ord) ? ord : []);
-            console.log("The order fetched from backend: ", orders);
         }catch(err){
             setAlertMessage("Error occured while loading items: ", err.message);
             setIsAlertOpen(true);

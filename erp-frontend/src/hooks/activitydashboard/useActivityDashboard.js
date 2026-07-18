@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import API from "../api/api";
+import API from "../../api/api";
 
 export default function useActivityDashboard({sessionToken, user, showErrorModal, addToast, setAlertMessage, setIsAlertOpen}){
     const [treeData, setTreeData] = useState({ past: [], ongoing: [], future: [] });
@@ -12,10 +12,12 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
     const [isSubmittingLog, setIsSubmittingLog] = useState(false);
     
     const loadData = useCallback(async () => {
+        if (!sessionToken) return;
+        setLoading(true);
+
         try {
-            setLoading(true);
             const data = await API.fetchActivityTree(sessionToken);
-            setTreeData(data);
+            setTreeData({past: data?.past || [], ongoing: data?.ongoing || [], future: data?.future || []});
         } catch (err) {
             setAlertMessage(err.message);
             setIsAlertOpen(true);
@@ -71,11 +73,6 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
             showErrorModal("Deletion Failed", err.message);
         }
     };
-    
-    useEffect(() => { 
-        if(sessionToken) loadData(); 
-    }, [sessionToken, loadData]);
-    
     
     return{loadData, toggleSection, toggleRow, setManualLogInputs, handleAddManualLog, handleDeleteLog,
         treeData, setTreeData, loading, setLoading, openSection, setOpenSection, openRows, setOpenRows,

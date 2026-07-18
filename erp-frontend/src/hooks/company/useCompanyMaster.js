@@ -8,7 +8,10 @@ export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAl
     const [companyForm, setCompanyForm] = useState({ ...defaultCompanyForm });
     const [selectedCompanyId, setSelectedCompanyId] = useState(null);
     const [isEditingCompany, setIsEditingCompany] = useState(false);
-    
+    const industrialCities = ["Mumbai", "Navi Mumbai", "Thane", "Kalyan", "Pune", "Nashik", "Aurangabad", "Nagpur", "Bangalore", "Chennai", "Hyderabad", "Ahmedabad", "New Delhi"];
+    const indianStates = ["Maharashtra", "Karnataka", "Tamil Nadu", "Telangana", "Gujarat", "Delhi", "Uttar Pradesh", "West Bengal", "Madhya Pradesh", "Rajasthan"];
+    const professionalRoles = ["QA/QC", "Production", "Project manager", "Others"];
+
     const triggerNewCompany = () => {
         setCompanyForm({ ...defaultCompanyForm });
         setIsEditingCompany(false);
@@ -87,5 +90,7 @@ export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAl
             setIsAlertOpen(true); 
         }
     };
-    return {companiesMaster, refreshCompanies, triggerNewCompany, triggerEditCompany, deleteCompany, refreshCompanies, commitCompanySubmit };
+    return {companiesMaster, refreshCompanies, triggerNewCompany, triggerEditCompany, deleteCompany, refreshCompanies, commitCompanySubmit,
+        indianStates, industrialCities, professionalRoles
+     };
 }

@@ -1,10 +1,7 @@
 import React from "react";
 
 export default function CompanyEntryFormView({ state }) {
-    const industrialCities = ["Mumbai", "Navi Mumbai", "Thane", "Kalyan", "Pune", "Nashik", "Aurangabad", "Nagpur", "Bangalore", "Chennai", "Hyderabad", "Ahmedabad", "New Delhi"];
-    const indianStates = ["Maharashtra", "Karnataka", "Tamil Nadu", "Telangana", "Gujarat", "Delhi", "Uttar Pradesh", "West Bengal", "Madhya Pradesh", "Rajasthan"];
-    const professionalRoles = ["QA/QC", "Production", "Project manager", "Others"];
-
+    
     const SectionHeader = ({ title }) => (
         <div style={{ marginTop: '30px', marginBottom: '15px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
             <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '15px', fontWeight: '600' }}>{title}</h4>
@@ -64,13 +61,13 @@ export default function CompanyEntryFormView({ state }) {
                     <div className="form-group">
                         <label className="input-label">City *</label>
                         <input type="text" list="city-options" required className="form-input" value={state.companyForm.city} onChange={e=>state.setCompanyForm({...state.companyForm, city: e.target.value})} placeholder="Select or type city..."/>
-                        <datalist id="company-options">{industrialCities.map(city=><option key={city} value={city}/>)}</datalist>
+                        <datalist id="company-options">{state.industrialCities.map(city=><option key={city} value={city}/>)}</datalist>
                     </div>
 
                     <div className="form-group">
                         <label className="input-label">State / Province *</label>
                         <input type="text" list="state-options" required className="form-input" value={state.companyForm.state} onChange={e => state.setCompanyForm({...state.companyForm, state: e.target.value})} placeholder="Select or type state..." />
-                        <datalist id="state-options">{indianStates.map(st => <option key={st} value={st} />)}</datalist>
+                        <datalist id="state-options">{state.indianStates.map(st => <option key={st} value={st} />)}</datalist>
                     </div>
 
                     <div className="form-group">
@@ -91,7 +88,7 @@ export default function CompanyEntryFormView({ state }) {
                     <div className="form-group">
                         <label className="input-label">Corporate Designation *</label>
                         <input type="text" list="role-options" required className="form-input" value={state.companyForm.contact_role} onChange={e => state.setCompanyForm({...state.companyForm, contact_role: e.target.value})}placeholder="Select or type role..." />
-                        <datalist id="role-options">{professionalRoles.map(role => <option key={role} value={role} />)}</datalist>
+                        <datalist id="role-options">{state.professionalRoles.map(role => <option key={role} value={role} />)}</datalist>
                     </div>
 
                     <div className="form-group">

@@ -12,7 +12,7 @@ export default function TasksWorkspaceView({ state }) {
     const [selectedAssignees, setSelectedAssignees] = useState([]);
     const [newTaskDeadline, setNewTaskDeadline] = useState('');
     const [newTaskFile, setNewTaskFile] = useState([]);
-    console.log("Tasks: ", state.tasks);
+    
     const tasksArray = state.tasks || [];
     
     const filteredTasks = tasksArray.filter(t => {

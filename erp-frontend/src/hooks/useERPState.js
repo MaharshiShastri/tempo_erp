@@ -8,7 +8,8 @@ import useItemMaster from "./items/useItemMaster";
 import useOrders from "./orders/useOrders";
 import useBilling from "./billing/useBilling";
 import useCore from "./useCore";
-import useActivityHub from "./useActivityDashboardHub";
+import useActivityHub from "./activitydashboard/useActivityDashboardHub";
+import useAdminHub from "./admin/useAdminHub";
 
 const API_HOST = window.location.hostname;
 
@@ -22,6 +23,7 @@ export default function useERPState() {
     const factoryRoles = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"];
     const salesRoles = ["Sales Representative", "Admin", "Chief Full Stack Developer"];
     const transportRoles = ["Dispatch Engineer", "Admin", "Chief Full Stack Developer"];
+    const adminRoles = ["Admin", "Chief Full Stack Developer"];
 
     const core = useCore();
     
@@ -35,9 +37,12 @@ export default function useERPState() {
     };
     //Division of states into different hooks
     
+    //All admin business states
+    const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+
     //All the shop floor business states
     const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-    const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMesssage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
 
 
     //all the sales business state
@@ -50,20 +55,26 @@ export default function useERPState() {
 
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
-        items.refreshItems(); //Global Modules
+
+        items.refreshItems?.(); //Global Modules
+
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
-            companies.refreshCompanies();
-            orders.loadOrders();
-            billing.loadBills();
+            companies.refreshCompanies?.();
+            orders.loadOrders?.();
+            billing.loadBills?.();
         }
 
         if (transportRoles.includes(core.user.role)) { //Transport module refresh
-            dispatch.loadPartners();
+            dispatch.loadPartners?.();
         }
 
         if (factoryRoles.includes(core.user.role)) { //Shop floor module refresh
-            tasks.loadTasks();
-            activity.loadData();
+            tasks.loadTasks?.();
+            activity.loadData?.();
+        }
+
+        if(adminRoles.includes(core.user.role)){
+            admin.loadUsers?.();
         }
     }, [core.user, core.sessionToken]);
 
@@ -126,6 +137,7 @@ export default function useERPState() {
     return {
         ...core, ...dispatch, ...logistics, ...companies, ...items, ...orders, ...billing, //Sales Business states unwinding
         ...tasks, ...activity, //Shop floor business states
+        ...admin, //Admin business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }

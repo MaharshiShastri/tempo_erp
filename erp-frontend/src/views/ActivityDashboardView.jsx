@@ -8,7 +8,7 @@ export default function ActivityDashboardView({ state }) {
 
         return (
             <div style={{ marginBottom: '15px', border: `1px solid var(--border-light)`, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                <div onClick={() => state.toggleSection(state.sectionKey)} style={{ background: isOpen ? 'var(--combobox-hover)' : 'var(--bg-surface)', padding: '16px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isOpen ? '1px solid var(--border-light)' : 'none', borderLeft: `4px solid var(${colorVar})` }}>
+                <div onClick={() => state.toggleSection(sectionKey)} style={{ background: isOpen ? 'var(--combobox-hover)' : 'var(--bg-surface)', padding: '16px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isOpen ? '1px solid var(--border-light)' : 'none', borderLeft: `4px solid var(${colorVar})` }}>
                     <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>
                         {title} <span style={{ opacity: 0.6, fontSize: '12px', marginLeft: '8px' }}>({dataArray.length})</span>
                     </h3>
