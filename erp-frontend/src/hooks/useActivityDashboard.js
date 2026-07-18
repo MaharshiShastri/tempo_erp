@@ -1,3 +1,6 @@
+import { useState, useCallback, useEffect } from "react";
+import API from "../api/api";
+
 export default function useActivityDashboard({sessionToken, user, showErrorModal, addToast, setAlertMessage, setIsAlertOpen}){
     const [treeData, setTreeData] = useState({ past: [], ongoing: [], future: [] });
     const [loading, setLoading] = useState(true);
@@ -8,12 +11,10 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
     const [manualLogInputs, setManualLogInputs] = useState({});
     const [isSubmittingLog, setIsSubmittingLog] = useState(false);
     
-    useEffect(() => { loadData(); }, []);
-    
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await API.fetchActivityTree(sesssionToken);
+            const data = await API.fetchActivityTree(sessionToken);
             setTreeData(data);
         } catch (err) {
             setAlertMessage(err.message);
@@ -21,7 +22,7 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
         } finally {
             setLoading(false);
         }
-    };
+    }, [sessionToken, setAlertMessage, setIsAlertOpen]);
     
     const toggleSection = (sectionKey) => {
         setOpenSection(prev => prev === sectionKey ? null : sectionKey);
@@ -43,7 +44,7 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
     
         setIsSubmittingLog(true);
         try {
-            await API.addManualActivityLog(orderId, { message }, state.user.access_token);
+            await API.addManualActivityLog(orderId, { message }, sessionToken);
             setManualLogInputs(prev => ({ ...prev, [orderId]: "" }));
             addToast("Activity manually logged.", "success");
             await loadData();
@@ -55,7 +56,7 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
     };
     
     const handleDeleteLog = async (logId) => {
-        if (role !== 'Admin' && role !== 'Chief Full Stack Developer') {
+        if (user.role !== 'Admin' && user.role !== 'Chief Full Stack Developer') {
             showErrorModal("Unauthorized", "Only System Administrators can alter the audit trail.");
             return;
         }
@@ -63,7 +64,7 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
         if (!window.confirm("WARNING: Deleting an audit log alters the immutable history of this order. Proceed?")) return;
     
         try {
-            await API.deleteActivityLog(logId, state.user.access_token);
+            await API.deleteActivityLog(logId, sessionToken);
             addToast("Audit log wiped.", "success");
             await loadData();
         } catch (err) {
@@ -71,12 +72,14 @@ export default function useActivityDashboard({sessionToken, user, showErrorModal
         }
     };
     
-    const renderSection = (title, sectionKey, dataArray, colorVar) => {
-        const isOpen = openSection === sectionKey;
-    }
+    useEffect(() => { 
+        if(sessionToken) loadData(); 
+    }, [sessionToken, loadData]);
+    
+    
     return{loadData, toggleSection, toggleRow, setManualLogInputs, handleAddManualLog, handleDeleteLog,
         treeData, setTreeData, loading, setLoading, openSection, setOpenSection, openRows, setOpenRows,
-        manualLogInputs, setManualLogInputs
+        manualLogInputs, setManualLogInputs, isSubmittingLog
     };
 
 }

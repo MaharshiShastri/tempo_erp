@@ -3,10 +3,12 @@ import API from '../api/api';
 import { FiPlus, FiTrash2 } from 'react-icons/fi';
 
 export default function ActivityDashboardView({ state }) {
-        
+    const renderSection = (title, sectionKey, dataArray, colorVar) =>{
+        const isOpen = state.openSection === sectionKey;
+
         return (
             <div style={{ marginBottom: '15px', border: `1px solid var(--border-light)`, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                <div onClick={() => toggleSection(sectionKey)} style={{ background: isOpen ? 'var(--combobox-hover)' : 'var(--bg-surface)', padding: '16px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isOpen ? '1px solid var(--border-light)' : 'none', borderLeft: `4px solid var(${colorVar})` }}>
+                <div onClick={() => state.toggleSection(state.sectionKey)} style={{ background: isOpen ? 'var(--combobox-hover)' : 'var(--bg-surface)', padding: '16px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isOpen ? '1px solid var(--border-light)' : 'none', borderLeft: `4px solid var(${colorVar})` }}>
                     <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>
                         {title} <span style={{ opacity: 0.6, fontSize: '12px', marginLeft: '8px' }}>({dataArray.length})</span>
                     </h3>
@@ -19,10 +21,10 @@ export default function ActivityDashboardView({ state }) {
                             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No orders in this category.</div>
                         ) : (
                             dataArray.map(order => {
-                                const isRowOpen = openRows.has(order.order_acceptance_id);
+                                const isRowOpen = state.openRows.has(order.order_acceptance_id);
                                 return (
                                     <div key={order.order_acceptance_id} style={{ marginBottom: '8px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                                        <div onClick={() => toggleRow(order.order_acceptance_id)} style={{ padding: '12px 15px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isRowOpen ? 'var(--bg-main)' : 'transparent', borderBottom: isRowOpen ? '1px solid var(--border-subtle)' : 'none' }}>
+                                        <div onClick={() => state.toggleRow(order.order_acceptance_id)} style={{ padding: '12px 15px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isRowOpen ? 'var(--bg-main)' : 'transparent', borderBottom: isRowOpen ? '1px solid var(--border-subtle)' : 'none' }}>
                                             <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                                 <span style={{ fontFamily: 'monospace', fontSize: '12px', background: 'var(--combobox-hover)', padding: '3px 8px', borderRadius: '4px' }}>
                                                     {order.order_acceptance_id.length > 7 ? `${order.order_acceptance_id.substring(0, 7)}...` : order.order_acceptance_id.substring(0, 7)}
@@ -48,13 +50,13 @@ export default function ActivityDashboardView({ state }) {
                                                         className="form-input" 
                                                         placeholder="Log manual activity or note..." 
                                                         style={{ fontSize: '12px', padding: '6px 10px' }}
-                                                        value={manualLogInputs[order.order_acceptance_id] || ""}
-                                                        onChange={e => setManualLogInputs(prev => ({ ...prev, [order.order_acceptance_id]: e.target.value }))}
+                                                        value={state.manualLogInputs[order.order_acceptance_id] || ""}
+                                                        onChange={e => state.setManualLogInputs(prev => ({ ...prev, [order.order_acceptance_id]: e.target.value }))}
                                                     />
                                                     <button 
                                                         className="btn btn-secondary" 
-                                                        disabled={isSubmittingLog || !manualLogInputs[order.order_acceptance_id]?.trim()} 
-                                                        onClick={() => handleAddManualLog(order.order_acceptance_id)}
+                                                        disabled={state.isSubmittingLog || !state.manualLogInputs[order.order_acceptance_id]?.trim()} 
+                                                        onClick={() => state.handleAddManualLog(order.order_acceptance_id)}
                                                         style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                                                     >
                                                         <FiPlus /> Add Log
@@ -79,7 +81,7 @@ export default function ActivityDashboardView({ state }) {
                                                                             
                                                                             {/* Only show trash can for admins */}
                                                                             {(state.user.role === 'Admin' || state.user.role === 'Chief Full Stack Developer') && (
-                                                                                <button className="btn-text-danger" onClick={() => handleDeleteLog(log.log_id)} style={{ padding: 0 }} title="Delete Audit Record">
+                                                                                <button className="btn-text-danger" onClick={() => state.handleDeleteLog(log.log_id)} style={{ padding: 0 }} title="Delete Audit Record">
                                                                                     <FiTrash2 size={12} />
                                                                                 </button>
                                                                             )}
@@ -108,21 +110,20 @@ export default function ActivityDashboardView({ state }) {
             </div>
         );
     };
+        if (state.loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Dashboard Telemetry...</div>;
 
-    if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Dashboard Telemetry...</div>;
-
-    return (
-        <div className="frappe-card">
-            <div className="system-header">
-                <h3>Shop Floor Accountability Hub</h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Audit trails, manual logging, and historical progression.</p>
+        return (
+            <div className="frappe-card">
+                <div className="system-header">
+                    <h3>Shop Floor Accountability Hub</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Audit trails, manual logging, and historical progression.</p>
+                </div>
+                
+                <div style={{ marginTop: '20px' }}>
+                    {renderSection('Work-in-Progress (WIP)', 'ongoing', state.treeData.ongoing, '--brand-accent')}
+                    {renderSection('Order Pipeline', 'future', state.treeData.future, '--brand-danger')}
+                    {renderSection('Archived / Completed', 'past', state.treeData.past, '--brand-success')}
+                </div>
             </div>
-            
-            <div style={{ marginTop: '20px' }}>
-                {renderSection('Work-in-Progress (WIP)', 'ongoing', treeData.ongoing, '--brand-accent')}
-                {renderSection('Order Pipeline', 'future', treeData.future, '--brand-danger')}
-                {renderSection('Archived / Completed', 'past', treeData.past, '--brand-success')}
-            </div>
-        </div>
-    );
-}
+        );
+    }

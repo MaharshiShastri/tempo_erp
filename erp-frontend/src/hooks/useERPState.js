@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, act } from "react";
 import API from "../api/api";
 import useTasks from "./tasks/useTasks";
 import useDispatchHub from "./dispatch/useDispatchHub";
@@ -8,6 +8,7 @@ import useItemMaster from "./items/useItemMaster";
 import useOrders from "./orders/useOrders";
 import useBilling from "./billing/useBilling";
 import useCore from "./useCore";
+import useActivityHub from "./useActivityDashboardHub";
 
 const API_HOST = window.location.hostname;
 
@@ -34,8 +35,12 @@ export default function useERPState() {
     };
     //Division of states into different hooks
     
-    //const master = useMasterData({sessionToken: sessionToken, user: user});
+    //All the shop floor business states
     const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMesssage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+
+
+    //all the sales business state
     const dispatch = useDispatchHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const logistics = useLogisticsHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
@@ -45,19 +50,20 @@ export default function useERPState() {
 
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
-        items.refreshItems();
-        if (salesRoles.includes(core.user.role)) {
+        items.refreshItems(); //Global Modules
+        if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies();
             orders.loadOrders();
             billing.loadBills();
         }
 
-        if (transportRoles.includes(core.user.role)) {
+        if (transportRoles.includes(core.user.role)) { //Transport module refresh
             dispatch.loadPartners();
         }
 
-        if (factoryRoles.includes(core.user.role)) {
+        if (factoryRoles.includes(core.user.role)) { //Shop floor module refresh
             tasks.loadTasks();
+            activity.loadData();
         }
     }, [core.user, core.sessionToken]);
 
@@ -118,7 +124,8 @@ export default function useERPState() {
     };
 
     return {
-        ...core, ...tasks, ...dispatch, ...logistics, ...companies, ...items, ...orders,
-        ...billing, notifications, unreadNotifCount, markAllNotifsRead, isServerLive
+        ...core, ...dispatch, ...logistics, ...companies, ...items, ...orders, ...billing, //Sales Business states unwinding
+        ...tasks, ...activity, //Shop floor business states
+        notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }
