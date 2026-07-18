@@ -13,6 +13,7 @@ import useAdminHub from "./admin/useAdminHub";
 import useCRMHub from "./CRM/useCRMHub";
 import useFAQHub from "./faq/useFAQHub";
 import useProductionHub from "./production/useProductionHub";
+import useGRN from "./grn/useGRN";
 
 const API_HOST = window.location.hostname;
 
@@ -51,6 +52,7 @@ export default function useERPState() {
     //All the shop floor business states
     const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const grn = useGRN({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
 
 
     //all the sales business state
@@ -148,7 +150,7 @@ export default function useERPState() {
 
     return {
         ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, //Sales Business states unwinding
-        ...tasks, ...activity, //Shop floor business states
+        ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, //Admin business states
         ...faq, ...items, ...production, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
