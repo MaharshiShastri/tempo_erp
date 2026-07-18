@@ -1,63 +1,9 @@
-import React, { useState, useEffect } from "react";
-import API from "../api/api";
 import { FiMessageCircle, FiCheckCircle, FiClock, FiSend, FiFilter } from "react-icons/fi";
 
 export default function FaqWorkspaceView({ state }) {
-    const [faqs, setFaqs] = useState([]);
-    const [newQuestion, setNewQuestion] = useState("");
-    const [answerTexts, setAnswerTexts] = useState({});
-    const [isLoading, setIsLoading] = useState(false);
-
-    const isRnD = ["R&D Engineer", "Admin", "Chief Full Stack Developer"].includes(state.user.role);
-    const [statusFilter, setStatusFilter] = useState("all");
-
-    useEffect(() => { loadFaqs(); }, []);
-
-    const loadFaqs = async () => {
-        try {
-            const data = await API.fetchFaqs(state.user.access_token);
-            setFaqs(data);
-        } catch (err) { state.showErrorModal("Fetch Error", err.message); }
-    };
-
-    const handleAskQuestion = async (e) => {
-        e.preventDefault();
-        if (!newQuestion.trim()) return;
-        setIsLoading(true);
-        try {
-            await API.askFaqQuestion({ question: newQuestion }, state.user.access_token);
-            setNewQuestion("");
-            await loadFaqs();
-            state.setAlertMessage("✅ Question submitted to R&D.");
-            state.setIsAlertOpen(true);
-        } catch (err) { state.showErrorModal("Error", err.message); }
-        finally { setIsLoading(false); }
-    };
-
-    const handleAnswerQuestion = async (faqId) => {
-        const answer = answerTexts[faqId];
-        if (!answer?.trim()) return;
-        
-        try {
-            await API.answerFaqQuestion(faqId, { answer }, state.user.access_token);
-            setAnswerTexts(prev => ({ ...prev, [faqId]: "" }));
-            await loadFaqs();
-            state.setAlertMessage("✅ Answer saved to Vector Database.");
-            state.setIsAlertOpen(true);
-        } catch (err) { state.showErrorModal("Error", err.message); }
-    };
-    const sortedFaqs = [...faqs].sort((a, b) => {
-        if (a.status === b.status) return 0;
-        return a.status === 'Answered' ? 1 : -1; // false (pending) comes before true
-    });
-
-    // 2. Apply the dropdown filter
-    const filteredFaqs = sortedFaqs.filter(faq => {
-        if (statusFilter === "pending") return faq.status === 'Pending';
-        if (statusFilter === "completed") return faq.status === 'Answered';
-        return true;
-    });
-
+    const {faqs, filteredFaqs, newQuestion, setNewQuestion, answerTexts, setAnswerTexts, statusFilter, setStatusFilter, isLoading, isRnD, loadFaqs,
+        handleAskQuestion, handleAnswerQuestion, handleFaqUpload} = state;
+    
     return (
         <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 25 }}>
             <div className="system-header" style={{ marginBottom: "20px" }}>

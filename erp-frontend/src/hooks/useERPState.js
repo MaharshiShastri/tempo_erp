@@ -11,6 +11,7 @@ import useCore from "./useCore";
 import useActivityHub from "./activitydashboard/useActivityDashboardHub";
 import useAdminHub from "./admin/useAdminHub";
 import useCRMHub from "./CRM/useCRMHub";
+import useFAQHub from "./faq/useFAQHub";
 
 const API_HOST = window.location.hostname;
 
@@ -37,6 +38,10 @@ export default function useERPState() {
         }
     };
     //Division of states into different hooks
+
+    //Global business state
+    const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -50,7 +55,6 @@ export default function useERPState() {
     const dispatch = useDispatchHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const logistics = useLogisticsHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
-    const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const orders = useOrders({sessionToken: core.sessionToken, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
@@ -58,7 +62,9 @@ export default function useERPState() {
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
 
-        items.refreshItems?.(); //Global Modules
+        //Global Modules
+        items.refreshItems?.(); 
+        faq.loadFaqs?.();
 
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies?.();
@@ -138,9 +144,10 @@ export default function useERPState() {
     };
 
     return {
-        ...core, ...dispatch, ...logistics, ...companies, ...items, ...orders, ...billing, ...crm, //Sales Business states unwinding
+        ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, //Sales Business states unwinding
         ...tasks, ...activity, //Shop floor business states
         ...admin, //Admin business states
+        ...faq, ...items, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }
