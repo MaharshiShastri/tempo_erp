@@ -10,6 +10,7 @@ import useBilling from "./billing/useBilling";
 import useCore from "./useCore";
 import useActivityHub from "./activitydashboard/useActivityDashboardHub";
 import useAdminHub from "./admin/useAdminHub";
+import useCRMHub from "./CRM/useCRMHub";
 
 const API_HOST = window.location.hostname;
 
@@ -52,6 +53,7 @@ export default function useERPState() {
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const orders = useOrders({sessionToken: core.sessionToken, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
+    const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
 
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
@@ -62,6 +64,7 @@ export default function useERPState() {
             companies.refreshCompanies?.();
             orders.loadOrders?.();
             billing.loadBills?.();
+            crm.loadLeads?.();
         }
 
         if (transportRoles.includes(core.user.role)) { //Transport module refresh
@@ -135,7 +138,7 @@ export default function useERPState() {
     };
 
     return {
-        ...core, ...dispatch, ...logistics, ...companies, ...items, ...orders, ...billing, //Sales Business states unwinding
+        ...core, ...dispatch, ...logistics, ...companies, ...items, ...orders, ...billing, ...crm, //Sales Business states unwinding
         ...tasks, ...activity, //Shop floor business states
         ...admin, //Admin business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive

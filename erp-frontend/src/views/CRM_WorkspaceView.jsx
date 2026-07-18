@@ -1,41 +1,6 @@
-import { useState, useEffect } from "react";
-import API from "../api/api";
 
 export default function CRM_WorkspaceView({ state }) {
-    const [leads, setLeads] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    const loadLeads = async () => {
-        setLoading(true);
-        try {
-            const data = await API.fetchLeads(state.user.access_token);
-            setLeads(data || []);
-        } catch (err) {
-            if (state.setAlertMessage && state.setIsAlertOpen) {
-                state.setAlertMessage("Failed to sync CRM Pipeline: " + err.message);
-                state.setIsAlertOpen(true);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadLeads();
-    }, []);
-
-    const handleStatusChange = async (leadId, newStatus) => {
-        try {
-            await API.updateLeadStatus(leadId, newStatus, state.user.access_token);
-            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
-        } catch (err) {
-            if (state.setAlertMessage && state.setIsAlertOpen) {
-                state.setAlertMessage("Database Update Failed: " + err.message);
-                state.setIsAlertOpen(true);
-            }
-        }
-    };
-
+    const {loadLeads, handleStatusChange, leads, loading} = state;
     // Helper to format the WPForms product query list into tags
     const renderProductTags = (queryStr) => {
         if (!queryStr) return <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>No specific product</span>;
