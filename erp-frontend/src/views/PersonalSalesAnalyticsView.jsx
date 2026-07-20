@@ -3,53 +3,12 @@ import API from "../api/api";
 import { FiTarget, FiAward, FiAlertCircle, FiTrendingUp, FiActivity } from "react-icons/fi";
 
 export default function PersonalSalesAnalyticsView({ state }) {
-    const [allSalesData, setAllSalesData] = useState([]);
-    const [myData, setMyData] = useState(null);
-
-    useEffect(() => {
-        const fetchGlobalSalesData = async () => {
-            try {
-                // Fetch the entire team's KPI array
-                const data = await API.fetchSalesKPIs(state.user.access_token);
-                setAllSalesData(data);
-                
-                // Identify the logged in user's specific row
-                if (state.user.role === "Sales Representative") {
-                    const me = data.find(k => k.email === state.user.email);
-                    setMyData(me);
-                } else {
-                    setMyData(null);
-                }
-
-            } catch (err) { state.showErrorModal("Error", err.message); }
-        };
-        fetchGlobalSalesData();
-    }, []);
-
-    if (state.user.role === "Sales Representative" && !myData) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading live leaderboards...</div>;
-
-    // Personal Metrics
-    const target = parseFloat(myData?.quarterly_order_value_target || myData?.monthly_lead_target || 0);
-    const harvested = parseFloat(myData?.targets_harvested || 0);
-    const shortfall = Math.max(0, target - harvested);
-    const progressPercentage = target > 0 ? Math.min(100, (harvested / target) * 100) : 0;
-
-    // Leaderboard Calculators
-    const getPercent = (kpi) => {
-        const t = parseFloat(kpi.quarterly_order_value_target || kpi.monthly_lead_target || 0);
-        const h = parseFloat(kpi.targets_harvested || 0);
-        return t > 0 ? (h / t) * 100 : 0;
-    };
-
-    // Sort 1: By Absolute Volume Amount
-    const leaderboardByAmount = [...allSalesData].sort((a, b) => parseFloat(b.targets_harvested || 0) - parseFloat(a.targets_harvested || 0));
-    
-    // Sort 2: By Percentage to Target
-    const leaderboardByPercent = [...allSalesData].sort((a, b) => getPercent(b) - getPercent(a));
-
+    const {target, harvested, progressPercentage, shortfall, leaderboardByAmount, leaderboardByPercent,
+        getPercent, user,
+    } = state;
     return (
         <div className="frappe-card" style={{ maxWidth: 1100, margin: "0 auto", padding: 30 }}>
-            {state.user.role === "Sales Representative" && (<>
+            {user.role === "Sales Representative" && (<>
             {/* 1. PERSONAL METRICS */}
             <div className="system-header" style={{ marginBottom: "20px" }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}><FiTarget /> My Quarterly Quota</h2>
@@ -104,11 +63,11 @@ export default function PersonalSalesAnalyticsView({ state }) {
                             {leaderboardByAmount.map((kpi, idx) => (
                                 <tr key={idx} style={{ 
                                     borderBottom: '1px solid var(--border-subtle)', 
-                                    background: kpi.email === state.user.email ? '#e0e7ff' : 'transparent' // Highlight logged-in user
+                                    background: kpi.email === user.email ? '#e0e7ff' : 'transparent' // Highlight logged-in user
                                 }}>
                                     <td style={{ padding: '12px', fontWeight: 'bold', color: idx < 3 ? 'var(--brand-accent)' : 'inherit' }}>
                                         {idx + 1}. {kpi.name.split(' ')[0]}
-                                        {kpi.email === state.user.email && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#4f46e5' }}>(You)</span>}
+                                        {kpi.email === user.email && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#4f46e5' }}>(You)</span>}
                                     </td>
                                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: 'var(--brand-success)' }}>
                                         ₹{parseFloat(kpi.targets_harvested || 0).toLocaleString('en-IN')}
@@ -131,7 +90,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
                                 return (
                                     <tr key={idx} style={{ 
                                         borderBottom: '1px solid var(--border-subtle)', 
-                                        background: kpi.email === state.user.email ? '#e0e7ff' : 'transparent' 
+                                        background: kpi.email === user.email ? '#e0e7ff' : 'transparent' 
                                     }}>
                                         <td style={{ padding: '12px', fontWeight: 'bold', color: idx < 3 ? 'var(--brand-accent)' : 'inherit' }}>
                                             {idx + 1}. {kpi.name.split(' ')[0]}

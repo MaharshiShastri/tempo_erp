@@ -16,6 +16,7 @@ import useProductionHub from "./production/useProductionHub";
 import useGRN from "./grn/useGRN";
 import useLeadGenerator from "./leads/useLeadGenerator";
 import useLogin from "./useLogin";
+import useAnalytics from "./analytics/useAnalytics";
 
 const API_HOST = window.location.hostname;
 
@@ -47,7 +48,8 @@ export default function useERPState() {
     //Global business state
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-    const production = useProductionHub({sessionToken: core.sessionToken, user: core.user, addToast: core.addToast, showErrorModal: core.showErrorModal})    ;
+    const production = useProductionHub({sessionToken: core.sessionToken, user: core.user, addToast: core.addToast, showErrorModal: core.showErrorModal});
+    const analytics = useAnalytics({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal});
 
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -66,7 +68,7 @@ export default function useERPState() {
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
     const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
-
+    
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
 
@@ -74,7 +76,8 @@ export default function useERPState() {
         items.refreshItems?.(); 
         faq.loadFaqs?.();
         production.loadPulse?.();
-
+        analytics.fetchAnalytics?.();
+        
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies?.();
             orders.loadOrders?.();
@@ -158,7 +161,7 @@ export default function useERPState() {
         ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, //Admin business states
-        ...faq, ...items, ...production, ...login, //Global business states
+        ...faq, ...items, ...production, ...login, ...analytics, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }

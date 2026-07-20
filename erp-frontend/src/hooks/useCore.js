@@ -71,7 +71,7 @@ export default function useCore(){
 
     return {user, setUser, sessionToken, activeTab, setActiveTab, showErrorModal, errorModal, errorModalOpen,
         setErrorModalOpen, addToast, toasts, isAlertOpen, setIsAlertOpen, alertMessage, setAlertMessage, errorMessage,
-        setErrorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword
+        setErrorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword,
     };
 
 }
