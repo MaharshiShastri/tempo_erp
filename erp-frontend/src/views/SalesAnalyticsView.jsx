@@ -13,7 +13,8 @@ export default function SalesAnalyticsView({ state }) {
         prodKpis, isLoading, selectedAnalytics, setSelectedAnalytics, isExporting, setIsExporting,
         quarterlyTargets, setQuarterlyTargets, salesPerformanceChart, transportChart, faqAskedChart, faqAnswerChart,
         completionChart, productionPieChart,totalQueued, conversionRatio, total_completed, totalCRM, totalErrors,
-        totalFaqAnswered, pendingFaqs, setAlertMessage, setIsAlertOpen, showErrorModal, user
+        totalFaqAnswered, pendingFaqs, setAlertMessage, setIsAlertOpen, showErrorModal, user, fromDate, setFromDate, 
+        toDate, setToDate, fetchAnalytics,
     } = state;
     
     const reportTabs = ["overview", "faq", "performance", "transport", "gtm", "production", "health"];
@@ -100,16 +101,7 @@ export default function SalesAnalyticsView({ state }) {
             setSelectedAnalytics(previousTab);
         }
     }
-    console.log("SalesAnalytics selectedAnalytics =", selectedAnalytics);
-
-    console.log(selectedAnalytics === "overview");
-    console.log(selectedAnalytics === "performance");
-    console.log(selectedAnalytics === "faq");
-    console.log(selectedAnalytics === "transport");
-    console.log(selectedAnalytics === "gtm");
-    console.log(selectedAnalytics === "production");
-    console.log(selectedAnalytics === "health");
-
+    
     if (isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Command Center Data...</div>;
     
     const handleUpdateTarget = async (email) => {
@@ -160,7 +152,19 @@ export default function SalesAnalyticsView({ state }) {
                         <p style={{ margin: '6px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>Financial data, GTM Evaluation, and System Health</p>
                     </div>
                 </div>
-
+                <div style={{display: "flex", gap: "15px", alignItems: "center", marginBottom: "20px"}}>
+                    <div className="form-group">
+                        <label>From</label>
+                        
+                        <input type="date" className="form-input" value={fromDate} onChange={(e)=>setFromDate(e.target.value)}/>
+                    </div>
+                    <div className="form-group">
+                        <label>To</label>
+                        
+                        <input type="date" className="form-input" value={toDate} max={new Date().toISOString().split('T')[0]} onChange={(e)=>setToDate(e.target.value)}/>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => fetchAnalytics(fromDate, toDate)}>Refresh Analytics</button>
+                </div>
                 <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "25px", overflowX: 'auto', paddingBottom: '10px' }}>
                     <button className={`btn ${selectedAnalytics === 'overview' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('overview')}>Overview</button>
                     <button className={`btn ${selectedAnalytics === 'faq' ? "btn-primary": "btn-text"}`} onClick={() => setSelectedAnalytics("faq")}><FiMessageSquare />F&Q Actions</button>

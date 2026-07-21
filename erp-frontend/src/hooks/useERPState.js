@@ -76,7 +76,7 @@ export default function useERPState() {
         items.refreshItems?.(); 
         faq.loadFaqs?.();
         production.loadPulse?.();
-        analytics.fetchAnalytics?.();
+        analytics.fetchAnalytics?.(analytics.fromDate, analytics.toDate);
         core.getUsers?.(core.sessionToken);
 
         if (salesRoles.includes(core.user.role)) { //Sales module refresh

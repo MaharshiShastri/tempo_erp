@@ -617,14 +617,14 @@ const API = {
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
-  async fetchSalesKPIs(token) {
-    const r = await fetch("/api/v1/analytics/sales", { headers: this.headers(token) });
+  async fetchSalesKPIs(token, fromDate, toDate) {
+    const r = await fetch(`/api/v1/analytics/sales?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
 
-  async fetchTransportKPIs(token) {
-    const r = await fetch("/api/v1/analytics/transport", { headers: this.headers(token) });
+  async fetchTransportKPIs(token, fromDate, toDate) {
+    const r = await fetch(`/api/v1/analytics/transport?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
@@ -653,8 +653,8 @@ const API = {
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
-  async fetchRnDKPIs(token) {
-    const r = await fetch("/api/v1/analytics/rnd", { headers: this.headers(token) });
+  async fetchRnDKPIs(token, fromDate, toDate) {
+    const r = await fetch(`/api/v1/analytics/rnd?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },
@@ -687,20 +687,22 @@ const API = {
 
     return r.json();
   },
-  async fetchGtmAnalytics(token) {
-    const r = await fetch("/api/v1/analytics/gtm-roi", { headers: this.headers(token) });
+  async fetchGtmAnalytics(token, fromDate, toDate) {
+    const r = await fetch(`/api/v1/analytics/gtm-roi?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) throw new Error("Failed to fetch GTM Analytics");
     return r.json();
   },
 
-  async fetchSystemHealth(token) {
-    const r = await fetch("/api/v1/analytics/system-health", { headers: this.headers(token) });
+  async fetchSystemHealth(token, fromDate, toDate) {
+    console.log("From date in api: ", fromDate);
+    console.log("TO date in api: ", toDate);
+    const r = await fetch(`/api/v1/analytics/system-health?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) throw new Error("Failed to fetch System Health");
     return r.json();
   },
   
-  async fetchProductionKPIs(token) {
-    const r = await fetch("/api/v1/analytics/production", { headers: this.headers(token) });
+  async fetchProductionKPIs(token, fromDate, toDate) {
+    const r = await fetch(`/api/v1/analytics/production?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },

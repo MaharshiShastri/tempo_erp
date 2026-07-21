@@ -4,11 +4,12 @@ export default function useAnalyticsWorkspace(){
 
     const today = new Date();
 
-    const [selectedYear,setSelectedYear] = useState(today.getFullYear());
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
+    
+    const lastDay = new Date(today.getFullYear(), today.getMonth()+ 1, 0).toISOString().split("T")[0];
 
-    const [selectedMonth,setSelectedMonth] = useState(today.getMonth()+1);
-
-    const [selectedQuarter,setSelectedQuarter] = useState(Math.floor(today.getMonth()/3)+1);
+    const [fromDate, setFromDate] = useState(firstDay);
+    const[toDate, setToDate] = useState(lastDay);
 
     const [selectedAnalytics, setSelectedAnalytics] = useState("overview");
     
@@ -16,9 +17,7 @@ export default function useAnalyticsWorkspace(){
     
     const [quarterlyTargets, setQuarterlyTargets] = useState({});
     
-    const [dateRange,setDateRange] = useState("month");
-
-    return{selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, selectedQuarter, setSelectedQuarter, dateRange, setDateRange, quarterlyTargets, setQuarterlyTargets,
+    return{fromDate, setFromDate, toDate, setToDate, quarterlyTargets, setQuarterlyTargets,
         isExporting, setIsExporting, selectedAnalytics, setSelectedAnalytics,
     };
 

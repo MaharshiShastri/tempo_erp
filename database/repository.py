@@ -22,7 +22,7 @@ from schemas.logistics_schema import FullPartnerProfile
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_UuRL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1263,9 +1263,9 @@ class PostgresRepository:
             session.commit()
 
 
-    def get_system_errors(self):
+    def get_system_errors(self, from_date, to_date):
         with SessionLocal() as session:
-            stmt = (select(SystemErrorLog).order_by(SystemErrorLog.created_at.desc()).limit(50))
+            stmt = (select(SystemErrorLog).order_by(SystemErrorLog.created_at.desc()).where(SystemErrorLog.created_at.between(from_date, to_date)).limit(50))
 
             errors = session.scalars(stmt).all()
 
@@ -1278,7 +1278,7 @@ class PostgresRepository:
             ]
     # --- SYSTEM LOGS end ---
     # --- SALES ANALYTICS & KPIs start ---
-    def get_sales_kpis(self):
+    def get_sales_kpis(self, from_date, to_date):
         with SessionLocal() as session:
 
             users = session.scalars(select(User).where(User.role == "Sales Representative")).all()
@@ -1287,26 +1287,26 @@ class PostgresRepository:
 
             for user in users:
 
-                total_spend = session.scalar(select(func.coalesce(func.sum(LeadTarget.cost_per_credit), 0)).where(LeadTarget.requested_by == user.email))
+                total_spend = session.scalar(select(func.coalesce(func.sum(LeadTarget.cost_per_credit), 0)).where(LeadTarget.requested_by == user.email, LeadTarget.added_date.between(from_date, to_date)))
 
-                targets_queued = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email,LeadTarget.status != "Inactive"))
+                targets_queued = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email,LeadTarget.status != "Inactive", LeadTarget.added_date.between(from_date, to_date)))
 
-                monthly_order_value = session.scalar(select(func.coalesce(func.sum(OrderItem.amount),0)).select_from(OrderHeader).join(OrderItem,OrderItem.order_acceptance_id ==OrderHeader.order_acceptance_id).where(OrderHeader.ordered_by == user.email,func.date_trunc("month",OrderHeader.created_at)==func.date_trunc("month",func.current_date())))
+                order_value = session.scalar(select(func.coalesce(func.sum(OrderItem.amount),0)).select_from(OrderHeader).join(OrderItem,OrderItem.order_acceptance_id ==OrderHeader.order_acceptance_id).where(OrderHeader.ordered_by == user.email, OrderHeader.created_at.between(from_date, to_date)))
 
-                rejected = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Rejected"))
+                rejected = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Rejected", LeadTarget.added_date.between(from_date, to_date)))
 
-                inactive = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Inactive"))
+                inactive = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Inactive", LeadTarget.added_date.between(from_date, to_date)))
 
-                crm_leads = session.scalar(select(func.count()).select_from(CRMLead).where(CRMLead.assigned_to == user.email))
+                crm_leads = session.scalar(select(func.count()).select_from(CRMLead).where(CRMLead.assigned_to == user.email, CRMLead.created_at.between(from_date, to_date)))
 
-                faqs = session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.asked_by == user.email))
+                faqs = session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.asked_by == user.email, FAQQuery.created_at.between(from_date, to_date)))
 
-                dispatches = session.scalar(select(func.count()).select_from(DispatchRecord).where(DispatchRecord.operator_email == user.email))
+                dispatches = session.scalar(select(func.count()).select_from(DispatchRecord).where(DispatchRecord.operator_email == user.email, DispatchRecord.created_at.between(from_date, to_date)))
 
-                actions = session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email == user.email))
+                actions = session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email == user.email, SystemAuditLog.created_at.between(from_date, to_date)))
 
 
-                performance_score = (float(monthly_order_value or 0) / 1000 + (crm_leads * 10) + (dispatches * 8) + (faqs * 3) + actions)
+                performance_score = (float(order_value or 0) / 1000 + (crm_leads * 10) + (dispatches * 8) + (faqs * 3) + actions)
 
 
                 result.append({
@@ -1318,7 +1318,7 @@ class PostgresRepository:
 
                     "targets_queued": targets_queued,
 
-                    "monthly_order_value": float(monthly_order_value or 0),
+                    "monthly_order_value": float(order_value or 0),
 
                     "rejected": rejected,
 
@@ -1338,7 +1338,7 @@ class PostgresRepository:
 
             return sorted(result, key=lambda x: x["performance_score"], reverse=True)
     
-    def get_rnd_kpis(self):
+    def get_rnd_kpis(self, from_date, to_date):
         with SessionLocal() as session:
 
             users = session.scalars(select(User).where(User.role=="R&D Engineer")).all()
@@ -1347,11 +1347,11 @@ class PostgresRepository:
 
             for user in users:
 
-                answered=session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.answered_by==user.email))
+                answered=session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.answered_by==user.email, FAQQuery.created_at.between(from_date, to_date)))
 
-                resolved=session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.answered_by==user.email,FAQQuery.status=="Answered"))
+                resolved=session.scalar(select(func.count()).select_from(FAQQuery).where(FAQQuery.answered_by==user.email,FAQQuery.status=="Answered", FAQQuery.updated_at.between(from_date, to_date)))
 
-                actions=session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email==user.email))
+                actions=session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email==user.email, SystemAuditLog.created_at.between(from_date, to_date)))
 
 
                 output.append({
@@ -1366,14 +1366,14 @@ class PostgresRepository:
 
             return sorted(output, key=lambda x:x["knowledge_score"], reverse=True)
         
-    def get_transport_kpis(self):
+    def get_transport_kpis(self, from_date, to_date):
 
         with SessionLocal() as session:
 
             total_partners=session.scalar(select(func.count(LogisticsPartner.id)))
 
 
-            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
+            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).where(DispatchRecord.created_at.between(from_date, to_date)).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
 
 
             return {
@@ -1389,14 +1389,14 @@ class PostgresRepository:
                 ]
             }
     
-    def get_transport_kpis(self):
+    def get_transport_kpis(self, from_date, to_date):
 
         with SessionLocal() as session:
 
             total_partners=session.scalar(select(func.count(LogisticsPartner.id)))
 
 
-            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
+            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).where(DispatchRecord.created_at.between(from_date, to_date)).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
 
 
             return {
@@ -1412,21 +1412,21 @@ class PostgresRepository:
                 ]
             }
     
-    def get_production_analytics(self):
+    def get_production_analytics(self, from_date, to_date):
         with SessionLocal() as session:
-            result = session.execute(select(func.coalesce(OrderHeader.production_stage, "PO_SUBMITTED").label("stage"),func.count(OrderHeader.order_acceptance_id).label("count")).group_by(OrderHeader.production_stage).order_by(desc("count"))).all()
+            result = session.execute(select(func.coalesce(OrderHeader.production_stage, "PO_SUBMITTED").label("stage"),func.count(OrderHeader.order_acceptance_id).label("count")).group_by(OrderHeader.production_stage).where(OrderHeader.created_at.between(from_date, to_date)).order_by(desc("count"))).all()
 
             return [{ "stage": row.stage, "count": row.count} for row in result]
     
-    def get_gtm_analytics(self):
+    def get_gtm_analytics(self, from_date, to_date):
         with SessionLocal() as session:
 
             month_expr = func.to_char(LeadTarget.added_date, "YYYY-MM")
 
             # Scalar subqueries (same semantics as your SQL)
-            total_queued = (select(func.count()).select_from(LeadTarget).where(LeadTarget.status != "Inactive").scalar_subquery())
+            total_queued = (select(func.count()).select_from(LeadTarget).where(LeadTarget.status != "Inactive", LeadTarget.created_at.between(from_date, to_date)).scalar_subquery())
 
-            total_completed = (select(func.count()).select_from(LeadTarget).where(LeadTarget.status == "Completed").scalar_subquery())
+            total_completed = (select(func.count()).select_from(LeadTarget).where(LeadTarget.status == "Completed", LeadTarget.created_at.between(from_date, to_date)).scalar_subquery())
 
             stmt = (select(LeadTarget.gtm_source.label("gtm_source"), month_expr.label("month"), func.count().label("total_targets"), func.count().filter(LeadTarget.status == "Completed").label("completed"), func.count().filter(LeadTarget.status == "Rejected").label("rejected"), func.count().filter(LeadTarget.status == "Pending").label("pending"), func.count().filter(LeadTarget.status == "Awaiting Review").label("awaiting_review"), func.sum(LeadTarget.cost_per_credit).label("total_spend"), func.sum(LeadTarget.emails_found).label("emails_found"), total_queued.label("total_queued"), total_completed.label("total_completed"), func.count(case(
                             (LeadTarget.email_status.in_(["Sent Email", "Got Reply", "Closed Enquiry", ]),1,))).label("emails_sent"),
@@ -1435,7 +1435,7 @@ class PostgresRepository:
 
                     func.count(case((LeadTarget.email_status == "Closed Enquiry",1,))).label("deals_closed"),
                 )
-                .where(LeadTarget.added_date >= date.today() - timedelta(days=30))
+                .where(LeadTarget.added_date.between(from_date, to_date))
                 .group_by(LeadTarget.gtm_source, month_expr,)
                 .order_by(month_expr.desc(),LeadTarget.gtm_source.asc(),)
             )

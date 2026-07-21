@@ -12,17 +12,19 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
     const [prodKpis, setProdKpis] = useState([]);
     const [errorLogs, setErrorLogs] = useState([]);
 
-    async function fetchAnalytics(){
+    async function fetchAnalytics(fromDate, toDate){
+        console.log("From date in analytics data: ", fromDate);
+        setIsLoading(true);
 
         try{
 
             const [sales, transport, rnd, gtm, errors, production] = await Promise.all([
-                API.fetchSalesKPIs(sessionToken),
-                API.fetchTransportKPIs(sessionToken),
-                API.fetchRnDKPIs(sessionToken),
-                API.fetchGtmAnalytics(sessionToken),
-                API.fetchSystemHealth(sessionToken),
-                API.fetchProductionKPIs(sessionToken)
+                API.fetchSalesKPIs(sessionToken, fromDate, toDate),
+                API.fetchTransportKPIs(sessionToken, fromDate, toDate),
+                API.fetchRnDKPIs(sessionToken, fromDate, toDate),
+                API.fetchGtmAnalytics(sessionToken, fromDate, toDate),
+                API.fetchSystemHealth(sessionToken, fromDate, toDate),
+                API.fetchProductionKPIs(sessionToken, fromDate, toDate)
                 ]);
 
             setSalesKpis(sales);
