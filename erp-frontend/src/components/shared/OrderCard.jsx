@@ -12,7 +12,8 @@ export default function OrderCard({ order, state}) {
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
                     {/*<button className="btn btn-secondary" onClick={() => state.executePrintWorkflow(order, 'order')}>🖨️ Print Order</button>*/}
 
-                    <button className="btn btn-success" onClick={() => state.triggerInvoiceSetupForOrder(order.order_acceptance_id)}>Generate Commercial Invoice</button>
+                    {order.production_stage === "READY_TO_DISPATCH" ? (<button className="btn btn-success" onClick={() => state.triggerInvoiceSetupForOrder(order.order_acceptance_id)}>Generate Commercial Invoice</button>) :
+                    (<h3 style={{margin: 0, fontSize: "14px", color: "var(--brand-accent)", alignSelf: "center"}}>Stage: {order.production_stage}</h3>)}
                 </div>
             </div>
 

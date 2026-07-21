@@ -15,7 +15,9 @@ def get_bills(user_profile: dict = Depends(verify_bearer_token)):
 @router.post("/create", dependencies=[Depends(check_department("Sales Representative"))])
 def create_bill(payload: BillHeaderCreate, user_profile: dict = Depends(verify_bearer_token)):
     try:
-        return EDBR.create_bill(payload.model_dump())
+        bill_details = EDBR.create_bill(payload.model_dump())
+        return bill_details
+    
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     

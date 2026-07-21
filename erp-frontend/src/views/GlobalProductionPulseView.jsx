@@ -62,16 +62,7 @@ export default function GlobalProductionPulseView({ state }) {
                                         </div>
 
                                         {/* Action Button */}
-                                        {isFactory && stage.key !== "DISPATCHED" && (
-                                            <button 
-                                                className="btn btn-secondary" 
-                                                style={{ width: "100%", fontSize: "11px", padding: "6px", display: "flex", justifyContent: "center", alignItems: "center", gap: "4px" }}
-                                                onClick={() => handleMoveStage(item._parentOrder.order_acceptance_id, stage.key)}
-                                            >
-                                                Advance Stage <FiArrowRight />
-                                            </button>
-                                        )}
-                                        {isDispatcher && stage.key == "READY_TO_DISPATCH" && (
+                                        {isFactory && stage.key !== "DISPATCHED" && stage.key !== "READY_TO_DISPATCH" && (
                                             <button 
                                                 className="btn btn-secondary" 
                                                 style={{ width: "100%", fontSize: "11px", padding: "6px", display: "flex", justifyContent: "center", alignItems: "center", gap: "4px" }}

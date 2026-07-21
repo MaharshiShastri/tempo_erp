@@ -374,27 +374,39 @@ class PostgresRepository:
 
     def create_bill(self, bill_data: dict) -> dict:
         with SessionLocal() as session:
+
             header = BillHeader(
-                bill_num=bill_data['bill_num'],
-                bill_date=bill_data['bill_date'],
-                order_acceptance_id=str(bill_data['order_acceptance_id'])
+                bill_num=bill_data["bill_num"],
+                bill_date=bill_data["bill_date"],
+                order_acceptance_id=bill_data["order_acceptance_id"]
             )
+
             session.add(header)
 
-            for item in bill_data['items']:
-                bi = BillItem(
-                    bill_num=header.bill_num,
-                    order_item_id=item['order_item_id'],
-                    quantity_shipped=item['quantity_shipped']
+            for item in bill_data["items"]:
+                session.add(
+                    BillItem(
+                        bill_num=header.bill_num,
+                        order_item_id=item["order_item_id"],
+                        quantity_shipped=item["quantity_shipped"]
+                    )
                 )
-                session.add(bi)
-                header.items.append(bi)
+
+            order = session.get(
+                OrderHeader,
+                bill_data["order_acceptance_id"]
+            )
+
+            if order is None:
+                raise ValueError("Order not found.")
+
+            order.production_stage = "DISPATCHED"
 
             session.commit()
             session.refresh(header)
-            
+
             h_dict = to_dict(header)
-            h_dict['items'] = [to_dict(i) for i in header.items]
+            h_dict["items"] = [to_dict(i) for i in header.items]
             return h_dict
     # --- GLOBAL BILLS ENGINE end---
 
@@ -1190,9 +1202,9 @@ class PostgresRepository:
             return result
         
     def update_order_stage(self, order_id: str, new_stage: str):
-        logger.warning(f"order id: {order_id}")
+        
         with SessionLocal() as session:
-            stmt = (update(OrderHeader).where(OrderHeader.order_acceptance_id == str(order_id)).values(production_stage=new_stage).returning(OrderHeader))
+            stmt = (update(OrderHeader).where(OrderHeader.order_acceptance_id == str(order_id)).values(production_stage=new_stage))
 
             order = session.execute(stmt).scalar_one_or_none()
 
