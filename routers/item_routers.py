@@ -18,11 +18,14 @@ def get_items(user_profile: dict=Depends(verify_bearer_token)):
 
 @router.post("/create")
 def create_item(payload: ItemMasterCreate, user_profile: dict=Depends(verify_bearer_token)):
+    print(payload.item_code)
     try:
-        return EDBR.create_item(payload)
+        return EDBR.create_item(payload.model_dump())
     
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Item Code already exists or data is invalid.")
+        print(type(e))
+        print(e)
+        raise HTTPException(status_code=400, detail=str(e))
     
 @router.put("/{item_code}")
 def update_item(item_code: str, payload: ItemMasterUpdate, user_profile=Depends(verify_bearer_token)):

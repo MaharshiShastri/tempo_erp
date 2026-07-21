@@ -15,7 +15,7 @@ export default function useProductionPulse({sessionToken, user, addToast, showEr
     const [isLoading, setIsLoading] = useState(false);
 
     const isFactory = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"].includes(user?.role);
-
+    const isDispatcher = ["Dispatch Engineer", "Admin", "Chief Full Stack Developer"].includes(user?.role);
     const loadPulse = useCallback(async () => {
 
         if (!sessionToken) return;
@@ -42,10 +42,13 @@ export default function useProductionPulse({sessionToken, user, addToast, showEr
 
     const handleMoveStage = async (orderId, currentStage) => {
 
-        if (!isFactory) return;
-
         const currentIndex = STAGES.findIndex(s => s.key === currentStage);
 
+        if(currentStage === "READY_TO_DISPATCH"){
+            if(!isDispatcher) return;
+        } else{
+            if (!isFactory) return;
+        }
         if (currentIndex === -1 || currentIndex === STAGES.length - 1) {
             return;
         }
@@ -73,6 +76,6 @@ export default function useProductionPulse({sessionToken, user, addToast, showEr
 
     };
 
-    return {STAGES, orders, isLoading, isFactory, loadPulse, handleMoveStage};
+    return {STAGES, orders, isLoading, isFactory, loadPulse, handleMoveStage, isDispatcher};
 
 }

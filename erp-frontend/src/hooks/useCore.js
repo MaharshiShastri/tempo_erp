@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import API from "../api/api";
 
 export default function useCore(){
     const [user, setUser] = useState(() => {
@@ -8,7 +9,7 @@ export default function useCore(){
     const sessionToken = user ? user.access_token : null;
     const [activeTab, setActiveTab] = useState('global-pulse');
     const [toasts, setToasts] = useState([]);
-    
+    const [systemUsers, setSystemUsers] = useState([]);
     const [errorModal, setErrorModal] = useState({title: "", message: "" });
     const [errorModalOpen, setErrorModalOpen] = useState(false);
         
@@ -32,6 +33,13 @@ export default function useCore(){
             setToasts(prev => prev.filter(t => t.id !== id));   
         }, 5000);
     };
+    
+    const getUsers = async(sessionToken) => {
+        const users = await API.fetchUsers(sessionToken);
+        const normalizedUsers = Array.isArray(users) ? users : []
+        setSystemUsers(normalizedUsers);
+        
+    }
 
     useEffect(() => {
         if ("Notification" in window && Notification.permission === "default") {
@@ -71,7 +79,8 @@ export default function useCore(){
 
     return {user, setUser, sessionToken, activeTab, setActiveTab, showErrorModal, errorModal, errorModalOpen,
         setErrorModalOpen, addToast, toasts, isAlertOpen, setIsAlertOpen, alertMessage, setAlertMessage, errorMessage,
-        setErrorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword,
+        setErrorMessage, loginEmail, setLoginEmail, loginPassword, setLoginPassword, systemUsers, setSystemUsers,
+        getUsers,
     };
 
 }

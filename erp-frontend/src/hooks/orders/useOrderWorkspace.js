@@ -28,13 +28,13 @@ export default function useOrderWorkspace({sessionToken, companiesMaster, itemsM
 
     
     const handleItemMasterSelection = (index, itemCode) => {
-        if (itemCode === "TRIGGER_ERR_UNREGISTERED_PART" || (itemCode && !itemsMaster.find(i => i.item_code === itemCode))) {
+        if (itemCode === "TRIGGER_ERR_UNREGISTERED_PART" || (itemCode && !itemsMaster.find( i => i.item_code?.trim() === itemCode?.trim()))) {
             setAlertMessage("Item missing from master logs."); setIsAlertOpen(true); updateOrderItemField(index, 'item_code', ''); return;
         }
-        const matched = itemsMaster.find(i => i.item_code === itemCode);
+        const matched = itemsMaster.find( i => i.item_code?.trim() === itemCode?.trim());
         if (matched) {
             const items = [...orderItems];
-            items[index] = { ...items[index], item_code: itemCode, additional_spec_text: matched.additional_spec_text || '', hsn_code: matched.hsn_code || '', rate: matched.rate || 0.00, unit_measure: matched.unit_measure || 'NOS', discount_percentage: 0.00 };
+            items[index] = { ...items[index], item_code: itemCode};
             setOrderItems(items);
         }
     };

@@ -1,8 +1,16 @@
 import API from "../../api/api";
 
-export default function useOrderSubmit({user, sessionToken, orderHeader, setOrderHeader, orderItems, setOrderItems, defaultOrderHeader,
+export default function useOrderSubmit({user, sessionToken, orderHeader, setIsBillingSameAsCustomer, setOrderHeader, orderItems, setOrderItems, defaultOrderHeader,
     defaultOrderItem, setOrders, isNewClient, temporaryClientName, setCompanyForm, setIsEditingCompany, setAlertMessage,
     setIsAlertOpen, setActiveTab, showErrorModal}){
+    
+    const triggerNewOrderInitialization = () => {
+        setIsBillingSameAsCustomer(true);
+        setOrderHeader({ ...defaultOrderHeader, order_acceptance_id: '', order_acceptance_date: new Date().toISOString().split('T')[0] });
+        setOrderItems([{ ...defaultOrderItem }]);
+        setActiveTab('order-new');
+    };
+
     const loadOrders = async () =>{
         try{
             const ord = await API.fetchOrders(sessionToken);
@@ -31,7 +39,7 @@ export default function useOrderSubmit({user, sessionToken, orderHeader, setOrde
             
             // Post-Submission Redirect Check modified for CompanyEntryForm routing view targets
             if (isNewClient) {
-                setIsEditingCompany(true);
+                
                 setCompanyForm(prev => ({
                     ...prev,
                     name: temporaryClientName || finalHeader.billing_name || "",
@@ -77,5 +85,5 @@ export default function useOrderSubmit({user, sessionToken, orderHeader, setOrde
         }
     };
 
-    return{loadOrders, commitOrderSubmit, handleFormSubmit};
+    return{loadOrders, commitOrderSubmit, handleFormSubmit, triggerNewOrderInitialization};
 }

@@ -4,6 +4,24 @@ import API from "../../api/api";
 export default function useTasks({sessionToken, user, showErrorModal, addToast, dispatchSystemNotification, setAlertMessage, setIsAlertOpen}) {
     const [tasks, setTasks] = useState([]);
     const [loadingTasks, setLoadingTasks] = useState(false);
+    const [expandedTaskId, setExpandedTaskId] = useState(null);
+    const [viewTab, setViewTab] = useState('received'); 
+    const [statusFilter, setStatusFilter] = useState('all'); 
+    
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskDetails, setNewTaskDetails] = useState('');
+    const [selectedAssignees, setSelectedAssignees] = useState([]);
+    const [newTaskDeadline, setNewTaskDeadline] = useState('');
+    const [newTaskFile, setNewTaskFile] = useState([]);
+
+    
+    const tasksArray = tasks || [];
+    
+    const filteredTasks = tasksArray.filter(t => {
+        const matchesTab = viewTab === 'received' ? t.assigned_to.includes(user.email) : t.assigned_by === user.email;
+        const matchesStatus = statusFilter === 'all' ? true : (statusFilter === 'pending' ? t.is_incomplete : !t.is_incomplete);
+        return matchesTab && matchesStatus;
+    });
 
     const loadTasks = useCallback(async () => {
 
@@ -43,6 +61,24 @@ export default function useTasks({sessionToken, user, showErrorModal, addToast, 
         }
 
     }, [sessionToken, showErrorModal]);
+
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        await createTask({
+            title: newTaskTitle,
+            details: newTaskDetails,
+            direction: 'dispatched',
+            assigned_to: selectedAssignees,
+            attachments: newTaskFile,
+            deadline: newTaskDeadline
+        });
+        setNewTaskTitle('');
+        setNewTaskDetails('');
+        setSelectedAssignees([]);
+        setNewTaskFile([]);
+        setNewTaskDeadline('');
+        document.getElementById('task-file-input').value = "";
+    };
 
     const updateTask = useCallback(async (taskId, payload) => {
 
@@ -140,6 +176,10 @@ export default function useTasks({sessionToken, user, showErrorModal, addToast, 
             showErrorModal?.("PDF Export Failed", err.message);
         }}, [sessionToken, showErrorModal]);
     
-    return {tasks, setTasks, loadingTasks, loadTasks, createTask, toggleTask, updateTask, deleteTask, openAttachment, downloadTaskPDF};
+    return {tasks, loadingTasks, loadTasks, filteredTasks, viewTab, setViewTab, statusFilter, expandedTaskId,
+        newTaskTitle, setNewTaskTitle, newTaskDetails, setNewTaskDetails, selectedAssignees, setSelectedAssignees, 
+        newTaskDeadline, setNewTaskDeadline, newTaskFile, setNewTaskFile, handleFormSubmit, createTask, toggleTask,
+        updateTask, deleteTask, openAttachment, downloadTaskPDF, setExpandedTaskId, setStatusFilter,
+    };
 
 }

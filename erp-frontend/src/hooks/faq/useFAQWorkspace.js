@@ -67,7 +67,8 @@ export default function useFAQWorkspace({sessionToken, user, showErrorModal, add
         }
     };
 
-    const handleFaqUpload = async (file) => {
+    const handleFaqUpload = useCallback(async (e) => {
+        const file = e.target.files?.[0];
 
         if (!file) return;
 
@@ -78,14 +79,17 @@ export default function useFAQWorkspace({sessionToken, user, showErrorModal, add
 
             await API.uploadFaqDoc(formData, sessionToken);
 
-            addToast?.("FAQ Document parsed and embedded successfully.", "success");
-
+            addToast?.("FAQ Document parsed and embedded successfully, refreshing the page", "success");
+            setIsLoading(true);
             await loadFaqs();
-
+            setIsLoading(false);
         } catch (err) {
             showErrorModal?.("Upload Failed", err.message);
+        }finally{
+            e.target.value = "";
+            
         }
-    };
+    }, [sessionToken, loadFaqs, addToast, showErrorModal]);
 
     const filteredFaqs = useMemo(() => {
 

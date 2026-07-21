@@ -23,7 +23,7 @@ services:
 
   worker:
     build: .
-    image: tempo-erp-app:v1.2.3
+    image: tempo-erp-app:v1.3.0
     command: celery -A services.celery_app:celery worker --loglevel=info
     volumes:
       - .:/app
@@ -34,7 +34,7 @@ services:
 
   beat:
     build: .
-    image: tempo-erp-app:v1.2.3
+    image: tempo-erp-app:v1.3.0
     command: celery -A services.celery_app:celery beat --loglevel=info
     volumes:
       - .:/app

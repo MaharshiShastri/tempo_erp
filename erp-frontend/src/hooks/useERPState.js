@@ -24,7 +24,7 @@ export default function useERPState() {
     
     const [notifications, setNotifications] = useState([]);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-
+    
     const [isServerLive, setIsServerLive] = useState(true);
     
     const factoryRoles = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"];
@@ -65,7 +65,7 @@ export default function useERPState() {
     const logistics = useLogisticsHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const orders = useOrders({sessionToken: core.sessionToken, user: core.user, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, showErrorModal: core.showErrorModal, setCompanyForm: companies.setCompanyForm, setIsEditingCompany: companies.setIsEditingCompany});
-    const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
+    const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, setIsBillingSameAsCustomer: orders.setIsBillingSameAsCustomer});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
     const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
     
@@ -77,7 +77,8 @@ export default function useERPState() {
         faq.loadFaqs?.();
         production.loadPulse?.();
         analytics.fetchAnalytics?.();
-        
+        core.getUsers?.(core.sessionToken);
+
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies?.();
             orders.loadOrders?.();

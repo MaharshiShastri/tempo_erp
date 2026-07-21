@@ -1,7 +1,7 @@
 import { FiActivity, FiArrowRight } from "react-icons/fi";
 
 export default function GlobalProductionPulseView({ state }) {
-    const {STAGES, orders, isLoading, isFactory, loadPulse, handleMoveStage} = state;
+    const {STAGES, orders, isLoading, isFactory, loadPulse, handleMoveStage, isDispatcher} = state;
 
     if (isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Factory Floor...</div>;
 
@@ -63,6 +63,15 @@ export default function GlobalProductionPulseView({ state }) {
 
                                         {/* Action Button */}
                                         {isFactory && stage.key !== "DISPATCHED" && (
+                                            <button 
+                                                className="btn btn-secondary" 
+                                                style={{ width: "100%", fontSize: "11px", padding: "6px", display: "flex", justifyContent: "center", alignItems: "center", gap: "4px" }}
+                                                onClick={() => handleMoveStage(item._parentOrder.order_acceptance_id, stage.key)}
+                                            >
+                                                Advance Stage <FiArrowRight />
+                                            </button>
+                                        )}
+                                        {isDispatcher && stage.key == "READY_TO_DISPATCH" && (
                                             <button 
                                                 className="btn btn-secondary" 
                                                 style={{ width: "100%", fontSize: "11px", padding: "6px", display: "flex", justifyContent: "center", alignItems: "center", gap: "4px" }}

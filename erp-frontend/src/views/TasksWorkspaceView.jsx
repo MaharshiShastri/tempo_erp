@@ -3,42 +3,10 @@ import TaskCreationForm from "../components/shared/TaskCreationForm";
 import TaskList from "../components/shared/TaskList";
 
 export default function TasksWorkspaceView({ state }) {
-    const [expandedTaskId, setExpandedTaskId] = useState(null);
-    const [viewTab, setViewTab] = useState('received'); 
-    const [statusFilter, setStatusFilter] = useState('all'); 
-    
-    const [newTaskTitle, setNewTaskTitle] = useState('');
-    const [newTaskDetails, setNewTaskDetails] = useState('');
-    const [selectedAssignees, setSelectedAssignees] = useState([]);
-    const [newTaskDeadline, setNewTaskDeadline] = useState('');
-    const [newTaskFile, setNewTaskFile] = useState([]);
-    
-    const tasksArray = state.tasks || [];
-    
-    const filteredTasks = tasksArray.filter(t => {
-        const matchesTab = viewTab === 'received' ? t.assigned_to.includes(state.user.email) : t.assigned_by === state.user.email;
-        const matchesStatus = statusFilter === 'all' ? true : (statusFilter === 'pending' ? t.is_incomplete : !t.is_incomplete);
-        return matchesTab && matchesStatus;
-    });
-
-    const handleFormSubmit = async (e) => {
-        e.preventDefault();
-        await state.createTask({
-            title: newTaskTitle,
-            details: newTaskDetails,
-            direction: 'dispatched',
-            assigned_to: selectedAssignees,
-            attachments: newTaskFile,
-            deadline: newTaskDeadline
-        });
-        setNewTaskTitle('');
-        setNewTaskDetails('');
-        setSelectedAssignees([]);
-        setNewTaskFile([]);
-        setNewTaskDeadline('');
-        document.getElementById('task-file-input').value = "";
-    };
-    
+    const {tasks, loadingTasks, loadTasks, filteredTasks, viewTab, setViewTab, statusFilter, expandedTaskId,
+        newTaskTitle, setNewTaskTitle, newTaskDetails, setNewTaskDetails, selectedAssignees, setSelectedAssignees, 
+        newTaskDeadline, setNewTaskDeadline, newTaskFile, setNewTaskFile, handleFormSubmit, createTask, toggleTask,
+        updateTask, deleteTask, openAttachment, downloadTaskPDF, setExpandedTaskId, setStatusFilter, systemUsers} = state;
     return (
         <div className="frappe-card">
             <div className="system-header">

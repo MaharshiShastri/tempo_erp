@@ -8,7 +8,9 @@ export default function TaskCreationForm({state, selectedAssignees, setSelectedA
         const offset = tomorrow.getTimezoneOffset() * 60000;
         return (new Date(tomorrow.getTime() - offset)).toISOString().slice(0, 16);
     };
-    
+    const assignableUsers = (state.systemUsers || []).filter(u =>
+        ["Shop Floor Worker", "Shop Floor Administrator", "Admin", "Chief Full Stack Developer"].includes(u.role)
+    );
     return (
         <form onSubmit={handleFormSubmit} style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px', border: '1px solid var(--border-light)' }}>
             <h4 style={{ margin: '0 0 15px 0', fontSize: '14px' }}>Delegate New Workflow Target</h4>
@@ -20,7 +22,7 @@ export default function TaskCreationForm({state, selectedAssignees, setSelectedA
 
                 <div className="form-group grid-span-2">
                     <label className="input-label">TO (Target Assignees) *</label>
-                    <OperatorMultiSelect users={state.systemUsers || []} selectedEmails={selectedAssignees} onChange={setSelectedAssignees} />
+                    <OperatorMultiSelect users={assignableUsers || []} selectedEmails={selectedAssignees} onChange={setSelectedAssignees} />
                 </div>
                 <div className="form-group">
                     <label className="input-label">Target Deadline (Optional)</label>

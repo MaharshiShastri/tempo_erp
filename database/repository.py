@@ -22,7 +22,7 @@ from schemas.logistics_schema import FullPartnerProfile
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABaASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_UuRL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -212,10 +212,11 @@ class PostgresRepository:
     def get_staged_order_by_oa(self, order_acceptance_id: str):
         with SessionLocal() as session:
             stmt = select(StagingOrderHeader).options(joinedload(StagingOrderHeader.items)).where(
-                StagingOrderHeader.order_acceptance_id == order_acceptance_id
+                StagingOrderHeader.order_acceptance_id == order_acceptance_id, StagingOrderHeader.status=="PENDING"
             ).limit(1)
             
             header = session.scalars(stmt).first()
+            
             if not header: return None
             
             h_dict = to_dict(header)

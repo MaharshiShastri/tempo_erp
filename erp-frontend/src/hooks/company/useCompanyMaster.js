@@ -49,7 +49,7 @@ export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAl
             await API.deleteCompany(companyId, sessionToken);
             setAlertMessage("Company profile deleted successfully.");
             setIsAlertOpen(true);
-            await refreshDataHub();
+        
             if (activeTab === 'company-new') setActiveTab('companies-list');
         } catch (err) {
             setAlertMessage(err.message);
@@ -75,6 +75,7 @@ export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAl
             if (isEditingCompany) {
                 await API.updateCompany(selectedCompanyId, companyForm, sessionToken);
                 setAlertMessage("Customer profile updated successfully.");
+                
             } else {
                 await API.saveCompanyMaster(companyForm, sessionToken);
                 setAlertMessage("Customer profile created successfully.");
@@ -83,7 +84,7 @@ export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAl
             setIsEditingCompany(false);
             setSelectedCompanyId(null);
             setIsAlertOpen(true);
-            await refreshDataHub(); 
+            refreshCompanies();
             setActiveTab('companies-list');
         } catch (err) { 
             setAlertMessage(err.message); 
@@ -91,6 +92,6 @@ export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAl
         }
     };
     return {companiesMaster, refreshCompanies, triggerNewCompany, triggerEditCompany, deleteCompany, refreshCompanies, commitCompanySubmit,
-        indianStates, industrialCities, professionalRoles
+        indianStates, industrialCities, professionalRoles, setIsEditingCompany, setCompanyForm, companyForm,
      };
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import API from "../../api/api";
 
 export default function useBilling({sessionToken, orders, setAlertMessage, setIsAlertOpen, setActiveTab}){
+    const [billItems, setBillItems] = useState([]);
     const [billHeader, setBillHeader] = useState({ bill_num: '', bill_date: '', order_acceptance_id: '' });
     const [bills, setBills] = useState([]);
 
@@ -34,11 +35,5 @@ export default function useBilling({sessionToken, orders, setAlertMessage, setIs
         setActiveTab('bill-new');
     }; 
 
-    const triggerNewOrderInitialization = () => {
-        setIsBillingSameAsCustomer(true);
-        setOrderHeader({ ...defaultOrderHeader, order_acceptance_id: '', order_acceptance_date: new Date().toISOString().split('T')[0] });
-        setOrderItems([{ ...defaultOrderItem }]);
-        setActiveTab('order-new');
-    };
-    return {loadBills, bills, commitBillSubmit, triggerInvoiceSetupForOrder, triggerNewOrderInitialization};
+    return {loadBills, bills, commitBillSubmit, triggerInvoiceSetupForOrder};
 }

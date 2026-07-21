@@ -6,7 +6,7 @@ export default function OrderEntryFormView({ state }) {
     const {orderHeader, setOrderHeader, orderItems, setOrderItems, appendOrderItemRow, popOrderItemRow, updateOrderItemField,
         handleCustomerMasterSelection, oaSuggestions, showOaSuggestions, oaInputRef, handleOaInputChange, handleOaSelect, handleOaSearch, 
         isNewClient, setIsNewClient, temporaryClientName, setTemporaryClientName, handleFormSubmit, totals,
-        isOcrLoading, isBillingSameAsCustomer, setIsBillingSameAsCustomer, itemsMaster,setActiveTab, 
+        isOcrLoading, isBillingSameAsCustomer, setIsBillingSameAsCustomer, itemsMaster,setActiveTab, handleItemMasterSelection
     } = state;
     
     const today = new Date().toISOString().split('T')[0];
@@ -193,7 +193,7 @@ export default function OrderEntryFormView({ state }) {
                                             <select 
                                                 className="form-select-native" 
                                                 value={item.item_code} 
-                                                onChange={e => handleItemMasterSelection(index, 'item_code', e.target.value)} 
+                                                onChange={e => handleItemMasterSelection(index, e.target.value)} 
                                                 required
                                             >
                                                 <option value="">-- Choose --</option>

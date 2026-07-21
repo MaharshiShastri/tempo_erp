@@ -205,6 +205,8 @@ class StagingOrderHeader(Base):
 
     purchase_order_number: Mapped[str | None] = mapped_column(String(100))
 
+    purchase_order_date: Mapped [date | None] = mapped_column(Date)
+    
     billing_name: Mapped[str | None] = mapped_column(String(100))
 
     billing_address: Mapped[str | None] = mapped_column(Text)

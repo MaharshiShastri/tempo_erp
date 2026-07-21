@@ -30,12 +30,9 @@ def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify
 def get_production_pulse(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_global_production_pulse()
 
-@router.patch("/{order_id:path}/stage")
-def update_stage(order_id: str, payload: StageUpdatePayload, user: dict = Depends(verify_bearer_token)):
-    print("order_id is : ", order_id)
-    # Restrict stage updates to Factory/Superusers if desired
-    if user["role"] not in ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"]:
-        raise HTTPException(status_code=403, detail="Unauthorized to update production stages.")
+@router.patch("/{order_id:path}/stage",)
+def update_stage(order_id: str, payload: StageUpdatePayload, user: dict = Depends(check_department(["Shop Floor Administrator", "Dispatch Engineer",]))):
+
     try:
         return EDBR.update_order_stage(order_id, payload.stage)
     except Exception as e:

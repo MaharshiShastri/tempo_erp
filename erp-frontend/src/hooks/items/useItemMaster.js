@@ -26,7 +26,6 @@ export default function useItemMaster({sessionToken, setAlertMessage, setIsAlert
         try {
             await API.saveItemMaster(itemForm, sessionToken);
             setItemForm({ ...defaultItemForm });
-            await refreshDataHub(); // Refreshes itemsMaster array globally
             setAlertMessage("Product successfully added to Item Master.");
             setIsAlertOpen(true);
         } catch (err) {
@@ -34,5 +33,7 @@ export default function useItemMaster({sessionToken, setAlertMessage, setIsAlert
             setIsAlertOpen(true);
         }
     };
-    return {itemsMaster, refreshItems, commitItemSubmit};
+    return {itemsMaster, refreshItems, commitItemSubmit, defaultItemForm, setItemsMaster, itemForm,
+        setItemForm, selectedItem, setSelectedItem, itemDetail, setItemDetail, isEditingItem, setIsEditingItem, 
+    };
 }
