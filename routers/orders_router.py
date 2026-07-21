@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/v1/orders", tags=["Orders Operations Engine"])
 
 @router.get("", dependencies=[Depends(check_department("Sales Representative"))])
 def get_orders(user_profile: dict = Depends(verify_bearer_token)):
-    return EDBR.get_all_orders()
+    return EDBR.get_orders_for_user(user_profile)
 
 @router.post("/create", dependencies=[Depends(check_department("Sales Representative"))])
 def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify_bearer_token)):
@@ -28,7 +28,7 @@ def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify
 
 @router.get("/pulse")
 def get_production_pulse(user: dict = Depends(verify_bearer_token)):
-    return EDBR.get_global_production_pulse()
+    return EDBR.get_global_production_pulse(user)
 
 @router.patch("/{order_id:path}/stage",)
 def update_stage(order_id: str, payload: StageUpdatePayload, user: dict = Depends(check_department(["Shop Floor Administrator", "Dispatch Engineer",]))):

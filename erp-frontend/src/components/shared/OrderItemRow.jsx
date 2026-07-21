@@ -15,7 +15,7 @@ export default function OrderItemRow({ item}) {
 
             <td>{quantity}</td>
 
-            <td>{item.unit_measure}</td>
+            <td>{item.um}</td>
 
             <td>₹{rate.toFixed(2)}</td>
 

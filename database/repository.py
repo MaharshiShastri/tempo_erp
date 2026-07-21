@@ -131,22 +131,30 @@ class PostgresRepository:
                 h_dict = to_dict(h)
                 h_dict['items'] = [to_dict(i) for i in h.items]
                 result.append(h_dict)
+                
             return result
 
     def get_orders_for_user(self, user_profile: dict):
-        department = user_profile.get('department')
         email = user_profile.get('email')
 
         with SessionLocal() as session:
-            if user_profile['role'] == 'Admin':
-                stmt = select(OrderHeader)
+            if user_profile['role'] in ["Admin", "Chief Full Stack Developer", "Shop Floor Administrator", "Dispatch Engineer",]:
+                stmt = select(OrderHeader).options(joinedload(OrderHeader.items)).order_by(OrderHeader.created_at.desc())
             else:
                 # Adapted to model fields: filtering by ordered_by (email)
-                stmt = select(OrderHeader).where(OrderHeader.ordered_by == email)
-            
-            orders = session.scalars(stmt).all()
-            return [to_dict(o) for o in orders]
 
+                stmt = select(OrderHeader).options(joinedload(OrderHeader.items)).order_by(OrderHeader.created_at.desc()).where(OrderHeader.ordered_by == email)
+            
+            orders = session.scalars(stmt).unique().all()
+            result = []
+        
+            for order in orders:
+                order_dict = to_dict(order)
+                order_dict["items"] = [to_dict(item) for item in order.items]
+                result.append(order_dict)
+        
+            return result
+        
     def create_order(self, order_data: dict) -> dict:
         with SessionLocal() as session:
             header = OrderHeader(
@@ -1164,34 +1172,23 @@ class PostgresRepository:
             return {"id": target.id}
     # --- LEAD GENERATOR ENGINE end ---
     # --- GLOBAL PRODUCTION PULSE start ---
-    def get_global_production_pulse(self):
+    def get_global_production_pulse(self, user):
         with SessionLocal() as session:
             stmt = (select(OrderHeader).options(selectinload(OrderHeader.items)).order_by(OrderHeader.due_date.asc()))
-
-            orders = session.scalars(stmt).all()
+            print(user["role"])
+            if user["role"] not in ["Admin", "Chief Full Stack Developer", "Shop Floor Administrator", "Dispatch Engineer"]:
+                stmt = stmt.where(OrderHeader.ordered_by == user["email"])
+            
+            orders = session.scalars(stmt).unique().all()
 
             result = []
 
             for order in orders:
-                result.append({
-                    "order_acceptance_id": order.order_acceptance_id,
-                    "billing_name": order.billing_name,
-                    "due_date": (
-                        order.due_date.isoformat()
-                        if order.due_date
-                        else None
-                    ),
-                    "production_stage": order.production_stage,
-                    "items": [
-                        {
-                            "item_code": item.item_code,
-                            "quantity": item.quantity
-                        }
-                        for item in order.items
-                    ]
-                })
-
+                order_dict = to_dict(order)
+                order_dict["items"] = [to_dict(item) for item in order.items]
+                result.append(order_dict)
             return result
+        
     def update_order_stage(self, order_id: str, new_stage: str):
         logger.warning(f"order id: {order_id}")
         with SessionLocal() as session:

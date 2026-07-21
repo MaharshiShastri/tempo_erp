@@ -21,9 +21,9 @@ export default function useBilling({sessionToken, orders, setAlertMessage, setIs
         e.preventDefault();
         try {
             const savedBill = await API.saveBill({ bill_num: billHeader.bill_num, bill_date: billHeader.bill_date, order_acceptance_id: billHeader.order_acceptance_id, items: billItems.map(b => ({ order_item_id: b.order_item_id, quantity_shipped: parseInt(b.quantity_shipped) })) }, sessionToken);
-            executePrintWorkflow(savedBill, "invoice");
+            /*executePrintWorkflow(savedBill, "invoice");*/
             setBillHeader({ bill_num: '', bill_date: '', order_acceptance_id: '' }); setBillItems([]);
-            await refreshDataHub(); setActiveTab('bills-list');
+            setActiveTab('bills-list');
         } catch (err) { alert(err.message); }
     };
 
@@ -35,5 +35,7 @@ export default function useBilling({sessionToken, orders, setAlertMessage, setIs
         setActiveTab('bill-new');
     }; 
 
-    return {loadBills, bills, commitBillSubmit, triggerInvoiceSetupForOrder};
+    return {loadBills, bills, commitBillSubmit, triggerInvoiceSetupForOrder, billItems, setBillItems, billHeader, 
+        setBillHeader, setBills,
+    };
 }

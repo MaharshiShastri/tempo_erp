@@ -9,9 +9,8 @@ const STAGES = [
     { key: "DISPATCHED", label: "Dispatched & Invoiced", color: "#8e44ad", bg: "#f5eef8" }
 ];
 
-export default function useProductionPulse({sessionToken, user, addToast, showErrorModal}) {
+export default function useProductionPulse({sessionToken, user, addToast, showErrorModal, orders, setOrders}) {
 
-    const [orders, setOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
 
     const isFactory = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"].includes(user?.role);

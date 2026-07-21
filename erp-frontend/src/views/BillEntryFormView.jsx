@@ -1,5 +1,6 @@
 import BillItemsTable from "../components/shared/BillItemsTable";
 export default function BillEntryFormView({ state }) {
+    console.log("The current bill headers: ", state.billHeader);
     const today = new Date().toISOString().split('T')[0];
     return (
         <div className="frappe-card">

@@ -1,5 +1,6 @@
 import OrderItemsTable from "./OrderItemsTable";
 export default function OrderCard({ order, state}) {
+    
     return (
         <div style={{ marginBottom: '20px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '15px'}}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px dashed var(--border-light)', paddingBottom: '10px'}}>
@@ -9,7 +10,7 @@ export default function OrderCard({ order, state}) {
                 </h3>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-                    <button className="btn btn-secondary" onClick={() => state.executePrintWorkflow(order, 'order')}>🖨️ Print Order</button>
+                    {/*<button className="btn btn-secondary" onClick={() => state.executePrintWorkflow(order, 'order')}>🖨️ Print Order</button>*/}
 
                     <button className="btn btn-success" onClick={() => state.triggerInvoiceSetupForOrder(order.order_acceptance_id)}>Generate Commercial Invoice</button>
                 </div>

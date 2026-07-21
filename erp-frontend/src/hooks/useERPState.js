@@ -44,12 +44,8 @@ export default function useERPState() {
         }
     };
     //Division of states into different hooks
-
-    //Global business state
+    //Global business state independent
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-    const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-    const production = useProductionHub({sessionToken: core.sessionToken, user: core.user, addToast: core.addToast, showErrorModal: core.showErrorModal});
-    const analytics = useAnalytics({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal});
 
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -59,7 +55,6 @@ export default function useERPState() {
     const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const grn = useGRN({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, itemsMaster: items.itemsMaster});
 
-
     //all the sales business state
     const dispatch = useDispatchHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const logistics = useLogisticsHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
@@ -68,7 +63,12 @@ export default function useERPState() {
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, setIsBillingSameAsCustomer: orders.setIsBillingSameAsCustomer});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
     const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
-    
+
+    //Global business state dependent
+    const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const production = useProductionHub({sessionToken: core.sessionToken, user: core.user, addToast: core.addToast, showErrorModal: core.showErrorModal, orders: orders.orders, setOrders: orders.setOrders});
+    const analytics = useAnalytics({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal});
+
     useEffect(() => {
         if (!core.user || !core.sessionToken) return;
 

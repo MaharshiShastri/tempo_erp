@@ -6,11 +6,10 @@ export default function OrderItemsTable({ items }) {
                 <thead>
                     <tr>
                         <th>Item Code</th>
-                        //Insert item production stage here?
                         <th>Specifications Description</th>
                         <th>HSN</th>
                         <th>Vol</th>
-                        <th>Per</th>
+                        <th>Units</th>
                         <th>Rate</th>
                         <th>Disc %</th>
                         <th style={{ textAlign: 'right' }}>
