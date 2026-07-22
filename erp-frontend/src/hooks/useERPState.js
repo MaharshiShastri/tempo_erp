@@ -17,6 +17,7 @@ import useGRN from "./grn/useGRN";
 import useLeadGenerator from "./leads/useLeadGenerator";
 import useLogin from "./useLogin";
 import useAnalytics from "./analytics/useAnalytics";
+import useGeo from "./geographic/useGeo";
 
 const API_HOST = window.location.hostname;
 
@@ -46,6 +47,7 @@ export default function useERPState() {
     //Division of states into different hooks
     //Global business state independent
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const indiaMap = useGeo({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
 
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -78,6 +80,7 @@ export default function useERPState() {
         production.loadPulse?.();
         analytics.fetchAnalytics?.(analytics.fromDate, analytics.toDate);
         core.getUsers?.(core.sessionToken);
+        indiaMap.loadIndia?.();//loading map
 
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies?.();
@@ -161,7 +164,7 @@ export default function useERPState() {
     return {
         ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
         ...tasks, ...activity, ...grn, //Shop floor business states
-        ...admin, //Admin business states
+        ...admin, ...indiaMap,//Admin business states
         ...faq, ...items, ...production, ...login, ...analytics, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };

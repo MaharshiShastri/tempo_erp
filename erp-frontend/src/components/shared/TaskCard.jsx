@@ -59,7 +59,7 @@ export default function TaskCard({task, viewTab, expandedTaskId, setExpandedTask
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {/* Attachment Button */}
-                    {!isEditing && task?.attachment_urls.length > 0 && (
+                    {!isEditing && task?.attachment_urls?.length > 0 && (
                         <div style={{display:"flex", gap:"6px", flexWrap:"wrap"}}>
                             {task.attachment_urls.map(file => (
                             <button key={file} className="btn btn-secondary" onClick={(e)=>{ e.stopPropagation(); handleFileAction(file);}}>

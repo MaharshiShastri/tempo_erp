@@ -1,0 +1,3 @@
+[submodule "static/maps"]
+	path = static/maps
+	url = https://github.com/datameet/maps.git

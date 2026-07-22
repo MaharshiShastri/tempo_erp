@@ -22,7 +22,7 @@ from schemas.logistics_schema import FullPartnerProfile
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -424,11 +424,11 @@ class PostgresRepository:
         with SessionLocal() as session:
             task = Task(
                 title=task_dict['title'],
-                description=task_dict.get('details'), # mapped old 'details' to model 'description'
+                details=task_dict.get('details'), # mapped old 'details' to model 'description'
                 assigned_by=assigned_by,
                 assigned_to=task_dict.get('assigned_to', ''),
-                due_date=task_dict.get('deadline'), # mapped old 'deadline' to model 'due_date'
-                status="Pending"
+                deadline=task_dict.get('deadline'), # mapped old 'deadline' to model 'due_date'
+                is_incomplete=True
             )
             session.add(task)
             session.commit()
@@ -1451,5 +1451,8 @@ class PostgresRepository:
                 for row in rows
             ]
     # --- SALES ANALYTICS & KPIs end ---
+    # --- Geo repository start --- 
+
+    # --- Geo repository end ---
 # Declare the class instance exactly as requested
 EDBR = PostgresRepository()

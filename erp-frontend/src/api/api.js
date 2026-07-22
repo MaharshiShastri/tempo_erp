@@ -75,7 +75,7 @@ const API = {
     return r.json();
   },
   async fetchCompany(companyId, token){
-    console.log(`/api/v1/companies/get/${companyId}`)
+    
     const r = await fetch(`/api/v1/companies/get/${companyId}`,{
       headers: this.headers(token),
     });
@@ -694,8 +694,7 @@ const API = {
   },
 
   async fetchSystemHealth(token, fromDate, toDate) {
-    console.log("From date in api: ", fromDate);
-    console.log("TO date in api: ", toDate);
+    
     const r = await fetch(`/api/v1/analytics/system-health?from_date=${fromDate}&to_date=${toDate}`, { headers: this.headers(token) });
     if (!r.ok) throw new Error("Failed to fetch System Health");
     return r.json();
@@ -854,6 +853,15 @@ const API = {
     }
     return r.json();
   },
+
+  async fetchIndiaGeoJSON(token){
+    const r = await fetch("/api/v1/geo/india", {headers: this.headers(token)});
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail || "Issue in fetching india GeoJSON");
+    }
+    return r.json();
+  }
 };
 
 export default API;

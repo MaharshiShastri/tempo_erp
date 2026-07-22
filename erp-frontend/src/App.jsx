@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw } from "react-icons/fi";
+import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe } from "react-icons/fi";
 import useERPState from "./hooks/useERPState";
 import packageJson from "../package.json";
 import LoginView from "./views/LoginView";
@@ -32,6 +32,7 @@ import ErrorModal from "./components/shared/ErrorModal";
 import GlobalProductionPulseView from "./views/GlobalProductionPulseView";
 import PersonalSalesAnalyticsView from "./views/PersonalSalesAnalyticsView";
 import TallyImportWorkspaceView from "./views/TallyImportWorkspaceView";
+import GeoAnalyticsView from "./views/GeoAnalyticsView";
 
 function App() {
     const state = useERPState();
@@ -305,6 +306,11 @@ function App() {
                                         {!sidebarCollapsed && <span>Fetch Tally XML data</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                     </a>
+                                    <a href="#map" className={`menu-item ${state.activeTab === 'map' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('map')}}>
+                                        <span><FiGlobe/></span>
+                                        {!sidebarCollapsed && <span>Map rendering</span>}
+                                        <span style={{fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subt;e)', padding:'2px 4px', borderRadius: '4px', marginLeft: 'auto'}}></span>
+                                    </a>
                                 </>
                             )}
                         </div>
@@ -400,6 +406,7 @@ function App() {
                     {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
                     {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
                     {isSuperUser && state.activeTab === 'tally-xml' && <TallyImportWorkspaceView state={state}/>}
+                    {isSuperUser && state.activeTab === 'map' && <GeoAnalyticsView state={state}/>}
                 </div>
             </div>
 
