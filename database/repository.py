@@ -350,9 +350,82 @@ class PostgresRepository:
                 inserted_count += 1
             session.commit()
         return inserted_count
+    
+    def extract_daybook_json(self, bill_data: dict):
+
+        bills = []
+
+        invoices = (bill_data.get("dbcolumnar", {}).get("dspcolvchdetail", []))
+
+        with SessionLocal() as session:
+
+            for invoice in invoices:
+
+                items = []
+
+                qty_details = (invoice.get("dbcqtydetails", {}).get("dspcolvchdetail", []))
+
+                # Sometimes a single inventory line is exported as an object
+                if isinstance(qty_details, dict):
+                    qty_details = [qty_details]
+
+                for item in qty_details:
+
+                    product = (item.get("dbcfixed", {}).get("dbcparty", "").strip())
+
+                    matched = self.resolve_item(session, product)
+
+                    items.append({
+
+                        "product_name": product,
+
+                        "item_code": matched.item_code if matched else "",
+
+                        "quantity_shipped": int(self._parse_tally_number(item.get("dbcqty"))),
+
+                        "rate": self._parse_tally_number(item.get("dbcrate")),
+
+                        "amount": abs(self._parse_tally_number(item.get("dbcamount")))
+
+                    })
+
+                bills.append({
+
+                    "bill_num": invoice.get("dbcvchno"),
+
+                    "bill_date": self._parse_daybook_date(invoice.get("dbcfixed", {}).get("dbcdate")),
+
+                    "party_name": invoice.get("dbcpartyname", ""),
+
+                    "order_acceptance_id": None,
+
+                    "items": items
+
+                })
+
+        return bills
+
     # --- GLOBAL ORDERS ENGINE end---
 
     # --- GLOBAL BILLS ENGINE start---
+    def resolve_item(self, session, tally_name):
+
+        items = session.scalars(select(ItemMaster)).all()
+
+        name = tally_name.upper()
+
+        # Rule 1
+        for item in items:
+            if item.item_code.upper() == name:
+                return item
+
+        # Rule 2
+        for item in items:
+            if item.item_code.upper() in name:
+                return item
+
+        return None
+        
     def get_all_bills(self):
         with SessionLocal() as session:
             stmt = select(BillHeader).options(joinedload(BillHeader.items).joinedload(BillItem.order_item)).order_by(BillHeader.created_at.desc())
@@ -408,6 +481,39 @@ class PostgresRepository:
             h_dict = to_dict(header)
             h_dict["items"] = [to_dict(i) for i in header.items]
             return h_dict
+    
+    def _parse_daybook_date(self, date_str):
+        if not date_str:
+            return None
+        return datetime.strptime(date_str, "%d-%b-%y").date()
+    
+    def ingest_daybook_json(self, bill_data: dict)->int:
+        inserted = 0
+        invoices = (bill_data.get("dbcolumnar", {}).get("dspcolvchdetail", []))
+        with SessionLocal() as session:
+            for invoice in invoices:
+                bill_num=invoice.get("dbcvchno")
+                if not bill_num:
+                    continue
+
+                bill_date = self._parse_daybook_date(invoice["dbcfixed"]["dbcdate"])
+
+                stmt = (pg_insert(BillHeader).values(bill_num=bill_num, bill_date=bill_date, order_acceptance_id=None).on_conflict_do_update(index_elements=["bill_num"], set_={"bill_date": bill_date}))
+                session.execute(stmt)
+                items = (invoice.get("dbcqtydetails", {}).get("dspcolvchdetail", []))
+                
+                for item in items:
+                    product_name = (item.get("dbcfixed", {}).get("dbcparty", ""))
+                    quantity = int(self._parse_tally_number(item.get("dbcqty")))
+                    rate = self._parse_tally_number(item.get("dbcrate"))
+                    amount = abs(self._parse_tally_number(item.get("dbcamount")))
+                    matched=self.resolve_item(session, product_name)
+                    session.add(BillItem(bill_num=bill_num, quantity_shipped=quantity, product_name=product_name, rate=rate, amount=amount, order_item_id = matched.item_code if matched else None))
+                    inserted += 1
+                
+                session.commit()
+        
+        return inserted
     # --- GLOBAL BILLS ENGINE end---
 
     # --- TASK MANAGER SUBSYSTEM start---

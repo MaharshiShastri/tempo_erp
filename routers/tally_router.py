@@ -441,3 +441,26 @@ async def upload_tally_json(file: UploadFile = File(...), user: dict = Depends(v
         "orders_found": len(data.get("tallymessage", [])),
         "orders_staged": inserted_count,
     }
+
+@router.post("/upload-bills", dependencies=[Depends(check_department("Admin"))])
+async def upload_bill_tally(file: UploadFile = File(...), user: dict=Depends(verify_bearer_token)):
+    if not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Only JSON files are supported.")
+
+    content = await file.read()
+    
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON format.")
+
+    # Delegate the parsing and DB staging to your new staging engine method
+    try:
+        inserted_count = EDBR.extract_daybook_json(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
+
+    return {
+        "status": "success",
+        "extracted_bills": inserted_count
+    }

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, Numeric, String, Text, JSON, func, Computed
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, Numeric, String, Text, JSON, func, Computed, Float
 
 from sqlalchemy.dialects.postgresql import ARRAY
 
@@ -159,10 +159,18 @@ class BillItem(Base):
 
     bill_num: Mapped[str] = mapped_column(ForeignKey("bill_headers.bill_num",ondelete="CASCADE",))
 
-    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.order_item_id"))
+    order_item_id: Mapped[int] = mapped_column(ForeignKey("order_items.order_item_id"), nullable=True)
 
     quantity_shipped: Mapped[int]
 
+    product_name: Mapped[str | None] = mapped_column(String(255))
+
+    hsn_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    rate: Mapped[float | None]
+
+    amount: Mapped[float | None]
+    
     bill: Mapped["BillHeader"] = relationship(back_populates="items")
 
     order_item: Mapped["OrderItem"] = relationship(back_populates="bill_items")
@@ -632,26 +640,63 @@ class SystemNotification(Base):
 class TestItemMaster(Base):
     __tablename__ = "test_items_master"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    item_code: Mapped[str] = mapped_column(
-        String(100),
-        unique=True,
-        nullable=False
-    )
+    item_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
 
-    item_specification: Mapped[str | None] = mapped_column(
-        Text
-    )
+    item_specification: Mapped[str | None] = mapped_column(Text)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    grn_items: Mapped[list["GRNItem"]] = relationship(
-        back_populates="item"
-    )
+    grn_items: Mapped[list["GRNItem"]] = relationship(back_populates="item")
+
+"""class StagingBillHeader(Base):
+    __tablename__ = "staging_bill_headers"
+
+    bill_num = mapped_column(String(50), primary_key=True)
+    bill_date = mapped_column(Date)
+
+    customer_name = mapped_column(Text)
+    customer_gstin = mapped_column(Text, nullable=True)
+
+    total_taxable = mapped_column(Numeric)
+    cgst = mapped_column(Numeric)
+    sgst = mapped_column(Numeric)
+    igst = mapped_column(Numeric)
+    invoice_total = mapped_column(Numeric)
+
+    order_acceptance_id = mapped_column(String(50), nullable=True)
+
+    import_batch = mapped_column(String(50))
+    status = mapped_column(String(20), default="PENDING")
+
+    created_at = mapped_column(DateTime, server_default=func.now())
+
+    items = relationship(back_populates="item")
+
+class StagingBillItem(Base):
+    __tablename__ = "staging_bill_items"
+
+    id = mapped_column(BigInteger, primary_key=True)
+
+    bill_num = mapped_column(ForeignKey("staging_bill_headers.bill_num"))
+
+    product_name = mapped_column(Text)
+
+    hsn = mapped_column(String(20))
+
+    quantity = mapped_column(Integer)
+
+    rate = mapped_column(Numeric)
+
+    taxable_amount = mapped_column(Numeric)
+
+    cgst = mapped_column(Numeric)
+
+    sgst = mapped_column(Numeric)
+
+    igst = mapped_column(Numeric)
+
+    total = mapped_column(Numeric)
+
+    order_item_id = mapped_column(BigInteger, nullable=True)"""

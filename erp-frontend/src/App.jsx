@@ -33,6 +33,7 @@ import GlobalProductionPulseView from "./views/GlobalProductionPulseView";
 import PersonalSalesAnalyticsView from "./views/PersonalSalesAnalyticsView";
 import TallyImportWorkspaceView from "./views/TallyImportWorkspaceView";
 import GeoAnalyticsView from "./views/GeoAnalyticsView";
+import TallyInvoiceImportWorkspaceView from "./views/TallyInvoiceImportWorkspaceView";
 
 function App() {
     const state = useERPState();
@@ -293,7 +294,7 @@ function App() {
                                     </a>
                                     <a href="#tally" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-sync')}}>
                                         <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
-                                        {!sidebarCollapsed && <span>Fetch Tally data</span>}
+                                        {!sidebarCollapsed && <span>Fetch Tally Bill data</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
                                     </a>
                                     <a href="#analytics" className={`menu-item ${state.activeTab === 'sales-analytics' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('sales-analytics'); }}>
@@ -303,7 +304,7 @@ function App() {
                                     </a>
                                     <a href="#tally" className={`menu-item ${state.activeTab === 'tally-xml' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-xml')}}>
                                         <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
-                                        {!sidebarCollapsed && <span>Fetch Tally XML data</span>}
+                                        {!sidebarCollapsed && <span>Fetch Tally Order data</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                     </a>
                                     <a href="#map" className={`menu-item ${state.activeTab === 'map' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('map')}}>
@@ -399,7 +400,7 @@ function App() {
                     {isSales && state.activeTab === 'crm-workspace' && <CRM_WorkspaceView state={state} />}
                     {isFactory && state.activeTab === 'grn-workspace' && (<GRN_WorkspaceView state={state} />)}
                     {isFactory && state.activeTab === 'items-upload' && <ItemMasterUploadView state={state} />}
-                    {isSuperUser && state.activeTab === 'tally-sync' && <TallySyncView state={state}/>}
+                    {isSuperUser && state.activeTab === 'tally-sync' && <TallyInvoiceImportWorkspaceView state={state}/>}
                     {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
                     {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}

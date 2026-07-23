@@ -861,7 +861,24 @@ const API = {
       throw new Error(err.detail || "Issue in fetching india GeoJSON");
     }
     return r.json();
-  }
+  },
+  
+  async uploadTallyInvoiceJSON(file, token) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const r = await fetch("/api/v1/tally/upload-bills", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }, // Browser handles multipart boundaries automatically
+      body: formData,
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || "JSON processing failed");
+    }
+    return r.json();
+  },
 };
 
 export default API;

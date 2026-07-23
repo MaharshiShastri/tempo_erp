@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api/v1/geo", tags=["Geography"])
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 print("Base directory inside geo router: ", BASE_DIR)
-MAP_PATH = BASE_DIR / "static" / "maps" / "Country" / "india-composite.geojson"
+MAP_PATH = BASE_DIR / "static" / "maps" / "Country" / "india-soi.geojson"
 
 @router.get("/india")
 def get_india_geojson():
