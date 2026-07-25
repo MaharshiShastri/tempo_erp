@@ -22,7 +22,7 @@ from schemas.logistics_schema import FullPartnerProfile
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATsABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -457,23 +457,39 @@ class PostgresRepository:
             session.add(header)
 
             for item in bill_data["items"]:
-                session.add(
-                    BillItem(
-                        bill_num=header.bill_num,
-                        order_item_id=item["order_item_id"],
-                        quantity_shipped=item["quantity_shipped"]
-                    )
+
+                session.add(BillItem(
+
+                    bill_num=header.bill_num,
+
+                    order_item_id=item.get("order_item_id"),
+
+                    item_code=item.get("item_code"),
+
+                    product_name=item.get("product_name"),
+
+                    hsn_code=item.get("hsn_code"),
+
+                    quantity_shipped=item["quantity_shipped"],
+
+                    rate=item["rate"],
+
+                    amount=item["amount"]
+
                 )
+
+            )
 
             order = session.get(
                 OrderHeader,
                 bill_data["order_acceptance_id"]
             )
 
-            if order is None:
-                raise ValueError("Order not found.")
+            if bill_data.get("order_acceptance_id"):
+                order = session.get(OrderHeader,bill_data["order_acceptance_id"])
 
-            order.production_stage = "DISPATCHED"
+                if order:
+                    order.production_stage = "DISPATCHED"
 
             session.commit()
             session.refresh(header)

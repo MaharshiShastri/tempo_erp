@@ -47,7 +47,7 @@ export default function LeadGeneratorView({ state }) {
                                     <label className="input-label">Feature Product from Catalog</label>
                                     <select className="form-select-native" value={selectedProductCode} onChange={e => setSelectedProductCode(e.target.value)}>
                                         <option value="">-- Select Product Context --</option>
-                                        {(state.itemsMaster || []).map(item => (
+                                        {(state.itemsMaster || [])?.map(item => (
                                             <option key={item.item_code} value={item.item_code}>{item.item_code} - {item.item_name}</option>
                                         ))}
                                     </select>
@@ -62,9 +62,9 @@ export default function LeadGeneratorView({ state }) {
                             </div>
 
                             {/* Display Attachment Names */}
-                            {attachments.length > 0 && (
+                            {attachments?.length > 0 && (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-                                    {attachments.map((file, idx) => (
+                                    {attachments?.map((file, idx) => (
                                         <span key={idx} style={{ fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             {file.name}
                                             <span style={{ color: 'var(--brand-danger)', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => removeAttachment(idx)}>✕</span>
@@ -177,7 +177,7 @@ export default function LeadGeneratorView({ state }) {
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {filteredTargets.map(target => {
+                        {filteredTargets?.map(target => {
                             const isExpanded = expandedTargetId === target.id;
                             const isEditing = editingTargetId === target.id;
                             const contacts = contactsCache[target.id] || [];
@@ -251,7 +251,7 @@ export default function LeadGeneratorView({ state }) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {stagedContacts.map((c, idx) => (
+                                                    {stagedContacts?.map((c, idx) => (
                                                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                                                             <td style={{ padding: '8px' }}>
                                                                 <input type="text" className="form-input" style={{ padding: '4px', fontSize: '13px' }} value={c.full_name} onChange={e => updateStagedContactField(idx, 'full_name', e.target.value)} />
@@ -263,7 +263,7 @@ export default function LeadGeneratorView({ state }) {
                                                                 <div style={{ display: 'flex', gap: '8px' }}>
                                                                     <select className="form-select-native" style={{ fontSize: '12px', padding: '4px' }} value={c.email || ""} onChange={e => updateStagedContactField(idx, 'email', e.target.value)}>
                                                                         <option value="">-- No Email --</option>
-                                                                        {rawEmails.map((email, i) => (
+                                                                        {rawEmails?.map((email, i) => (
                                                                             <option key={i} value={email}>{email}</option>
                                                                         ))}
                                                                     </select>
@@ -306,7 +306,7 @@ export default function LeadGeneratorView({ state }) {
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {contacts.map((c, idx) => (
+                                                        {contacts?.map((c, idx) => (
                                                             <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)'}}>
                                                                 <td style={{ padding: '10px' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

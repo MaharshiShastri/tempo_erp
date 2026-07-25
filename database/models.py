@@ -163,6 +163,8 @@ class BillItem(Base):
 
     quantity_shipped: Mapped[int]
 
+    item_code: Mapped[str | None] = mapped_column(ForeignKey("items_master.item_code"), nullable=True)
+
     product_name: Mapped[str | None] = mapped_column(String(255))
 
     hsn_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -175,6 +177,7 @@ class BillItem(Base):
 
     order_item: Mapped["OrderItem"] = relationship(back_populates="bill_items")
 
+    item = relationship("ItemMaster")
 class ItemMaster(Base):
     __tablename__ = "items_master"
     #Done

@@ -1,21 +1,39 @@
 import { useState } from "react";
+import shp from "shpjs";
 import API from "../../api/api";
 
-export default function useGeoWorkspace({sessionToken, setAlertMessage, setIsAlertOpen, showErrorModal}){
-    const [indiaMap, setIndiaMap] = useState(null);
-    const [isLoading, setIsLoading] = useState(null);
+export default function useGeoWorkspace({sessionToken, setAlertMessage, setIsAlertOpen, showErrorModal}) {
 
-    async function loadIndia(){
+    const [indiaMap, setIndiaMap] = useState(null);
+
+    const [isLoading, setIsLoading] = useState(false);
+    
+    async function loadIndia() {
 
         setIsLoading(true);
-        try{
-            const data = await API.fetchIndiaGeoJSON(sessionToken);
-            setIndiaMap(data);
+
+        try {
+            
+            const zippedFile = await API.indiaStates(sessionToken);
+
+            const geojson = await shp(zippedFile);
+            
+            setIndiaMap(geojson);
+            setAlertMessage("Successfully loaded the shapefile");
+            
         } catch(err){
-            showErrorModal("GeoJSON Error: ", err.message);
-        }finally{
-            setIsLoading(false);
+            setAlertMessage("Error in trying to load the shapefile");
+            setIsAlertOpen(true);
+
         }
+         finally {
+
+            setIsLoading(false);
+
+        }
+
     }
-    return{indiaMap, isLoading, loadIndia};
+
+    return {indiaMap, isLoading, loadIndia,};
+
 }

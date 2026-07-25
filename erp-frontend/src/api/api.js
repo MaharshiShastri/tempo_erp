@@ -854,14 +854,14 @@ const API = {
     return r.json();
   },
 
-  async fetchIndiaGeoJSON(token){
+  /*async fetchIndiaGeoJSON(token){
     const r = await fetch("/api/v1/geo/india", {headers: this.headers(token)});
     if(!r.ok){
       const err = await r.json();
       throw new Error(err.detail || "Issue in fetching india GeoJSON");
     }
     return r.json();
-  },
+  },*/
   
   async uploadTallyInvoiceJSON(file, token) {
     const formData = new FormData();
@@ -879,6 +879,18 @@ const API = {
     }
     return r.json();
   },
+  async indiaStates(token){
+    const r = await fetch("/api/v1/geo/india-shapefile", {
+      headers: { Authorization: `Bearer ${token}`}
+      }
+    );
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail || "FAiled to fetch the shapefile");
+    }
+    
+    return r.arrayBuffer();
+  }
 };
 
 export default API;
