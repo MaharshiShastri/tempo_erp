@@ -23,7 +23,7 @@ export default function SearchableMultiSelect({label, options = [], value=[], on
                 style={{ maxHeight:220, overflowY:"auto", border:"1px solid #ddd", borderRadius:6, padding:8,marginTop:6}}>
 
                 <label>
-
+                    
                     <input type="checkbox" checked={value.length===options.length} onChange={e=> onChange( e.target.checked ? options : [])}/>
                     Select All
 

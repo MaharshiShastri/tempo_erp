@@ -1,14 +1,29 @@
 import { useState, useEffect } from "react";
 import API from "../../api/api";
 
-export default function useGeoAnalytics({sessionToken, showErrorModal, indiaMap}){
+export default function useGeoAnalytics({sessionToken, showErrorModal, indiaMap, itemsMaster}){
     const [selectedStates, setSelectedStates] = useState([]);
     const [stateSummary, setStateSummary] = useState([]);
     const [selectedItems, setSelectedItems] = useState([]);
+    const [selectedGroups, setSelectedGroups] = useState([]);
 
-    async function loadStateSummary(fromDate, toDate, items=selectedItems){
+    const today = new Date().toISOString().split("T")[0];
+    const [fromGeoDate, setFromGeoDate] = useState("2026-01-01");
+    const [toGeoDate, setToGeoDate] = useState(today);
+    
+    async function loadStateSummary(fromDate, toDate){
+        
+        let items = [...selectedItems];
+
+        if(selectedGroups.length){
+            const groupedItems = itemsMaster.filter(i=>selectedGroups.includes(i.item_group)).map(i=>i.item_code);
+
+            items = [...new Set([...selectedItems, ...groupedItems])];
+
+        }
+        
         try{
-            const data = await API.fetchStateSummary(sessionToken, fromDate, toDate, items);
+            const data = await API.fetchStateSummary(sessionToken, fromGeoDate, toGeoDate, items);
             setStateSummary(data)
         }catch(err){
             showErrorModal("Geo analytics", err.message);
@@ -16,8 +31,8 @@ export default function useGeoAnalytics({sessionToken, showErrorModal, indiaMap}
     }
 
     useEffect(() => {
-        loadStateSummary("2026-01-01", "2026-12-31", selectedItems);
-    }, [selectedItems]);
+        loadStateSummary(fromGeoDate, toGeoDate);
+    }, [fromGeoDate, toGeoDate, selectedItems, selectedGroups]);
     
     const visibleMap = !indiaMap ? null : {
         type: "FeatureCollection",
@@ -34,6 +49,7 @@ export default function useGeoAnalytics({sessionToken, showErrorModal, indiaMap}
     };
 
     return {selectedStates, setSelectedStates, stateSummary, setStateSummary, loadStateSummary,
-        visibleMap, selectedItems, setSelectedItems
+        visibleMap, selectedItems, setSelectedItems, selectedGroups, setSelectedGroups, fromGeoDate, setFromGeoDate,
+        toGeoDate, setToGeoDate,
     };
 }
