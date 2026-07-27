@@ -20,9 +20,15 @@ from database.models import (
 )
 from schemas.logistics_schema import FullPartnerProfile
 
+INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHATTISGARH", "GOA", "GUJARAT",
+    "HARYANA", "HIMACHAL PRADESH", "JHARKHAND", "KARNATAKA", "KERALA", "MADHYA PRADESH", "MAHARASHTRA", "MANIPUR",
+    "MEGHALAYA", "MIZORAM", "NAGALAND", "ODISHA", "PUNJAB", "RAJASTHAN", "SIKKIM", "TAMIL NADU", "TELANGANA",
+    "TRIPURA", "UTTAR PRADESH", "UTTARAKHAND", "WEST BENGAL", "DELHI", "CHANDIGARH", "JAMMU AND KASHMIR", "LADAKH",
+    "PUDUCHERRY", "DADRA AND NAGAR HAVELI", "DAMAN AND DIU", "ANDAMAN AND NICOBAR"]
+
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATsABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -46,6 +52,18 @@ def to_dict(obj, expand_relationships=False):
         data[col.name] = val
     return data
 
+def resolve_state(address: str):
+
+    if not address:
+        return None
+
+    address = address.upper()
+
+    for state in INDIAN_STATES:
+        if state in address:
+            return state.title()
+
+    return None
 class PostgresRepository:
     
     # --- AUTH & RBAC start---
@@ -409,23 +427,53 @@ class PostgresRepository:
 
     # --- GLOBAL BILLS ENGINE start---
     def resolve_item(self, session, tally_name):
-
+    
         items = session.scalars(select(ItemMaster)).all()
-
+    
         name = tally_name.upper()
-
+    
         # Rule 1
         for item in items:
             if item.item_code.upper() == name:
                 return item
-
+    
         # Rule 2
         for item in items:
             if item.item_code.upper() in name:
                 return item
+    
+        return None
+    
+    def resolve_product(self, session, item):
+
+        candidates = []
+
+        primary = item.get("dbcfixed", {}).get("dbcparty")
+
+        if primary:
+            candidates.append(primary)
+
+        descriptions = (
+            item.get("dspcolvchitemdescription", {})
+                .get("dspcolvchdetail", [])
+        )
+
+        for desc in descriptions:
+
+            name = desc.get("dbcfixed", {}).get("dbcparty")
+
+            if name:
+                candidates.append(name)
+
+        for candidate in candidates:
+
+            matched = self.resolve_item(session, candidate)
+
+            if matched:
+                return matched
 
         return None
-        
+            
     def get_all_bills(self):
         with SessionLocal() as session:
             stmt = select(BillHeader).options(joinedload(BillHeader.items).joinedload(BillItem.order_item)).order_by(BillHeader.created_at.desc())
@@ -451,7 +499,8 @@ class PostgresRepository:
             header = BillHeader(
                 bill_num=bill_data["bill_num"],
                 bill_date=bill_data["bill_date"],
-                order_acceptance_id=bill_data["order_acceptance_id"]
+                order_acceptance_id=bill_data["order_acceptance_id"],
+                indian_state=bill_data["indian_state"]
             )
 
             session.add(header)
@@ -511,10 +560,13 @@ class PostgresRepository:
                 bill_num=invoice.get("dbcvchno")
                 if not bill_num:
                     continue
-
+                
                 bill_date = self._parse_daybook_date(invoice["dbcfixed"]["dbcdate"])
+                buyer_address = invoice.get("dbcbuyeraddress", "")
 
-                stmt = (pg_insert(BillHeader).values(bill_num=bill_num, bill_date=bill_date, order_acceptance_id=None).on_conflict_do_update(index_elements=["bill_num"], set_={"bill_date": bill_date}))
+                state = resolve_state(buyer_address)
+
+                stmt = (pg_insert(BillHeader).values(bill_num=bill_num, bill_date=bill_date, order_acceptance_id=None, indian_state=state).on_conflict_do_update(index_elements=["bill_num"], set_={"bill_date": bill_date}))
                 session.execute(stmt)
                 items = (invoice.get("dbcqtydetails", {}).get("dspcolvchdetail", []))
                 
@@ -523,7 +575,7 @@ class PostgresRepository:
                     quantity = int(self._parse_tally_number(item.get("dbcqty")))
                     rate = self._parse_tally_number(item.get("dbcrate"))
                     amount = abs(self._parse_tally_number(item.get("dbcamount")))
-                    matched=self.resolve_item(session, product_name)
+                    matched = self.resolve_product(session, item)
                     session.add(BillItem(bill_num=bill_num, quantity_shipped=quantity, product_name=product_name, rate=rate, amount=amount, order_item_id = matched.item_code if matched else None))
                     inserted += 1
                 
@@ -1574,7 +1626,26 @@ class PostgresRepository:
             ]
     # --- SALES ANALYTICS & KPIs end ---
     # --- Geo repository start --- 
+    def get_state_summary(self, from_date, to_date, items=None):
+        with SessionLocal() as session:
 
+            stmt = (select(
+                BillHeader.indian_state.label("state"),
+                func.count(func.distinct(BillHeader.bill_num)).label("shipments"),
+                func.sum(BillItem.amount).label("revenue"),
+                func.sum(BillItem.quantity_shipped).label("quantity"),
+
+            ).join(BillItem)
+            .where(BillHeader.bill_date.between(from_date, to_date)))
+
+            if items:
+                stmt = stmt.where(BillItem.item_code.in_(items))
+
+            stmt = stmt.group_by(BillHeader.indian_state)
+
+            rows = session.execute(stmt).mappings().all()
+
+            return rows
     # --- Geo repository end ---
 # Declare the class instance exactly as requested
 EDBR = PostgresRepository()

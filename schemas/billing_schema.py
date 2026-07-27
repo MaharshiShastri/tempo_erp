@@ -17,5 +17,5 @@ class BillHeaderCreate(BaseModel):
     bill_date: date
 
     order_acceptance_id: Optional[str] = None
-
+    indian_state: str
     items: List[BillItemCreate]

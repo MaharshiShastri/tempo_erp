@@ -890,7 +890,31 @@ const API = {
     }
     
     return r.arrayBuffer();
-  }
+  },
+  async fetchStateSummary(token, fromDate, toDate, items=[]){
+    const params = new URLSearchParams({
+      from_date: fromDate, 
+      to_date: toDate
+    });
+
+    items.forEach(item=>params.append("items", item));
+    
+    const r = await fetch(
+          `/api/v1/geo/state-summary?${params}`,
+          {
+              headers:{
+                  Authorization:`Bearer ${token}`
+              }
+          }
+      );
+
+      if(!r.ok){
+          const err = await r.json();
+          throw new Error(err.detail);
+      }
+
+      return await r.json();
+  },
 };
 
 export default API;

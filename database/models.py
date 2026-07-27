@@ -146,6 +146,8 @@ class BillHeader(Base):
 
     order_acceptance_id: Mapped[str | None] = mapped_column(ForeignKey("order_headers.order_acceptance_id"))
 
+    indian_state: Mapped[str | None] = mapped_column(String(100))
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(),)
 
     order: Mapped["OrderHeader | None"] = relationship(back_populates="bills")

@@ -44,6 +44,22 @@ export default function TallyInvoiceImportWorkspaceView({ state }) {
         }
     }
 
+    function updateBill(billIndex, field, value) {
+
+        setStagedBills(prev => {
+
+            const copy = [...prev];
+
+            copy[billIndex] = {
+                ...copy[billIndex],
+                [field]: value
+            };
+
+            return copy;
+        });
+
+    }
+
     function removeBill(index) {
         setStagedBills(prev => prev.filter((_, i) => i !== index));
     }
@@ -198,7 +214,7 @@ export default function TallyInvoiceImportWorkspaceView({ state }) {
                                             <th>Product</th>
 
                                             <th>Item Code</th>
-
+                                            <th>State</th>
                                             <th>Qty</th>
 
                                             <th>Rate</th>
@@ -223,10 +239,20 @@ export default function TallyInvoiceImportWorkspaceView({ state }) {
 
                                                 <td>
 
-                                                    <input className="form-input" value={item.item_code || ""} onChange={(e) => updateItem( billIndex, itemIndex, "item_code", e.target.value)}/>
+                                                    <select className="form-input" value={item.item_code || ""} onChange={(e)=>updateItem(billIndex, itemIndex, "item_code", e.target.value)}>
+                                                        <option value="">Select Item</option>
+                                                        {state.itemsMaster.map(item=>(
+                                                            <option key={item.item_code} value={item.item_code}>{item.item_code}</option>
+                                                        ))}
+                                                    </select>
 
                                                 </td>
-
+                                                <td>
+                                                    <select className="form-input" value={bill.indian_state || ""} onChange={(e)=>updateBill(billIndex, "indian_state", e.target.value)}>
+                                                        <option value="">Select state</option>
+                                                        {state.indiaMap.features.map(feature=><option key={feature.properties.ST_NM} value={feature.properties.ST_NM}>{feature.properties.ST_NM}</option>)}
+                                                    </select>
+                                                </td>
                                                 <td>{item.quantity_shipped}</td>
 
                                                 <td>{item.rate}</td>

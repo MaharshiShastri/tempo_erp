@@ -27,15 +27,33 @@ export default function useOpenLayersMap(mapRef, indiaMap){
 
         const vectorLayer = new VectorLayer({
             source: vectorSource,
-            style: new Style({
-                stroke: new Stroke({
-                    color: "#8f99a3",
-                    width: 1
-                }),
-                fill: new Fill({
-                    color: "#f5f7fa"
-                })
-            })
+            style: feature => {
+                const revenue = feature.get("revenue");
+                let fillColor = "#f2f2f2";
+
+                if (revenue>500000){
+                    fillColor="#08306b";
+                }
+                else if(revenue>250000){
+                    fillColor="#2171b5";
+                }
+                else if(revenue>100000){
+                    fillColor="#6baed6";
+                }
+                else if(revenue > 0){
+                    fillColor="#c6dbef";
+                }
+
+                return new Style({
+                    stroke: new Stroke({
+                        color: "#444",
+                        width: 1
+                    }),
+                    fill: new Fill({
+                        color: fillColor
+                    })
+                });
+            }
         });
 
         const map = new Map({
