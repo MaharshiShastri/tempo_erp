@@ -309,7 +309,7 @@ function App() {
                                     </a>
                                     <a href="#map" className={`menu-item ${state.activeTab === 'map' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('map')}}>
                                         <span><FiGlobe/></span>
-                                        {!sidebarCollapsed && <span>Map rendering</span>}
+                                        {!sidebarCollapsed && <span>Geo Analytics</span>}
                                         <span style={{fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subt;e)', padding:'2px 4px', borderRadius: '4px', marginLeft: 'auto'}}></span>
                                     </a>
                                 </>
