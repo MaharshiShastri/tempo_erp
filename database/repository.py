@@ -1554,11 +1554,46 @@ class PostgresRepository:
             total_partners=session.scalar(select(func.count(LogisticsPartner.id)))
 
 
-            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).where(DispatchRecord.created_at.between(from_date, to_date)).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
+            monthly = session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"),
+                                             func.count(DispatchRecord.id).label("total_dispatches"),
+                                             func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost"))
+                                             .where(DispatchRecord.created_at.between(from_date, to_date))
+                                             .group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM"))
+                                             .order_by(desc("month_period"))).all()
 
+            dispatches = session.scalars(select(DispatchRecord).where(DispatchRecord.created_at.between(from_date, to_date))
+                                         .order_by(DispatchRecord.created_at.desc())).all()
 
+            dispatch_records = {}
+
+            for d in dispatches:
+                month = d.created_at.strftime("%Y-%m")
+
+                dispatch_records.setdefault(month, []).append({
+                    "id": d.id,
+                    "partner_name": d.partner_name,
+                    "destination_zone": d.destination_zone,
+                    "chargeable_weight": float(d.chargeable_weight or 0),
+                    "basic_freight": float(d.basic_freight or 0),
+                    "fuel_charge": float(d.fuel_charge or 0),
+                    "oda_charge": float(d.oda_charge or 0),
+                    "fov_charge": float(d.fov_charge or 0),
+                    "loading_charges": float(d.loading_charge or 0),
+                    "hamali_cost": float(d.hamali_cost or 0),
+                    "subtotal": float(d.subtotal or 0),
+                    "gst": float(d.dispatch_cost_gst or 0),
+                    "operator": d.operator_email,
+                    "created_at": d.created_at.strftime("%d-%b-%Y")
+                })
+
+            total_dispatches = sum(m.total_dispatches for m in monthly)
+
+            total_cost = sum(float(m.total_cost or 0) for m in monthly)
             return {
                 "total_partners": total_partners,
+                "total_dispatches": total_dispatches,
+                "total_cost": total_cost,
+                "average_dispatch_cost": round(total_cost / total_dispatches, 2) if total_dispatches else 0,
 
                 "monthly_costs":[
                     {
@@ -1567,30 +1602,9 @@ class PostgresRepository:
                         "total_cost":float(m.total_cost or 0)
                     }
                     for m in monthly
-                ]
-            }
-    
-    def get_transport_kpis(self, from_date, to_date):
+                ],
 
-        with SessionLocal() as session:
-
-            total_partners=session.scalar(select(func.count(LogisticsPartner.id)))
-
-
-            monthly=session.execute(select(func.to_char(DispatchRecord.created_at, "YYYY-MM").label("month_period"), func.count(DispatchRecord.id).label("total_dispatches"), func.sum(DispatchRecord.dispatch_cost_gst).label("total_cost")).where(DispatchRecord.created_at.between(from_date, to_date)).group_by(func.to_char(DispatchRecord.created_at, "YYYY-MM")).order_by(desc("month_period"))).all()
-
-
-            return {
-                "total_partners": total_partners,
-
-                "monthly_costs":[
-                    {
-                        "month_period":m.month_period,
-                        "total_dispatches":m.total_dispatches,
-                        "total_cost":float(m.total_cost or 0)
-                    }
-                    for m in monthly
-                ]
+                "dispatch_records": dispatch_records
             }
     
     def get_production_analytics(self, from_date, to_date):

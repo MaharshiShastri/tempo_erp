@@ -5,7 +5,7 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
-
+import TransportAnalyticsView from "./TransportAnalyticsView";
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
 
 export default function SalesAnalyticsView({ state }) {
@@ -280,50 +280,7 @@ export default function SalesAnalyticsView({ state }) {
                 )}
                 
                 {selectedAnalytics==="transport"&&(
-
-                    <div className="print-section">
-                        <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"20px", marginBottom:"30px"}}>
-
-                            <div className="frappe-card">
-                                <h4>Total Logistics Partners</h4>
-                                <h2>{transportKpis?.total_partners}</h2>
-                            </div>
-
-                            <div className="frappe-card">
-                                <h4>Total Dispatches</h4>
-                                <h2>{transportKpis?.monthly_costs?.reduce((a,b)=>a+Number(b.total_dispatches),0)}</h2>
-                            </div>
-
-                            <div className="frappe-card">
-                                <h4>Total Freight Spend</h4>
-                                <h2>₹{transportKpis?.monthly_costs?.reduce((a,b)=>a+Number(b.total_cost),0).toLocaleString()}</h2>
-                            </div>
-
-                        </div>
-                        
-                        <div style={{height:"350px", marginBottom:"30px"}}>
-                            <Line data={transportChart} options={{responsive:true, maintainAspectRatio:false, plugins:{title:{display:true,text:"Monthly Logistics Spend"}}}}/>
-                        </div>
-
-                        <table style={{ width:"100%", borderCollapse:"collapse"}}>
-                            <thead>
-                                <tr>
-                                    <th>Month</th>
-                                    <th>Dispatches</th>
-                                    <th>Total Cost</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {transportKpis?.monthly_costs?.map((m,i)=>
-                                    <tr key={i}>
-                                        <td>{m.month_period}</td>
-                                        <td>{m.total_dispatches}</td>
-                                        <td>₹{Number(m.total_cost).toLocaleString()}</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <TransportAnalyticsView state={state} />
                 )}
                 
                 {/* Tab: R&D Knowledge Base */}

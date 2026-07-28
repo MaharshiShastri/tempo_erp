@@ -34,13 +34,14 @@ import PersonalSalesAnalyticsView from "./views/PersonalSalesAnalyticsView";
 import TallyImportWorkspaceView from "./views/TallyImportWorkspaceView";
 import GeoAnalyticsView from "./views/GeoAnalyticsView";
 import TallyInvoiceImportWorkspaceView from "./views/TallyInvoiceImportWorkspaceView";
+import TransportAnalyticsView from "./views/TransportAnalyticsView";
 
 function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-    const [openModules, setOpenModules] = useState({global: true, sales: true, factory: true, admin: false});
+    const [openModules, setOpenModules] = useState({global: true, sales: true, factory: true, transport: true, admin: false});
     const __APP_VERSION = packageJson.version;
     const toggleModule = (moduleKey) => {
         setOpenModules(prev => ({ ...prev, [moduleKey]: !prev[moduleKey] }));
@@ -169,7 +170,7 @@ function App() {
                     </div>
 
                     {/* SALES MODULE */}
-                    {(isSales || isTransporter) && (
+                    {(isSales) && (
                         <div className="menu-group">
                             <div className="menu-title" onClick={() => toggleModule('sales')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span>Sales Module</span>
@@ -199,20 +200,7 @@ function App() {
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+B</span>
                                         </a>
                                     )}
-                                    {(isSales || isTransporter) && (
-                                        <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
-                                            <span>🚚</span> 
-                                            {!sidebarCollapsed && <span>Dispatch Planner</span>}
-                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+D</span>
-                                        </a>
-                                    )}
-                                    {isTransporter && (
-                                        <a href="#partner-new" className={`menu-item ${state.activeTab === 'partner-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('partner-new')}}>
-                                            <span>🤝</span>
-                                            {!sidebarCollapsed && <span>Logistics Master</span>}
-                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
-                                        </a>
-                                    )}
+                                    
                                     {isSales && (
                                         <a href="#crm" className={`menu-item ${state.activeTab === 'crm-workspace' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('crm-workspace')}}>
                                             <span>🎯</span> 
@@ -277,6 +265,40 @@ function App() {
                         </div>
                     )}
 
+                    {isTransporter && (
+                        <div className="menu-group">
+                            <div className="menu-title" onClick={() => toggleModule('transport')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Transport</span>
+                                {!sidebarCollapsed && <span>{openModules.transport ? '▼' : '▶'}</span>}
+                            </div>
+                            
+                            {openModules.transport && (
+                                <>
+                                    {(isSales || isTransporter) && (
+                                        <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
+                                            <span>🚚</span> 
+                                            {!sidebarCollapsed && <span>Dispatch Planner</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+D</span>
+                                        </a>
+                                    )}
+                                    {isTransporter && (
+                                        <a href="#partner-new" className={`menu-item ${state.activeTab === 'partner-new' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('partner-new')}}>
+                                            <span>🤝</span>
+                                            {!sidebarCollapsed && <span>Logistics Master</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+L</span>
+                                        </a>
+                                    )}
+                                    {isTransporter&& (
+                                    <a href="#transport-analytics" className={`menu-item ${state.activeTab === "transport-analytics" ? "active" : ""}`} onClick={(e)=>{e.preventDefault();state.setActiveTab("transport-analytics");}}>
+                                        <span>📈</span>
+                                        {!sidebarCollapsed && <span>Transport Analytics</span>}
+                                    </a>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+                    
                     {/* ADMINISTRATION MODULE */}
                     {isSuperUser && (
                         <div className="menu-group">
@@ -408,6 +430,7 @@ function App() {
                     {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
                     {isSuperUser && state.activeTab === 'tally-xml' && <TallyImportWorkspaceView state={state}/>}
                     {isSuperUser && state.activeTab === 'map' && <GeoAnalyticsView state={state}/>}
+                    {isTransporter && state.activeTab === "transport-analytics" && <TransportAnalyticsView state={state}/>}
                 </div>
             </div>
 

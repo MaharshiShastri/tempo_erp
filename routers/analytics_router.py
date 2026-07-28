@@ -26,7 +26,7 @@ def return_sales_targets(from_date: date = Query(...), to_date: date = Query(...
 
 @router.get("/transport", tags=["Admin Only"])
 def get_transport_kpis(from_date:date =  Query(...), to_date: date = Query(...), user: dict = Depends(verify_bearer_token)):
-    if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:
+    if user.get("role") not in ["Admin", "Chief Full Stack Developer", "Dispatch Engineer"]:
         raise HTTPException(status_code=403, detail="Unauthorized access to KPIs.")
     try:
         return EDBR.get_transport_kpis(from_date, to_date)
