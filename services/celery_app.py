@@ -18,6 +18,11 @@ celery.conf.beat_schedule = {
         "task": "services.tasks.fetch_tally_daily",
         "schedule": crontab(hour=10, minute=0),
     },
+
+    "refresh-items-cache": {
+        "task": "services.tasks.rebuild_item_cache",
+        "schedule": crontab(hour=1, minute=0)
+    }
 }
 
 celery.conf.timezone = "Asia/Kolkata"

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 export default function useOrderWorkspace({sessionToken, companiesMaster, itemsMaster, setAlertMessage, setIsAlertOpen, setActiveTab}){
     const defaultOrderItem = { item_code: '', additional_spec_text: '', hsn_code: '', quantity: 1, unit_measure: 'NOS', rate: 0.00, discount_percentage: 0.00 };
-    const defaultOrderHeader = { order_acceptance_id: '', order_acceptance_date: '', purchase_order_number: '', purchase_order_date: '', customer_code: '', payment_terms: '', billing_name: '', billing_address: '', due_date: '' };
+    const defaultOrderHeader = { order_acceptance_id: '', order_acceptance_date: '', purchase_order_number: '', purchase_order_date: '', customer_code: '', company_name: "", payment_terms: '', billing_name: '', billing_address: '', due_date: '' };
     
     const [orders, setOrders] = useState([]);
     const [orderHeader, setOrderHeader] = useState({...defaultOrderHeader});
@@ -18,12 +18,17 @@ export default function useOrderWorkspace({sessionToken, companiesMaster, itemsM
         if (custCode === "TRIGGER_ERR_UNAUTHORIZED_CLIENT" || (custCode && !companiesMaster.find(c => c.id === custCode))) {
             setAlertMessage("The chosen corporate entity does not exist within the customer master data tables.");
             setIsAlertOpen(true);
-            setOrderHeader({ ...orderHeader, customer_code: '', billing_name: '', billing_address: '' });
+            setOrderHeader({ ...orderHeader, customer_code: '', customer_name: orderHeader.billing_name || orderHeader.customer_name || "",  billing_name: '', billing_address: '' });
             return;
         }
         const matched = companiesMaster.find(c => c.id === custCode);
-        if (matched) setOrderHeader({ ...orderHeader, customer_code: custCode, billing_name: isBillingSameAsCustomer ? matched.name : '', billing_address: isBillingSameAsCustomer ? matched.address : '' });
-        else setOrderHeader({ ...orderHeader, customer_code: '', billing_name: '', billing_address: '' });
+        if(!matched){
+            setAlertMessage("The chosen corporate entity does not exist.");
+            setIsAlertOpen(true);
+            setOrderHeader(prev => ({...prev, customer_code: "", customer_name: "", billing_name: "", billing_address: "" }));
+        }
+        setOrderHeader({ ...orderHeader, customer_code: custCode, billing_name: isBillingSameAsCustomer ? matched.name : '', billing_address: isBillingSameAsCustomer ? matched.address : '' });
+        
     };
 
     

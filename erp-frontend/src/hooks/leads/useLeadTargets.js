@@ -86,12 +86,14 @@ export default function useLeadTargets({user, setAlertMessage, setIsAlertOpen, s
         if (target.status === 'Completed' && !contactsCache[target.id]) {
             try {
                 const contacts = await API.fetchLeadContacts(target.id, user.access_token);
+                
                 setContactsCache(prev => ({ ...prev, [target.id]: contacts }));
             } catch (err) { console.error("Failed to load contacts:", err); }
         } else if (target.status === 'Awaiting Review') {
             // Load and safely parse current mapped contacts into state for manual editing
             const rawData = target.snovio_raw_data || {};
             const initialContacts = rawData.mapped_contacts || [];
+            
             setStagedContacts(initialContacts);
         }
     };

@@ -171,7 +171,7 @@ export default function LeadGeneratorView({ state }) {
                     </div>
                 </div>
 
-                {filteredTargets.length === 0 ? (
+                {(filteredTargets ?? []).length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px dashed var(--border-light)' }}>
                         No targets match the selected status filter.
                     </div>
@@ -278,7 +278,8 @@ export default function LeadGeneratorView({ state }) {
                                                             </td>
                                                         </tr>
                                                     ))}
-                                                    {stagedContacts.length === 0 && (
+                                                    
+                                                    {(stagedContacts ?? []).length === 0 && (
                                                         <tr>
                                                             <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                                                                 No contacts loaded. Use "Add Contact Row" to populate details manually.

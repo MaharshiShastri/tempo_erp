@@ -185,7 +185,7 @@ export default function SalesAnalyticsView({ state }) {
                         </div>
                         <div style={{ background: 'rgba(75, 192, 192, 0.1)', padding: '25px 25px 0px 25px', borderRadius: '8px', border: '1px solid rgba(75, 192, 192, 0.3)' }}>
                             <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Lead Harvest Ratio</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: conversionRatio > 50 ? 'rgba(75, 192, 192, 1)' : 'var(--brand-danger)' }}>{conversionRatio}%</div>
+                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: conversionRatio > 50 ? 'rgba(75, 192, 192, 1)' : 'var(--brand-danger)' }}>{conversionRatio.toFixed(2)}%</div>
                             <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)'}}>{total_completed} out of {totalQueued}</div>
                         </div>
                         <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>

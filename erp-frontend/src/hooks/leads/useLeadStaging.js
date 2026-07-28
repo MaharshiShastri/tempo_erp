@@ -1,10 +1,10 @@
 import { useState } from "react";
 import API from "../../api/api";
 
-export default function useLeadStaging(companyName, setCompanyName, domain, setDomain, targets, expandedTargetId, setExpandedTargetId,
+export default function useLeadStaging({companyName, setCompanyName, domain, setDomain, targets, expandedTargetId, setExpandedTargetId,
         contactsCache, statusFilter, setStatusFilter, file, setFile, isLoading, uploading, editingTargetId,
         editForm, setEditForm, loadTargets, handleTargetSubmit, handleBulkUpload, downloadSampleFile, handleAccordionToggle,
-        startEditing, saveEdit, handleDelete, handleMockSync, user, setAlertMessage, setIsAlertOpen, showErrorModal, stagedContacts, setStagedContacts){
+        startEditing, saveEdit, handleDelete, handleMockSync, user, setAlertMessage, setIsAlertOpen, showErrorModal, stagedContacts, setStagedContacts}){
     
     const updateStagedContactField = (index, field, value) => {
         const updated = [...stagedContacts];
@@ -27,7 +27,7 @@ export default function useLeadStaging(companyName, setCompanyName, domain, setD
         // Validate at least one contact is fully mapped
         const validContacts = stagedContacts.filter(c => c.full_name.trim() && c.email.trim());
         if (validContacts.length === 0) {
-            state.showErrorModal("Mapping Validation", "Please map at least one contact with a name and email before approving.");
+            showErrorModal("Mapping Validation", "Please map at least one contact with a name and email before approving.");
             return;
         }
 
@@ -37,17 +37,17 @@ export default function useLeadStaging(companyName, setCompanyName, domain, setD
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${state.user.access_token}`
+                    "Authorization": `Bearer ${user.access_token}`
                 },
                 body: JSON.stringify({ contacts: validContacts })
             });
-            state.setAlertMessage("🏆 Lead contacts verified and stored in database.");
-            state.setIsAlertOpen(true);
+            setAlertMessage("🏆 Lead contacts verified and stored in database.");
+            setIsAlertOpen(true);
             setExpandedTargetId(null);
             setStagedContacts([]);
             await loadTargets();
         } catch (err) {
-            state.showErrorModal("Approval Error", err.message);
+            showErrorModal("Approval Error", err.message);
         }
     };
 
@@ -56,9 +56,9 @@ export default function useLeadStaging(companyName, setCompanyName, domain, setD
         if(!window.confirm("Reject this harvested data?")) return;
 
         try{
-            await API.rejectSnovioStaging(targetId, {reason}, state.user.access_token);
-            state.setAlertMessage("❌ Harvest rejected.")
-            state.setIsAlertOpen(true);
+            await API.rejectSnovioStaging(targetId, {reason}, user.access_token);
+            setAlertMessage("❌ Harvest rejected.")
+            setIsAlertOpen(true);
 
             setExpandedTargetId(null);
             setStagedContacts([]);
@@ -66,7 +66,7 @@ export default function useLeadStaging(companyName, setCompanyName, domain, setD
             await loadTargets();
         }
         catch(err){
-            state.showErrorModal("Reject failed", err.message);
+            showErrorModal("Reject failed", err.message);
         }
     }
     return {stagedContacts, updateStagedContactField, addStagedContactRow, removeStagedContactRow, handleApproveStaging, handleRejectStaging};

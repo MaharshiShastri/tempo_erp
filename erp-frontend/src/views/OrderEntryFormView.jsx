@@ -6,7 +6,8 @@ export default function OrderEntryFormView({ state }) {
     const {orderHeader, setOrderHeader, orderItems, setOrderItems, appendOrderItemRow, popOrderItemRow, updateOrderItemField,
         handleCustomerMasterSelection, oaSuggestions, showOaSuggestions, oaInputRef, handleOaInputChange, handleOaSelect, handleOaSearch, 
         isNewClient, setIsNewClient, temporaryClientName, setTemporaryClientName, handleFormSubmit, totals,
-        isOcrLoading, isBillingSameAsCustomer, setIsBillingSameAsCustomer, itemsMaster,setActiveTab, handleItemMasterSelection
+        isOcrLoading, isBillingSameAsCustomer, setIsBillingSameAsCustomer, itemsMaster,setActiveTab, handleItemMasterSelection, setShowOaSuggestions,
+
     } = state;
     
     const today = new Date().toISOString().split('T')[0];
@@ -121,11 +122,19 @@ export default function OrderEntryFormView({ state }) {
                         </div>
                         
                         {!isNewClient ? (
-                            <SearchBox 
-                                searchUrl="/api/v1/orders/search/companies" 
-                                placeholder="Search customer (type name or code)..." 
-                                onSelect={(cust) => { handleCustomerMasterSelection(cust.id); }}
-                            />
+                            <>
+                                <SearchBox searchUrl="/api/v1/orders/search/companies"  placeholder="Search customer (type name or code)..."  onSelect={(cust) => { handleCustomerMasterSelection(cust.id); }}/>
+                                {orderHeader.customer_name && (
+                                    <div style={{marginTop: 8, padding: "8px 12px", borderRadius: 6, background: "#eef6ff"}}>
+                                        Selected Customer: <strong>{orderHeader.customer_name}</strong>
+                                        {!orderHeader.customer_code && (
+                                        <span style={{color: "#d97706", marginLeft: 8}}>
+                                            (Not registered yet)
+                                        </span>
+                                    )}
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <input 
                                 type="text" 

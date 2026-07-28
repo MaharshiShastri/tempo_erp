@@ -19,6 +19,7 @@ from database.models import (
     SystemNotification, TestItemMaster
 )
 from schemas.logistics_schema import FullPartnerProfile
+from services.item_matcher import resolve_item_code
 
 INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHATTISGARH", "GOA", "GUJARAT",
     "HARYANA", "HIMACHAL PRADESH", "JHARKHAND", "KARNATAKA", "KERALA", "MADHYA PRADESH", "MAHARASHTRA", "MANIPUR",
@@ -28,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -280,6 +281,7 @@ class PostgresRepository:
         return "\n".join([str(item) for item in field_list if isinstance(item, str)]).strip()
 
     def ingest_tally_json(self, tally_data: dict) -> int:
+        
         inserted_count = 0
         vouchers = tally_data.get("tallymessage", [])
         
@@ -342,7 +344,12 @@ class PostgresRepository:
                 
                 items = voucher.get("allinventoryentries", [])
                 for item in items:
-                    item_code = item.get("stockitemname", "")
+                    item_code = resolve_item_code(item.get("stockitemname", "").strip().upper())
+
+                    if not item_code:
+                        print(f"Unknown item: {item.get('stockitemname')}")
+                        continue
+
                     spec_text = self._extract_tally_text_list(item.get("basicuserdescription"))
                     hsn_code = item.get("gsthsnname", "")
                     qty = self._parse_tally_number(item.get("actualqty"))
