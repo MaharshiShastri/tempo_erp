@@ -1589,6 +1589,11 @@ class PostgresRepository:
             total_dispatches = sum(m.total_dispatches for m in monthly)
 
             total_cost = sum(float(m.total_cost or 0) for m in monthly)
+
+            partner_distribution = session.execute(select(DispatchRecord.partner_name, func.count().label("dispatches"))
+                                                   .group_by(DispatchRecord.partner_name)).all()
+            partner_distribution =  [{"partner": row.partner_name, "dispatches": row.dispatches} for row in partner_distribution]
+
             return {
                 "total_partners": total_partners,
                 "total_dispatches": total_dispatches,
@@ -1604,7 +1609,8 @@ class PostgresRepository:
                     for m in monthly
                 ],
 
-                "dispatch_records": dispatch_records
+                "dispatch_records": dispatch_records,
+                "partner_distribution": partner_distribution,
             }
     
     def get_production_analytics(self, from_date, to_date):

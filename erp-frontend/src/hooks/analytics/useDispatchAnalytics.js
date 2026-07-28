@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
-export default function useDispatchAnalytics({transportKpis = {total_partners: 0,monthly_costs: []}}) {
-
+export default function useDispatchAnalytics({transportKpis = {total_partners: 0,monthly_costs: [], partner_distribution: []}}) {
+    
     return useMemo(() => {
 
         const totalPartners = transportKpis.total_partners;
@@ -34,7 +34,17 @@ export default function useDispatchAnalytics({transportKpis = {total_partners: 0
 
         };
 
-        return {totalPartners, totalDispatches, totalFreightSpend, transportChart};
+        const partnerPie = {
+            labels:transportKpis.partner_distribution.map(p => p.partner),
+
+            datasets:[
+                {
+                    data:transportKpis.partner_distribution.map(p=>p.dispatches)
+                }
+            ]
+        };
+
+        return {totalPartners, totalDispatches, totalFreightSpend, transportChart, partnerPie};
 
     }, [transportKpis]);
 

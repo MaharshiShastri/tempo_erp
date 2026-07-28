@@ -292,6 +292,7 @@ function App() {
                                     <a href="#transport-analytics" className={`menu-item ${state.activeTab === "transport-analytics" ? "active" : ""}`} onClick={(e)=>{e.preventDefault();state.setActiveTab("transport-analytics");}}>
                                         <span>📈</span>
                                         {!sidebarCollapsed && <span>Transport Analytics</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                     </a>
                                     )}
                                 </>

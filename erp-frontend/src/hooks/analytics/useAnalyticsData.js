@@ -7,13 +7,13 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
 
     const [salesKpis, setSalesKpis] = useState([]);
     const [rndKpis, setRndKpis] = useState([]);
-    const [transportKpis, setTransportKpis] = useState({total_partners:0, monthly_costs:[]});
+    const [transportKpis, setTransportKpis] = useState({total_partners:0, monthly_costs:[], partner_distribution:[]});
     const [gtmKpis, setGtmKpis] = useState([]);
     const [prodKpis, setProdKpis] = useState([]);
     const [errorLogs, setErrorLogs] = useState([]);
 
     async function fetchAnalytics(fromDate, toDate){
-        console.log("From date in analytics data: ", fromDate);
+        
         setIsLoading(true);
 
         try{
@@ -33,7 +33,7 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
             setGtmKpis(gtm);
             setErrorLogs(errors);
             setProdKpis(production);
-
+            
         }
         catch(err){
             showErrorModal("Analytics Error",err.message);
