@@ -915,6 +915,46 @@ const API = {
 
       return await r.json();
   },
+
+  async adjustItemStock(token, payload){
+    const r = await fetch(
+      "/api/v1/master/items/adjust-stock",
+        { method: "POST",
+          headers:{
+            "Content-Type": "application/json",
+
+            Authorization:`Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if(!r.ok){
+          const err = await r.json();
+          throw new Error(err.detail);
+      }
+
+      return await r.json();
+  },
+  
+  async fetchStockLedger(token){
+
+    const r = await fetch(
+      "/api/v1/master/items/stock-ledger",
+      {
+        headers:{
+            Authorization:`Bearer ${token}`
+        }
+      }
+    );
+
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+
+    return await r.json();
+  },
 };
 
 export default API;

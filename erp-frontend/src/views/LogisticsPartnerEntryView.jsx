@@ -26,9 +26,10 @@ export default function LogisticsPartnerEntryView({ state }) {
 
             <form onSubmit={state.handleSave}>
                 <h4 style={{ color: "var(--brand-accent)", marginTop: "20px" }}>Core Contract Parameters</h4>
-                <div className="form-grid-layout" style={{ gap: "15px" }}>
+                <div className="form-grid-layout" style={{ gap: "15px", display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
                     <div className="form-group"><label className="input-label">Transporter Name</label><input required className="form-input" value={state.partner.name} onChange={e => state.setPartner({ ...state.partner, name: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Distance Calculator Link</label><input type="url" className="form-input" value={state.partner.partner_link || ""} onChange={e => state.setPartner({ ...state.partner, partner_link: e.target.value })} /></div>
+                    <div className="form-group"><label className="input-label">Mobile Number</label><input type="text" className="form-input" value={state.partner.mobile_number || ""} onChange={e=> state.setPartner({...state.partner, mobile_number: e.target.value})} /></div>
                     <div className="form-group"><label className="input-label">CFT Factor</label><input required type="number" step="0.01" className="form-input" value={state.partner.cft_factor} onChange={e => state.setPartner({ ...state.partner, cft_factor: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Min Weight (KG)</label><input required type="number" className="form-input" value={state.partner.minimum_weight} onChange={e => state.setPartner({ ...state.partner, minimum_weight: e.target.value })} /></div>
                     <div className="form-group"><label className="input-label">Min Freight Value (₹)</label><input required type="number" className="form-input" value={state.partner.minimum_freight_value} onChange={e => state.setPartner({ ...state.partner, minimum_freight_value: e.target.value })} /></div>
@@ -152,7 +153,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                     </div>
                     
                     <div>
-                        {state.hasChanges && (
+                        {hasChanges && (
                             <button type="submit" className="btn btn-success" style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold" }}>
                                 {state.selectedPartnerId ? "Update Changed Matrices" : "Save New Transporter Master"}
                             </button>

@@ -9,3 +9,4 @@ pyvenv.cfg
 data/
 chroma_db/
 /*.sqlite3
+/uploaded_task_attachments/

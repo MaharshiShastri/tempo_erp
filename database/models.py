@@ -309,6 +309,8 @@ class LogisticsPartner(Base):
 
     hub_loading_max_cost: Mapped[Decimal] = mapped_column(Numeric, server_default="0.0", nullable=True)
 
+    mobile_number: Mapped[str|None] = mapped_column(String(20))
+    
     zones: Mapped[list["LogisticsZone"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
 
     zone_rates: Mapped[list["LogisticsZoneRate"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
@@ -685,53 +687,23 @@ class TestItemMaster(Base):
 
     grn_items: Mapped[list["GRNItem"]] = relationship(back_populates="item")
 
-"""class StagingBillHeader(Base):
-    __tablename__ = "staging_bill_headers"
+class StockLedger(Base):
+    __tablename__ = "stock_ledger"
 
-    bill_num = mapped_column(String(50), primary_key=True)
-    bill_date = mapped_column(Date)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    customer_name = mapped_column(Text)
-    customer_gstin = mapped_column(Text, nullable=True)
+    item_code: Mapped[str | None] = mapped_column(String(100), ForeignKey("items_master.item_code"), nullable=True)
 
-    total_taxable = mapped_column(Numeric)
-    cgst = mapped_column(Numeric)
-    sgst = mapped_column(Numeric)
-    igst = mapped_column(Numeric)
-    invoice_total = mapped_column(Numeric)
+    quantity_change: Mapped[int] = mapped_column(Integer)
 
-    order_acceptance_id = mapped_column(String(50), nullable=True)
+    stock_before: Mapped[int] = mapped_column(Integer)
 
-    import_batch = mapped_column(String(50))
-    status = mapped_column(String(20), default="PENDING")
+    stock_after: Mapped[int] = mapped_column(Integer)
 
-    created_at = mapped_column(DateTime, server_default=func.now())
+    movement_type: Mapped[str] = mapped_column(String(30))# ADJUSTMENT # DISPATCH # RETURN # PURCHASE
 
-    items = relationship(back_populates="item")
+    remarks: Mapped[str | None] = mapped_column(Text)
 
-class StagingBillItem(Base):
-    __tablename__ = "staging_bill_items"
+    operator_email: Mapped[str] = mapped_column(ForeignKey("users.email"))
 
-    id = mapped_column(BigInteger, primary_key=True)
-
-    bill_num = mapped_column(ForeignKey("staging_bill_headers.bill_num"))
-
-    product_name = mapped_column(Text)
-
-    hsn = mapped_column(String(20))
-
-    quantity = mapped_column(Integer)
-
-    rate = mapped_column(Numeric)
-
-    taxable_amount = mapped_column(Numeric)
-
-    cgst = mapped_column(Numeric)
-
-    sgst = mapped_column(Numeric)
-
-    igst = mapped_column(Numeric)
-
-    total = mapped_column(Numeric)
-
-    order_item_id = mapped_column(BigInteger, nullable=True)"""
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

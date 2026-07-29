@@ -9,7 +9,11 @@ export default function useItemMaster({sessionToken, setAlertMessage, setIsAlert
     const [selectedItem, setSelectedItem] = useState(null);
     const [itemDetail, setItemDetail] = useState(null);
     const [isEditingItem, setIsEditingItem] = useState(false);
-    
+    const [stockModal, setStockModal] = useState({operation: "add", itemCode: "", quantity: 0, remarks: ""});
+    const [stockModalOpen, setStockModalOpen] = useState(false);
+
+    const [stockLedger, setStockLedger] = useState([]);
+
     const refreshItems = async() =>{
         try{
             const items = await API.fetchItemMaster(sessionToken);
@@ -33,7 +37,39 @@ export default function useItemMaster({sessionToken, setAlertMessage, setIsAlert
             setIsAlertOpen(true);
         }
     };
+
+    function openStockModal(item){
+        setSelectedItem(item);
+
+        setStockModal({open: true, itemCode: item.item_code, operation: "add", quantity: 0, remarks: ""});
+        setStockModalOpen(true);
+    }
+
+    const closeStockModal = () =>{
+        setStockModalOpen(false);
+        setSelectedItem(null);
+        setStockModal({operation: "add", itemCode: "", quantity: 0, remarks: ""});
+    }
+
+    async function saveStockAdjustment(){
+        await API.adjustItemStock(sessionToken, {
+            item_code: stockModal.itemCode,
+            operation: stockModal.operation,
+            quantity_change: Number(stockModal.quantity),
+            remarks: stockModal.remarks
+        });
+
+        closeStockModal();
+        await refreshItems();
+    }
+    
+    async function refreshStockLedger(){
+        const logs = await API.fetchStockLedger(sessionToken);
+        setStockLedger(logs);
+    }
     return {itemsMaster, refreshItems, commitItemSubmit, defaultItemForm, setItemsMaster, itemForm,
         setItemForm, selectedItem, setSelectedItem, itemDetail, setItemDetail, isEditingItem, setIsEditingItem, 
+        stockModal, setStockModal, stockModalOpen, openStockModal, closeStockModal, saveStockAdjustment,
+        stockLedger, refreshStockLedger,
     };
 }

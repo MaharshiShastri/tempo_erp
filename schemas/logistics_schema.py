@@ -9,6 +9,7 @@ class LogisticsPartnerCreate(BaseModel):
     documentation_charge: float = 0.0
     delivery_destination_charge: float = 0.0
     freight_invoice_brokerage_percentage: float = 0.0
+    mobile_number: str | None = None
 
 class ZoneDef(BaseModel):
     zone_code: str
@@ -40,7 +41,7 @@ class FullPartnerProfile(BaseModel):
     documentation_charge: float = 0.0
     fov_percentage: float = 0.0
     gst_percentage: float = 18.0
-
+    mobile_number: str | None = None
     local_loading_cost: float = 0.0
     hub_loading_max_cost: float = 0.0
     

@@ -3,7 +3,7 @@ import API from "../../api/api";
 
 export default function useTransportPartners({sessionToken, showErrorModal, addToast}) {
 
-    const defaultPartner = {name: "", partner_link: "", cft_factor: 10, minimum_weight: 0, minimum_freight_value: 0, documentation_charge: 0,
+    const defaultPartner = {name: "", partner_link: "", mobile_number: "", cft_factor: 10, minimum_weight: 0, minimum_freight_value: 0, documentation_charge: 0,
         fov_percentage: 0, gst_percentage: 18, local_loading_cost: 0, hub_loading_max_cost: 0};
 
     const [partners, setPartners] = useState([]);

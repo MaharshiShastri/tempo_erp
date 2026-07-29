@@ -16,7 +16,7 @@ from database.models import (
     LogisticsZone, LogisticsZoneRate, LogisticsFuelMatrix, LogisticsODAMatrix, 
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
-    SystemNotification, TestItemMaster
+    SystemNotification, TestItemMaster, StockLedger
 )
 from schemas.logistics_schema import FullPartnerProfile
 from services.item_matcher import resolve_item_code
@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATaABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -708,6 +708,7 @@ class PostgresRepository:
                 partner.gst_percentage = p.gst_percentage
                 partner.local_loading_cost = p.local_loading_cost
                 partner.hub_loading_max_cost = p.hub_loading_max_cost
+                partner.mobile_number = p.mobile_number
 
                 # Cascade WIPE
                 session.execute(delete(LogisticsZone).where(LogisticsZone.partner_id == partner_id))
@@ -756,7 +757,8 @@ class PostgresRepository:
                     name=p.name, partner_link=p.partner_link, cft_factor=p.cft_factor, 
                     minimum_weight=p.minimum_weight, minimum_freight_value=p.minimum_freight_value, 
                     documentation_charge=p.documentation_charge, fov_percentage=p.fov_percentage, 
-                    gst_percentage=p.gst_percentage, local_loading_cost=p.local_loading_cost, hub_loading_max_cost=p.hub_loading_max_cost
+                    gst_percentage=p.gst_percentage, local_loading_cost=p.local_loading_cost, hub_loading_max_cost=p.hub_loading_max_cost,
+                    mobile_number=p.mobile_number
                 )
                 session.add(partner)
                 session.flush() # get ID
@@ -934,6 +936,83 @@ class PostgresRepository:
         with SessionLocal() as session:
             items = session.scalars(select(ItemMaster)).all()
             return [to_dict(i) for i in items]
+
+    def adjust_item_stock(self, item_code, operation, quantity, remarks, operator_email):
+        with SessionLocal() as session:
+
+            item = session.get(ItemMaster, item_code)
+            
+            if not item:
+                raise ValueError("Item not found.")
+
+            before = item.available_stock
+
+            if operation == "add":
+                after = before + quantity
+                movement = quantity
+
+            elif operation == "subtract":
+                after = before - quantity
+                movement = -quantity
+
+            elif operation == "set":
+                after = quantity
+                movement = quantity - before
+
+            else:
+                raise ValueError("Invalid stock operation.")
+
+            if after < 0:
+                raise ValueError("Stock cannot become negative.")
+
+            item.available_stock = after
+
+            session.add(
+                StockLedger(
+                    item_code=item_code,
+                    quantity_change=movement,
+                    stock_before=before,
+                    stock_after=after,
+                    movement_type="ADJUSTMENT",
+                    remarks=remarks,
+                    operator_email=operator_email
+                )
+            )
+
+            session.commit()
+
+            return {"available_stock": after}
+
+    def get_stock_ledger(self):
+        with SessionLocal() as session:
+
+            logs = (
+                session.query(
+                    StockLedger,
+                    User.name.label("operator_name"),
+                    ItemMaster.item_name.label("item_name")
+                )
+                .join(User, User.email == StockLedger.operator_email)
+                .join(ItemMaster, ItemMaster.item_code == StockLedger.item_code)
+                .order_by(StockLedger.created_at.desc())
+                .all()
+            )
+
+            return [
+                {
+                    "id": log.id,
+                    "created_at": log.created_at,
+                    "item_code": log.item_code,
+                    "item_name": item_name,
+                    "movement_type": log.movement_type,
+                    "quantity_change": log.quantity_change,
+                    "stock_before": log.stock_before,
+                    "stock_after": log.stock_after,
+                    "remarks": log.remarks,
+                    "operator": operator_name
+                }
+                for log, operator_name, item_name in logs
+            ]
     # --- ITEM MASTERY end---
     
     # --- CONTEXTUAL ACCOUNTABILITY HUB (ACTIVITY LOGS) start---
@@ -1651,7 +1730,7 @@ class PostgresRepository:
                 .order_by(func.date(Task.completed_at))
             ).all()
 
-            print("The production stage information: ", stages)
+            
             return {
                 "production_stage": [
                     {

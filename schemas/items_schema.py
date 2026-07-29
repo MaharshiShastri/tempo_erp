@@ -20,3 +20,9 @@ class ItemMasterUpdate(BaseModel):
     additional_spec_text: Optional[str] = None
     hsn_code: Optional[str] = None
     revision_no: Optional[str] = None
+
+class StockAdjustment(BaseModel):
+    item_code: str
+    operation: str
+    quantity_change: int
+    remarks: str = ""
