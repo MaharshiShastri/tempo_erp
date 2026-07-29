@@ -19,7 +19,8 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         classification = classify_city_zone(destination_city, partner_zones_data["zones"])
 
         destination_zone = classification["zone_code"]
-        state = classification["state"]
+        state = classification["indian_state"]
+
         debug["destination_city"] = destination_city
         debug["destination_zone"] = destination_zone
         debug["partner_zone_options"] = partner_zones_data

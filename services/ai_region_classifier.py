@@ -1,6 +1,6 @@
 import os
 from groq import Groq
-
+import json
 API_KEY = os.getenv("GROQ_API_KEY", "")
 
 print(API_KEY)
@@ -14,13 +14,13 @@ def classify_city_zone(city: str, zones: list):
         for z in zones
     ])
 
-    prompt = f"""
+    prompt = f'''
 You are a logistics routing classifier.
 
 Return ONLY zone_code & the Indian state in JSON format.
 Example: {{
-'zone_code': '',
-'indian_state': ''
+"zone_code": "",
+"indian_state": ""
 }}
 No explanation.
 No markdown.
@@ -32,7 +32,7 @@ City:
 Available Zones:
 
 {zone_text}
-"""
+'''
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -45,4 +45,6 @@ Available Zones:
         ]
     )
     
-    return (response.choices[0].message.content.strip())
+    content = response.choices[0].message.content.strip()
+    
+    return json.loads(content)
