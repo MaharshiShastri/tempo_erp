@@ -192,6 +192,7 @@ export default function DispatchPlannerView({ state }) {
                                          <summary>Cost Breakdown</summary>
                                         <div style={{ marginTop: 10, fontSize: "13px", display: "grid", gridTemplateColumns: "1fr auto", gap: "6px" }}>
                                             <span>Destination Zone</span><strong>{opt.destination_zone}</strong>
+                                            <span>State</span><strong>{opt.state}</strong>
                                             <span>Chargeable Weight</span><strong>{opt.chargeable_weight} kg</strong>
                                             <span>Basic Freight</span><strong>₹{opt.basic_freight}</strong>
                                             <span>Loading Charge</span><strong>₹{opt.loading_charge}</strong>

@@ -41,25 +41,25 @@ export default function TransportAnalyticsView({state}){
             </div>
 
             {activeView==="statistics" &&(
-                <div style={{display: "grid", gridTemplateColumns:"repeat(4, 1fr)", gap: 20, marginBottom: 25}}>
+                <div style={{display: "grid", gridTemplateColumns:"repeat(3, 1fr)", gap: 20, marginBottom: 25}}>
                     <div className="frappe-card">
                         <h4>Total Logistics Partners</h4>
-                        <h2 color={"var(--brand-accent)"}>{transportKpis?.total_partners}</h2>
+                        <h2 style={{color: "var(--brand-accent) !important"}}>{transportKpis?.total_partners}</h2>
                     </div>
 
                     <div className="frappe-card">
                         <h4>Total Dispatches</h4>
-                        <h2 color={"var(--brand-success)"}>{transportKpis?.total_dispatches}</h2>
+                        <h2 style={{color: "var(--brand-success) !important"}}>{transportKpis?.total_dispatches}</h2>
                     </div>
 
                     <div className="frappe-card">
                         <h4>Total Freight Spend</h4>
-                        <h2 color={"var(--brand-danger)"}>₹{transportKpis?.total_cost.toLocaleString()}</h2>
+                        <h2 style={{color: "var(--brand-danger) !important"}}>₹{transportKpis?.total_cost.toLocaleString()}</h2>
                     </div>
 
                     <div className="frappe-card">
                         <h4>Average Freight</h4>
-                        <h2 color={"var(--text-muted)"}>₹{transportKpis?.average_dispatch_cost}</h2>
+                        <h2 style={{color: "var(--text-muted) !important"}}>₹{transportKpis?.average_dispatch_cost}</h2>
                     </div>
 
                     <div className="frappe-card">
@@ -113,7 +113,7 @@ export default function TransportAnalyticsView({state}){
 
                         {Object.entries(transportKpis?.dispatch_records ?? {}).map(([month,records])=>(
 
-                        <details key={month} className="frappe-card" style={{marginBottom:16}}>
+                        <div key={month} className="frappe-card" style={{hieght: 500, overflowY: "auto"}}>
 
                             <summary style={{ cursor:"pointer", padding:"12px", fontWeight:600}}>
 
@@ -123,7 +123,7 @@ export default function TransportAnalyticsView({state}){
 
                             </summary>
 
-                            <table style={{ width:"100%", borderCollapse:"collapse"}}>
+                            <table style={{ width:"100%", borderCollapse:"collapse", maxWidth:'100vw'}}>
 
                                 <thead>
 
@@ -175,17 +175,19 @@ export default function TransportAnalyticsView({state}){
 
                             </table>
 
-                        </details>
+                        </div>
                     ))}
                     </div>
                 </div>
             )}
             {activeView==="charts" && (
-                <div style={{height:450}}>
-
+                <div style={{display: "grid", gridTemplateColumns:"2fr 1fr", gap:20}}>
+                    <div className="frappe-card">
                     <Line data={transportChart} options={{ responsive:true,maintainAspectRatio:false, plugins:{ title:{ display:true, text:"Monthly Logistics Spend"} }}}/>
+                    </div>
+                    <div className="frappe-card">
                     <Pie data={partnerPie} options={{ responsive:true, plugins:{ title:{ display:true, text:"Dispatches by Logistics Partner"}}}}/>
-
+                    </div>
                 </div>
 
             )}

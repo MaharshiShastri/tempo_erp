@@ -52,7 +52,7 @@ def get_system_health(from_date: date = Query(...), to_date: date = Query(...), 
 
 @router.get("/production", tags=["Admin Only"])
 def get_production_kpis(from_date: date = Query(...), to_date: date = Query(...), user: dict = Depends(verify_bearer_token)):
-    if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:
+    if user.get("role") not in ["Admin", "Chief Full Stack Developer", "Shop Floor Administrator"]:
         raise HTTPException(status_code=403, detail="Unauthorized access to KPIs.")
     try:
         return EDBR.get_production_analytics(from_date, to_date)

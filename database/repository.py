@@ -675,7 +675,8 @@ class PostgresRepository:
                 hamali_cost=record.get("hamali_cost", 0),
                 subtotal=record.get("subtotal"),
                 dispatch_cost_gst=record.get("dispatch_cost_gst"),
-                operator_email=operator_email
+                operator_email=operator_email,
+                state=record.get("state")
             )
             session.add(dr)
             session.commit()
@@ -1615,9 +1616,68 @@ class PostgresRepository:
     
     def get_production_analytics(self, from_date, to_date):
         with SessionLocal() as session:
-            result = session.execute(select(func.coalesce(OrderHeader.production_stage, "PO_SUBMITTED").label("stage"),func.count(OrderHeader.order_acceptance_id).label("count")).group_by(OrderHeader.production_stage).where(OrderHeader.created_at.between(from_date, to_date)).order_by(desc("count"))).all()
+            stages = session.execute(select(
+                    func.coalesce(OrderHeader.production_stage, "PO_SUBMITTED").label("stage"),
+                    func.count(OrderHeader.order_acceptance_id).label("order_count")
+                )
+                .where(OrderHeader.created_at.between(from_date, to_date))
+                .group_by(OrderHeader.production_stage)
+                .order_by(desc("order_count"))
+            ).all()
 
-            return [{ "stage": row.stage, "count": row.count} for row in result]
+            task_summary = session.execute(select(User.name.label("operator"), 
+
+                func.count(Task.id).filter(Task.assigned_by == User.email).label("assigned"),
+
+                func.count(Task.id).filter(User.email == func.any(Task.assigned_to)).label("received")
+
+            )
+            .where(or_(User.role == "Shop Floor Administrator", User.role == "Admin", User.role == "Chief Full Stack Developer"))
+            .group_by(User.email, User.name)
+            .order_by(User.name)
+
+            ).all()
+            
+            completed_daily = session.execute(
+                select(
+                    func.date(Task.completed_at).label("day"),
+                    func.count(Task.id).label("completed"),
+                )
+                .where(
+                    Task.completed_at.is_not(None),
+                    Task.completed_at.between(from_date, to_date)
+                )
+                .group_by(func.date(Task.completed_at))
+                .order_by(func.date(Task.completed_at))
+            ).all()
+
+            print("The production stage information: ", stages)
+            return {
+                "production_stage": [
+                    {
+                        "stage": r.stage,
+                        "count": r.order_count
+                    }
+                    for r in stages
+                ],
+
+                "task_summary":[
+                    {
+                        "operator": r.operator,
+                        "assigned": r.assigned,
+                        "received": r.received
+                    }
+                    for r in task_summary
+                ],
+
+                "daily_completed": [
+                    {
+                        "day": str(r.day),
+                        "completed": r.completed
+                    }
+                    for r in completed_daily
+                ]
+            }
     
     def get_gtm_analytics(self, from_date, to_date):
         with SessionLocal() as session:

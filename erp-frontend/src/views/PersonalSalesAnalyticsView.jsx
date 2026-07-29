@@ -100,7 +100,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
                                                 <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: pct >= 100 ? 'var(--brand-success)' : 'var(--brand-accent)' }} />
                                             </div>
                                         </td>
-                                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold' }}>
+                                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: "var(--brand-success)" }}>
                                             {pct.toFixed(1)}%
                                         </td>
                                     </tr>

@@ -35,6 +35,7 @@ import TallyImportWorkspaceView from "./views/TallyImportWorkspaceView";
 import GeoAnalyticsView from "./views/GeoAnalyticsView";
 import TallyInvoiceImportWorkspaceView from "./views/TallyInvoiceImportWorkspaceView";
 import TransportAnalyticsView from "./views/TransportAnalyticsView";
+import ProductionAnalyticsView from "./views/ProductionAnalyticsView";
 
 function App() {
     const state = useERPState();
@@ -260,12 +261,17 @@ function App() {
                                         {!sidebarCollapsed && <span>Bulk Import Items</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                     </a>
+                                    <a href="#production-stats" className={`menu-item ${state.activeTab === 'prod-stats' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('prod-stats')}}>
+                                        <span>📊</span> 
+                                        {!sidebarCollapsed && <span>Production Analytics</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                    </a>
                                 </>
                             )}
                         </div>
                     )}
 
-                    {isTransporter && (
+                    {(isTransporter || isSales) && (
                         <div className="menu-group">
                             <div className="menu-title" onClick={() => toggleModule('transport')} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span>Transport</span>
@@ -432,6 +438,7 @@ function App() {
                     {isSuperUser && state.activeTab === 'tally-xml' && <TallyImportWorkspaceView state={state}/>}
                     {isSuperUser && state.activeTab === 'map' && <GeoAnalyticsView state={state}/>}
                     {isTransporter && state.activeTab === "transport-analytics" && <TransportAnalyticsView state={state}/>}
+                    {isFactory && state.activeTab==='prod-stats' && <ProductionAnalyticsView state={state}/>}
                 </div>
             </div>
 

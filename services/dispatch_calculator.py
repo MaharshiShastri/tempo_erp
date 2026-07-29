@@ -16,8 +16,10 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         # Step 1: Zone Identification
         destination_city = shipment["destination_city"]
         partner_zones_data = EDBR.get_partner_zones(partner_id)
-        destination_zone = classify_city_zone(destination_city, partner_zones_data["zones"])
+        classification = classify_city_zone(destination_city, partner_zones_data["zones"])
 
+        destination_zone = classification["zone_code"]
+        state = classification["state"]
         debug["destination_city"] = destination_city
         debug["destination_zone"] = destination_zone
         debug["partner_zone_options"] = partner_zones_data
@@ -46,7 +48,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         # Step 5: Surcharges and ODA
         fuel_percentage = float(EDBR.get_fuel_surcharge(partner_id, shipment.get("diesel_price", 90.0)) or 0)
         fuel_charge = (basic_freight * fuel_percentage / 100)
-        print("fuel percentage: ", fuel_percentage, " and fuel charge is: ", fuel_charge)
+        
 
         fov_charge = (float(shipment["invoice_value"]) * float(partner["fov_percentage"]) / 100)
         partner_distances = shipment.get("partner_distances", {})
@@ -89,6 +91,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
             "partner_id": partner_id,
             "partner_name": partner["name"],
             "destination_zone": destination_zone,
+            "state": state,
             "chargeable_weight": round(chargeable_weight, 2),
             "basic_freight": round(basic_freight, 2),
             "fuel_charge": round(fuel_charge, 2),

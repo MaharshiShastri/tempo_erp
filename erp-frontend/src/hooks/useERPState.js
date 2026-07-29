@@ -78,7 +78,7 @@ export default function useERPState() {
         items.refreshItems?.(); 
         faq.loadFaqs?.();
         production.loadPulse?.();
-        analytics.fetchAnalytics?.(analytics.fromDate, analytics.toDate);
+        analytics.fetchAnalytics?.(core.user.role, analytics.fromDate, analytics.toDate);
         core.getUsers?.(core.sessionToken);
         indiaMap.loadIndia?.();//loading map
 

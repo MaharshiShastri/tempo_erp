@@ -17,8 +17,11 @@ def classify_city_zone(city: str, zones: list):
     prompt = f"""
 You are a logistics routing classifier.
 
-Return ONLY the zone_code.
-
+Return ONLY zone_code & the Indian state in JSON format.
+Example: {{
+'zone_code': '',
+'indian_state': ''
+}}
 No explanation.
 No markdown.
 No JSON.
