@@ -35,7 +35,7 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
         }
     };
 
-    const handleDelete = async () => {
+    const handlePartnerDelete = async () => {
         if (!selectedPartnerId) return;
         
         const confirmDelete = window.confirm("⚠️ Are you sure you want to completely delete this logistics partner?\n\nThis will permanently wipe all their core parameters, zones, rates, fuel matrices, and ODA matrices. This action cannot be undone.");
@@ -44,7 +44,7 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
 
         setIsDeleting(true);
         try {
-            const response = await fetch(`/api/v1/logistics/config/partners/${selectedPartnerId}`, {
+            const response = await fetch(`/api/v1/dispatch/partners/${selectedPartnerId}`, {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${sessionToken}` }
             });
@@ -69,7 +69,7 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
         }
     };
 
-    const handleSave = async (e) => {
+    const handlePartnerSave = async (e) => {
         e.preventDefault();
         const payload = buildCurrentPayload();
         try {
@@ -79,7 +79,7 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
                 
             const actionStatus = backendResponse.status || "processed";
             const partnerName = backendResponse.partner_name || payload.name;
-            addToast("Database Synced"`🚚 Logistics Partner "${partnerName}" was successfully ${actionStatus}.`);
+            addToast("Database Synced", `🚚 Logistics Partner "${partnerName}" was successfully ${actionStatus}.`);
             setOriginalPayloadString(JSON.stringify(payload));
             loadPartnersList(); 
         } catch (err) {
@@ -164,6 +164,6 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
         };
     };
 
-    return {partner, setPartner, availablePartners, selectedPartnerId, setSelectedPartnerId, handlePartnerSelection, handleDelete, handleSave, buildCurrentPayload, populateState, isDeleting, originalPayloadString};
+    return {partner, setPartner, availablePartners, selectedPartnerId, setSelectedPartnerId, handlePartnerSelection, handlePartnerDelete, handlePartnerSave, buildCurrentPayload, populateState, isDeleting, originalPayloadString};
     
 }

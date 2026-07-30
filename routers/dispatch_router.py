@@ -176,7 +176,13 @@ async def extract_partner_from_file(file: UploadFile = File(...), user: dict = D
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Parsing Failed: {str(e)}")
+
+
+@router.delete("/partners/{partner_id}")
+def delete_partner(partner_id: int, user=Depends(verify_bearer_token)):
     
+    return EDBR.delete_partner(partner_id, user["email"])
+
 """@router.post("/calculate", dependencies=[Depends(check_department("Sales Representative"))])
 def calculate_dispatch(payload: dict, user: dict = Depends(verify_bearer_token)):
     try:

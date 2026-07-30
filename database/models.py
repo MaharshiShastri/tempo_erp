@@ -311,11 +311,11 @@ class LogisticsPartner(Base):
 
     mobile_number: Mapped[str|None] = mapped_column(String(20))
     
-    zones: Mapped[list["LogisticsZone"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
+    zones: Mapped[list["LogisticsZone"]] = relationship(back_populates="partner", cascade="all, delete-orphan",)
 
-    zone_rates: Mapped[list["LogisticsZoneRate"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
+    zone_rates: Mapped[list["LogisticsZoneRate"]] = relationship(back_populates="partner", cascade="all, delete-orphan",)
 
-    fuel_matrix: Mapped[list["LogisticsFuelMatrix"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
+    fuel_matrix: Mapped[list["LogisticsFuelMatrix"]] = relationship(back_populates="partner", cascade="all, delete-orphan",)
 
     oda_matrix: Mapped[list["LogisticsODAMatrix"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
 

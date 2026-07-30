@@ -733,10 +733,12 @@ class PostgresRepository:
                 raise e
     
     def delete_partner(self, partner_id: int, operator_email: str):
+        
         with SessionLocal() as session:
             try:
                 partner = session.scalars(select(LogisticsPartner).where(LogisticsPartner.id == partner_id)).first()
                 if not partner:
+                    print("No partners available")
                     return {"partner_id": partner_id, "status": "not_found"}
                     
                 partner_name = partner.name
