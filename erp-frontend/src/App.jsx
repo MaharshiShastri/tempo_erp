@@ -37,6 +37,7 @@ import TallyInvoiceImportWorkspaceView from "./views/TallyInvoiceImportWorkspace
 import TransportAnalyticsView from "./views/TransportAnalyticsView";
 import ProductionAnalyticsView from "./views/ProductionAnalyticsView";
 import InventoryAuditLogsView from "./views/InventoryAuditLogsView";
+import LogisticsPartnerReadOnlyView from "./views/LogisticsPartnerReadOnlyView";
 function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
@@ -306,6 +307,13 @@ function App() {
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                     </a>
                                     )}
+                                    {(isSales || isTransporter) && (
+                                        <a href="#logistics-read" className={`menu-item ${state.activeTab === 'logistics-read' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('logistics-read')}} >
+                                            <span>🚚</span> 
+                                            {!sidebarCollapsed && <span>Logistics Partner Information</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                        </a>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -445,6 +453,7 @@ function App() {
                     {isTransporter && state.activeTab === "transport-analytics" && <TransportAnalyticsView state={state}/>}
                     {isFactory && state.activeTab==='prod-stats' && <ProductionAnalyticsView state={state}/>}
                     {isFactory && state.activeTab==='audit' && <InventoryAuditLogsView state={state}/>}
+                    {(isSales || isTransporter) && state.activeTab==='logistics-read' && <LogisticsPartnerReadOnlyView state={state}/>}
                 </div>
             </div>
 

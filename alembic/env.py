@@ -5,12 +5,14 @@ from sqlalchemy import pool
 import os
 from alembic import context
 from database.models import Base
+import dotenv
+dotenv.load_dotenv()
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LOCAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 config.set_main_option("sqlalchemy.url", DB_DSN)
 # Interpret the config file for Python logging.
