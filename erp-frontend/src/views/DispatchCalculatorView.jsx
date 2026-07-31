@@ -216,17 +216,15 @@ export default function DispatchCalculatorView({state = {}, theme = "light", set
 
             {state?.resultsData?.options?.length > 0 && (
                 <div>
-                    <h4>Total Options: {state.resultsData.options.length}</h4>
-                    {" "}
-                    <button className="btn btn-primary" onClick={generatePDF}>Download Dispatch Report</button>
+                    <h4>Total Options: {state.resultsData.options.length}</h4>{" Download comparison report: "}<button className="btn btn-primary" onClick={generatePDF}>Download Dispatch Report</button>
                     <div style={{ display: "flex", gap: 15, overflowX: "auto" }}>
                         {state?.resultsData?.options.map((opt, idx) => {
                             const isBest = state.selectedTransport?.partner_name === opt.partner_name;
                             return (
                                  <div key={idx} style={{ minWidth: 280, padding: 15, border: isBest ? "2px solid var(--brand-success)" : "1px solid var(--border-subtle)", background: isBest ? "#eaffea" : "var(--bg-surface)" }}>
                                     <strong style={{ color: "var(--brand-accent)" }}>Partners Evaluation:</strong>
-                                         <h4>{opt.partner_name}{isBest && <span style={{marginLeft: 8, padding: "2px 8px", fontSize: "11px", fontWeight: 600, borderRadius: "12px", background: "var(--brand-success)", color: "#fff", display: "inline-block", verticalAlign: "middle" }}>🟢 Cheapest</span>}</h4>
-                                    <p>Cost: ₹{opt.dispatch_cost_gst}</p>
+                                    <h4 style={{color: "var(--brand-success)"}}>{opt.partner_name}{isBest && <span style={{marginLeft: 8, padding: "2px 8px", fontSize: "11px", fontWeight: 600, borderRadius: "12px", background: "var(--brand-success)", color: "#fff", display: "inline-block", verticalAlign: "middle" }}>🟢 Cheapest</span>}</h4>
+                                    <p style={{color: "var(--brand-accent"}}>Cost: ₹{opt.dispatch_cost_gst}</p>
                                     <details style={{ marginTop: 10 }}>
                                          <summary>Cost Breakdown</summary>
                                         <div style={{ marginTop: 10, fontSize: "13px", display: "grid", gridTemplateColumns: "1fr auto", gap: "6px" }}>
@@ -252,7 +250,7 @@ export default function DispatchCalculatorView({state = {}, theme = "light", set
                 </div>
             )}
 
-            {state?.selectedTransport && (
+            {state?.selectedTransport && state?.isTransportModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-box">
                           <h3>Confirmed Transport</h3>
@@ -260,7 +258,7 @@ export default function DispatchCalculatorView({state = {}, theme = "light", set
                         <p>Final Cost: ₹{state?.selectedTransport?.dispatch_cost_gst}</p>
                         <button className="btn btn-primary" onClick={() => state?.confirmTransport(state?.selectedTransport)}>Print Invoice</button>
                         {" or "}
-                        <button className="btn btn-secondary" onClick={() => state?.setSelectedTransport(null)}>Close</button>
+                        <button className="btn btn-secondary" onClick={() => state?.setIsTransportModalOpen(false)}>Close</button>
                     </div>
                 </div>
             )}

@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -676,7 +676,7 @@ class PostgresRepository:
                 subtotal=record.get("subtotal"),
                 dispatch_cost_gst=record.get("dispatch_cost_gst"),
                 operator_email=operator_email,
-                state=record.get("state")
+                indian_state=record.get("state")
             )
             session.add(dr)
             session.commit()

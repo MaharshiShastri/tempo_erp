@@ -10,6 +10,7 @@ export default function useDispatchPlanner({sessionToken, showErrorModal, addToa
 
     const [resultsData, setResultsData] = useState(null);
     const [selectedTransport, setSelectedTransport] = useState(null);
+    const [isTransportModalOpen, setIsTransportModalOpen] = useState(false);
     const [partnerDistances, setPartnerDistances] = useState({});
     const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
     
@@ -81,6 +82,8 @@ export default function useDispatchPlanner({sessionToken, showErrorModal, addToa
     const confirmTransport = async (provider) => {
         try {
             const response = await API.saveDispatchRecord(provider, sessionToken);
+            setSelectedTransport(provider);
+            setIsTransportModalOpen(true);
             setModalAlert({ isOpen: true, title: "Success", message: response.message || "Dispatch option saved successfully.", isError: false });
             setSelectedTransport(provider);
             setTimeout(() => window.print(), 800); 
@@ -93,7 +96,7 @@ export default function useDispatchPlanner({sessionToken, showErrorModal, addToa
         products, unit, dim, resultsData, selectedTransport, partnerDistances, modalAlert, 
         setUnit, setDim, setSelectedTransport, setPartnerDistances, setModalAlert,
         updateProduct, addProduct, removeProduct, 
-        handleEvaluate, confirmTransport 
+        handleEvaluate, confirmTransport, isTransportModalOpen, setIsTransportModalOpen,
     };
 
 }
