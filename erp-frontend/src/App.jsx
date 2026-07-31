@@ -442,7 +442,7 @@ function App() {
                     {isSales && state.activeTab === 'bills-list' && <BillsListView state={state} />}
                     {isSales && state.activeTab === 'bill-new' && <BillEntryFormView state={state} />}
                     {isSuperUser && state.activeTab === 'admin-users' && <AdminUserRegistryView state={state} />}
-                    {(isSales || isTransporter) && state.activeTab === 'dispatch-calculator' && <DispatchCalculatorView state={state}/>}
+                    {(isSales || isTransporter) && state.activeTab === 'dispatch-calculator' && <DispatchCalculatorView state={state} theme={theme} setTheme={setTheme}/>}
                     {state.activeTab === 'items-master' && <ItemMasterView state={state} />}
                     {isFactory && state.activeTab === "item-detail" && <ItemMasterDetailView state={state}/>}
                     {isFactory && state.activeTab === "item-create" && <ItemMasterCreateView state={state}/>}
