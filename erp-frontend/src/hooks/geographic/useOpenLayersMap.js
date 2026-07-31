@@ -17,7 +17,7 @@ import Fill from "ol/style/Fill";
 import formatIndianCurrency from "../../utils/formatIndianCurrency";
 import Overlay from "ol/Overlay";
 
-export default function useOpenLayersMap(mapRef, toolTipRef, indiaMap){
+export default function useOpenLayersMap(mapRef, toolTipRef, indiaMap, isDispatcher){
 
     useEffect(()=> {
         if(!indiaMap || !mapRef.current) return;
@@ -105,7 +105,7 @@ export default function useOpenLayersMap(mapRef, toolTipRef, indiaMap){
             shipments.textContent = `Shipments: ${feature.get("shipments")}`;
 
             const quantity = document.createElement("div");
-            quantity.textContent = `Quantity: ${feature.get("quantity")}`;
+            quantity.textContent = `Quantity: ${feature.get("quantity")} ${isDispatcher ? "Chargable Weight" : "products"}`;
 
             const revenue = document.createElement("div");
             revenue.textContent = `Revenue: ${formatIndianCurrency(feature.get("revenue"))}`;

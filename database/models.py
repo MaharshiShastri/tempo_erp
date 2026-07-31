@@ -412,7 +412,7 @@ class DispatchRecord(Base):
 
     hamali_cost: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
 
-    state: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    indian_state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     
     subtotal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
 

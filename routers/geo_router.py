@@ -27,4 +27,4 @@ def get_admin2():
 
 @router.get("/state-summary")
 def get_state_summary(from_date: date = Query(...), to_date: date = Query(...), items: List[str] = Query(default=[]), user: dict = Depends(verify_bearer_token)):
-    return EDBR.get_state_summary(from_date, to_date, items)
+    return EDBR.get_state_summary(from_date, to_date, items, user["role"])

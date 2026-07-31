@@ -5,11 +5,11 @@ import GeoMapLegend from "./GeoMapLegend";
 
 import { fromLonLat } from "ol/proj";
 
-export default function GeoMapCanvas({visibleMap}){
+export default function GeoMapCanvas({visibleMap, isDispatcher}){
     const mapRef = useRef(null);
     const toolTipRef = useRef(null);
 
-    useOpenLayersMap(mapRef, toolTipRef,  visibleMap);
+    useOpenLayersMap(mapRef, toolTipRef,  visibleMap, isDispatcher);
     return(
         <div style={{position:"relative"}}>
             <div ref={mapRef} style={{width: "100%", height:"700px", borderRadius: "8px", background: "#fff"}} />

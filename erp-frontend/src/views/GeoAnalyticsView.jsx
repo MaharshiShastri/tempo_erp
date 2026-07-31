@@ -1,17 +1,17 @@
-import { useEffect } from "react";
 import GeoMapCanvas from "../components/geo/GeoMapCanvas";
 import SearchableMultiSelect from "../components/shared/SearchableMultiselect";
 export default function GeoAnalyticsView({ state }) {
         
-    const stateList = state.indiaMap ? state.indiaMap.features.map(f=>f.properties.ST_NM).sort() : [];
+    const stateList = Array.isArray(state?.indiaMap?.features) ? state.indiaMap.features.map(f=>f.properties.ST_NM).sort() : [];
     
     const itemGroups = [...new Set((state.itemsMaster ?? []).map(item => item.item_group).filter(Boolean))].sort();
-    
+    const isDispatchAnalytics = state?.user?.role === "Dispatch Engineer";
     if (state.isLoading)
         return <p>Loading map...</p>;
 
     return (
         <div className="frappe-card">
+            <h3>Geographic Analytics {isDispatchAnalytics ? "- Dispatch Data" : "- Sales/Billing Data"}</h3>
             <div style={{display: "flex", flexDirection: "column", gap: 18, marginBottom: 20}}>
                 <div>
                     <label className="form-label">From Date</label>
@@ -39,7 +39,7 @@ export default function GeoAnalyticsView({ state }) {
                 <span><b>Selected {state.selectedItems.length}</b> Items</span>
                 <span><b>Selected {state.selectedStates.length}</b> states</span>
             </div>
-            <GeoMapCanvas visibleMap={state.visibleMap}/>
+            <GeoMapCanvas visibleMap={state.visibleMap} isDispatcher={isDispatchAnalytics}/>
         </div>
     );
 }

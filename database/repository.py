@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
+DB_DSN = os.getenv("DATABAaSE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1795,26 +1795,62 @@ class PostgresRepository:
             ]
     # --- SALES ANALYTICS & KPIs end ---
     # --- Geo repository start --- 
-    def get_state_summary(self, from_date, to_date, items=None):
+    def get_state_summary(self, from_date, to_date, items=None, role=None):
+        print("The current role is: ", role)
         with SessionLocal() as session:
+            if role in ["Admin", "Sales Representative", "Chief Full Stack Developer"]:
+                stmt = (select(
+                    BillHeader.indian_state.label("state"),
+                    func.count(func.distinct(BillHeader.bill_num)).label("shipments"),
+                    func.sum(BillItem.amount).label("revenue"),
+                    func.sum(BillItem.quantity_shipped).label("quantity"),
 
-            stmt = (select(
-                BillHeader.indian_state.label("state"),
-                func.count(func.distinct(BillHeader.bill_num)).label("shipments"),
-                func.sum(BillItem.amount).label("revenue"),
-                func.sum(BillItem.quantity_shipped).label("quantity"),
+                ).join(BillItem)
+                .where(BillHeader.bill_date.between(from_date, to_date)))
 
-            ).join(BillItem)
-            .where(BillHeader.bill_date.between(from_date, to_date)))
+                if items:
+                    stmt = stmt.where(BillItem.item_code.in_(items))
 
-            if items:
-                stmt = stmt.where(BillItem.item_code.in_(items))
+                stmt = stmt.group_by(BillHeader.indian_state)
 
-            stmt = stmt.group_by(BillHeader.indian_state)
+                rows = session.execute(stmt).mappings().all()
 
-            rows = session.execute(stmt).mappings().all()
+                return [{
+                    "state": row["state"],
+                    "shipments": int(row["shipments"] or 0),
+                    "revenue": float(row["revenue"] or 0),
+                    "quantity": float(row["quantity"] or 0),
+                    "source": "bill_headers",
+                    }
+                    for row in rows
+                ]
 
-            return rows
+            if role=="Dispatch Engineer":
+                stmt = (
+                   select(DispatchRecord.indian_state.label("state"),
+                        func.count(DispatchRecord.id).label("shipments"),
+
+                        func.coalesce(func.sum(DispatchRecord.dispatch_cost_gst),0).label("revenue"),
+
+                        func.coalesce(func.sum(DispatchRecord.chargeable_weight),0).label("quantity"),
+                    )
+                    .where(func.date(DispatchRecord.created_at).between(from_date,to_date,))
+                )
+
+                stmt = stmt.group_by(DispatchRecord.indian_state)
+
+                rows = session.execute(stmt).mappings().all()
+                
+                return [{
+                    "state": row["state"],
+                    "shipments": int(row["shipments"] or 0),
+                    "revenue": float(row["revenue"] or 0),
+                    "quantity": float(row["quantity"] or 0),
+                    "source": "dispatch_records",
+                    }
+                    for row in rows
+                ]
+            raise PermissionError(f"Role'{role}' is not permitted to access")
     # --- Geo repository end ---
 # Declare the class instance exactly as requested
 EDBR = PostgresRepository()

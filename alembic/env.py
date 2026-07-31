@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 config = context.config
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LOCAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABaASE_URL_LOCAL", f"postgresql://{USER}:{PASSWORD}@192.168.0.148:5432/tempo_erp")
 
 config.set_main_option("sqlalchemy.url", DB_DSN)
 # Interpret the config file for Python logging.
