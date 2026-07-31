@@ -6,7 +6,7 @@ export default function useDispatchPlanner({sessionToken, showErrorModal, addToa
     const [products, setProducts] = useState([{ width: "", height: "", depth: ""}]);
     const [unit, setUnit] = useState("cm"); // Default unit as requested
 
-    const [dim, setDim] = useState({invoice_value: 0, destination_city: "", diesel_price: 98, loading_type: "local", hub_loading_input: 0, delivery_type: "door", hamali_detail: "", hamali_cost: 0});
+    const [dim, setDim] = useState({weight: 0, invoice_value: 0, destination_city: "", diesel_price: 100, loading_type: "local", hub_loading_input: 0, delivery_type: "door", hamali_detail: "", hamali_cost: 0});
 
     const [resultsData, setResultsData] = useState(null);
     const [selectedTransport, setSelectedTransport] = useState(null);

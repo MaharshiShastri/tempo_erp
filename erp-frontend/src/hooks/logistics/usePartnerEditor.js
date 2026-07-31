@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import API from "../../api/api";
 
 export default function usePartnerEditor({sessionToken, showErrorModal, addToast, zones, setZones, fuelMatrix, setFuelMatrix, odaDistances, setOdaDistances, odaWeights, setOdaWeights, odaCharges, setOdaCharges}){
-    const defaultPartner = {name: "", partner_link: "", cft_factor: 10, minimum_weight: 0, minimum_freight_value: 0, documentation_charge: 0,
+    const defaultPartner = {name: "", partner_link: "", cft_factor: 10, mobile_number: "", minimum_weight: 0, minimum_freight_value: 0, documentation_charge: 0,
     fov_percentage: 0, gst_percentage: 18, local_loading_cost: 0, hub_loading_max_cost: 0};
 
     const [availablePartners, setAvailablePartners] = useState([]);
@@ -90,7 +90,7 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
 
     const populateState = (profile) => {
         setPartner({
-            name: profile.name || "", partner_link: profile.partner_link || "", cft_factor: profile.cft_factor ?? 10,
+            name: profile.name || "", mobile_number: profile.mobile_number || "cant render number", partner_link: profile.partner_link || "", cft_factor: profile.cft_factor ?? 10,
             minimum_weight: profile.minimum_weight ?? 0, minimum_freight_value: profile.minimum_freight_value ?? 0,
             documentation_charge: profile.documentation_charge ?? 0, fov_percentage: profile.fov_percentage ?? 0,
             gst_percentage: profile.gst_percentage ?? 18, local_loading_cost: profile.local_loading_cost ?? 0, hub_loading_max_cost: profile.hub_loading_max_cost ?? 0
@@ -140,7 +140,7 @@ export default function usePartnerEditor({sessionToken, showErrorModal, addToast
         });
 
         return {
-            name: partner.name || "", partner_link: partner.partner_link || "", cft_factor: parseFloat(partner.cft_factor) || 0,
+            name: partner.name || "", mobile_number: partner.mobile_number, partner_link: partner.partner_link || "", cft_factor: parseFloat(partner.cft_factor) || 0,
             minimum_weight: parseFloat(partner.minimum_weight) || 0, minimum_freight_value: parseFloat(partner.minimum_freight_value) || 0,
             documentation_charge: parseFloat(partner.documentation_charge) || 0, fov_percentage: parseFloat(partner.fov_percentage) || 0,
             gst_percentage: parseFloat(partner.gst_percentage) || 0, local_loading_cost: parseFloat(partner.local_loading_cost) || 0, 

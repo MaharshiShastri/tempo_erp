@@ -11,7 +11,7 @@ import CompaniesListView from "./views/CompaniesListView";
 import CompanyEntryFormView from "./views/CompanyEntryFormView";
 import TasksWorkspaceView from "./views/TasksWorkspaceView";
 import AdminUserRegistryView from "./views/AdminUserRegistryView";
-import DispatchPlannerView  from "./views/DispatchPlannerView";
+import DispatchCalculatorView  from "./views/DispatchCalculatorView";
 import SharedAlertModal from "./components/shared/SharedAlertModal";
 import {ToastContainer} from "./components/Shared";
 import CRM_WorkspaceView from "./views/CRM_WorkspaceView";
@@ -38,6 +38,8 @@ import TransportAnalyticsView from "./views/TransportAnalyticsView";
 import ProductionAnalyticsView from "./views/ProductionAnalyticsView";
 import InventoryAuditLogsView from "./views/InventoryAuditLogsView";
 import LogisticsPartnerReadOnlyView from "./views/LogisticsPartnerReadOnlyView";
+import DispatchPlannerView from "./views/DispatchPlannerView";
+
 function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
@@ -287,9 +289,9 @@ function App() {
                             {openModules.transport && (
                                 <>
                                     {(isSales || isTransporter) && (
-                                        <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
-                                            <span>🚚</span> 
-                                            {!sidebarCollapsed && <span>Dispatch Planner</span>}
+                                        <a href="#dispatch" className={`menu-item ${state.activeTab === 'dispatch-calculator' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-calculator')}} >
+                                            <span>🧮</span> 
+                                            {!sidebarCollapsed && <span>Dispatch Calculator</span>}
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+D</span>
                                         </a>
                                     )}
@@ -311,6 +313,13 @@ function App() {
                                         <a href="#logistics-read" className={`menu-item ${state.activeTab === 'logistics-read' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('logistics-read')}} >
                                             <span>🚚</span> 
                                             {!sidebarCollapsed && <span>Logistics Partner Information</span>}
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                        </a>
+                                    )}
+                                    {isTransporter && (
+                                        <a href="#logistics-plan" className={`menu-item ${state.activeTab === 'dispatch-planner' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('dispatch-planner')}} >
+                                            <span>🚚</span> 
+                                            {!sidebarCollapsed && <span>Dispatch Planner</span>}
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                         </a>
                                     )}
@@ -433,7 +442,7 @@ function App() {
                     {isSales && state.activeTab === 'bills-list' && <BillsListView state={state} />}
                     {isSales && state.activeTab === 'bill-new' && <BillEntryFormView state={state} />}
                     {isSuperUser && state.activeTab === 'admin-users' && <AdminUserRegistryView state={state} />}
-                    {(isSales || isTransporter) && state.activeTab === 'dispatch-planner' && <DispatchPlannerView state={state}/>}
+                    {(isSales || isTransporter) && state.activeTab === 'dispatch-calculator' && <DispatchCalculatorView state={state}/>}
                     {state.activeTab === 'items-master' && <ItemMasterView state={state} />}
                     {isFactory && state.activeTab === "item-detail" && <ItemMasterDetailView state={state}/>}
                     {isFactory && state.activeTab === "item-create" && <ItemMasterCreateView state={state}/>}
@@ -454,6 +463,7 @@ function App() {
                     {isFactory && state.activeTab==='prod-stats' && <ProductionAnalyticsView state={state}/>}
                     {isFactory && state.activeTab==='audit' && <InventoryAuditLogsView state={state}/>}
                     {(isSales || isTransporter) && state.activeTab==='logistics-read' && <LogisticsPartnerReadOnlyView state={state}/>}
+                    {isTransporter && state.activeTab==='dispatch-planner' && <DispatchPlannerView state={state}/>}
                 </div>
             </div>
 

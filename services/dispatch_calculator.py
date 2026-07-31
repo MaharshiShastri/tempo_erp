@@ -12,6 +12,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
 
     try:
         partner_id = partner["id"]
+        partner_name = partner["name"]
 
         # Step 1: Zone Identification
         destination_city = shipment["destination_city"]
@@ -47,7 +48,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         basic_freight = max(basic_freight, float(partner["minimum_freight_value"]))
 
         # Step 5: Surcharges and ODA
-        fuel_percentage = float(EDBR.get_fuel_surcharge(partner_id, shipment.get("diesel_price", 90.0)) or 0)
+        fuel_percentage = float(EDBR.get_fuel_surcharge(partner_id, float(shipment["diesel_price"])) or 0)
         fuel_charge = (basic_freight * fuel_percentage / 100)
         
 
@@ -60,9 +61,22 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         if delivery_type == "door":
             partner_distances = shipment.get("partner_distances", {})
             distance = float(partner_distances.get(str(partner["id"]), partner_distances.get(partner["id"], 0)))
-        
-        oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
-        
+
+        #SSP UNIQUE LOGIC CALCULATION
+        if partner_name == "SSP EXPRESS":
+            if chargeable_weight > 191:
+                oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0) * chargeable_weight
+            else:
+                oda_charge = oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
+
+            hamali_cost =  float(shipment["weight"]) * 3 if float(shipment["weight"]) > 60 else 0
+            hamali_detail = "SSP(> 60KG) chrgs" if hamali_cost > 0 else ''
+
+        else:
+            oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
+            hamali_cost = float(shipment.get("hamali_cost", 0))
+            hamali_detail = shipment.get("hamali_detail", "")        
+
         loading_type = shipment.get("loading_type", "local")
         loading_charge = 0.0
         
@@ -77,10 +91,6 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
                 loading_charge = min(user_hub_input, max_hub_cost)
             else:
                 loading_charge = user_hub_input
-
-
-        hamali_cost = float(shipment.get("hamali_cost", 0))
-        hamali_detail = shipment.get("hamali_detail", "")
 
         subtotal = (basic_freight + fuel_charge + fov_charge + oda_charge + loading_charge + float(partner["documentation_charge"]) + hamali_cost)
 

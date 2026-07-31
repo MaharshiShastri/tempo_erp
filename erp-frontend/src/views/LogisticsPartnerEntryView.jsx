@@ -11,7 +11,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 
                 <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
                     <div>
-                        <input type="file" accept=".pdf" ref={state.fileInputRef} style={{ display: 'none' }} onChange={state.handleFileUpload} />
+                        <input type="file" accept=".pdf" ref={state.fileInputRef} style={{ display: 'none' }} onChange={state.handleLogisticsFileUpload} />
                         <button type="button" className="btn btn-secondary" style={{ background: "var(--brand-accent)", color: "#fff", border: "none" }} onClick={() => state.fileInputRef.current.click()} disabled={state.isExtracting}>
                             {state.isExtracting ? "⏳ Extracting..." : "🤖 Auto-Fill via Contract PDF"}
                         </button>

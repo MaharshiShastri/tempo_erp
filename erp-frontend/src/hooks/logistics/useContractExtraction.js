@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
-export default function useContractExtraction({state, setModalAlert, populateState, setSelectedPartnerId}){
+export default function useContractExtraction({sessionToken, setModalAlert, showErrorModal, addToast, populateState, setSelectedPartnerId}){
     const [isExtracting, setIsExtracting] = useState(false);
     const fileInputRef = useRef(null);
 
-    const handleFileUpload = async (e) => {
+    const handleLogisticsFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -16,7 +16,7 @@ export default function useContractExtraction({state, setModalAlert, populateSta
         try {
             const response = await fetch("/api/v1/dispatch/partners/extract-from-file", {
                 method: "POST",
-                headers: { "Authorization": `Bearer ${state.user.access_token}` },
+                headers: { "Authorization": `Bearer ${sessionToken}` },
                 body: formData
             });
 
@@ -38,5 +38,5 @@ export default function useContractExtraction({state, setModalAlert, populateSta
             if(fileInputRef.current) fileInputRef.current.value = ""; 
         }
     };
-    return {isExtracting, fileInputRef, handleFileUpload};
+    return {isExtracting, fileInputRef, handleLogisticsFileUpload};
 }

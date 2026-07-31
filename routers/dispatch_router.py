@@ -106,7 +106,7 @@ def patch_partner(partner_id: int, payload: FullPartnerProfile, user: dict = Dep
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=f"Failed to patch partner: {str(e)}")
 
-@router.get("/partners/{partner_id}/profile", dependencies=[Depends(check_department("Dispatch Engineer"))])
+@router.get("/partners/{partner_id}/profile")
 def get_partner_profile(partner_id: int, user: dict = Depends(verify_bearer_token)):
     try:
         profile = EDBR.get_full_partner_profile(partner_id)

@@ -15,13 +15,13 @@ def extract_logistics_profile_from_text(contract_text: str) -> dict:
     {
         "name": "Transporter Name",
         "cft_factor": 10.0,
+        "mobile_number": "mobileNumber",
         "minimum_weight": 0.0,
         "minimum_freight_value": 0.0,
         "documentation_charge": 0.0,
         "fov_percentage": 0.0,
         "gst_percentage": 18.0,
-        "zones": [{"zone_code": "Z1", "zone_name": "Zone Name", "states_raw": "State1, State2"}],
-        "rates": [{"destination_zone": "Z1", "rate_per_kg": 15.5}],
+        "zones": [{"zone_code": "Z1", "zone_name": "Zone Name", "states_raw": "State1, State2", "rate_per_kg": 15.5}],
         "fuel_matrix": [{"fuel_price_from": 90.0, "fuel_price_to": 100.0, "surcharge_percentage": 5.0}],
         "oda_matrix": [{"km_from": 0.0, "km_to": 50.0, "weight_from": 0.0, "weight_to": 100.0, "oda_charge": 500.0}]
     }

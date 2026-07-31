@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASaE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -691,6 +691,7 @@ class PostgresRepository:
             return [to_dict(p) for p in partners]
                 
     def update_full_partner_profile(self, partner_id: int, p: FullPartnerProfile):
+        
         with SessionLocal() as session:
             try:
                 partner = session.scalars(select(LogisticsPartner).where(LogisticsPartner.id == partner_id)).first()
@@ -738,7 +739,7 @@ class PostgresRepository:
             try:
                 partner = session.scalars(select(LogisticsPartner).where(LogisticsPartner.id == partner_id)).first()
                 if not partner:
-                    print("No partners available")
+                    
                     return {"partner_id": partner_id, "status": "not_found"}
                     
                 partner_name = partner.name
@@ -1450,7 +1451,7 @@ class PostgresRepository:
     def get_global_production_pulse(self, user):
         with SessionLocal() as session:
             stmt = (select(OrderHeader).options(selectinload(OrderHeader.items)).order_by(OrderHeader.due_date.asc()))
-            print(user["role"])
+            
             if user["role"] not in ["Admin", "Chief Full Stack Developer", "Shop Floor Administrator", "Dispatch Engineer"]:
                 stmt = stmt.where(OrderHeader.ordered_by == user["email"])
             

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, act } from "react";
 import API from "../api/api";
 import useTasks from "./tasks/useTasks";
-import useDispatchHub from "./dispatch/useDispatchHub";
+import useDispatchCalculator from "./dispatch/useDispatchCalculatorHub";
 import useLogisticsHub from "./logistics/useLogisticsHub";
 import useCompanyMaster from "./company/useCompanyMaster";
 import useItemMaster from "./items/useItemMaster";
@@ -18,6 +18,7 @@ import useLeadGenerator from "./leads/useLeadGenerator";
 import useLogin from "./useLogin";
 import useAnalytics from "./analytics/useAnalytics";
 import useGeo from "./geographic/useGeo";
+import useDispatchPlannerHub from "./dispatch/useDispatchPlannerHub";
 
 const API_HOST = window.location.hostname;
 
@@ -58,13 +59,16 @@ export default function useERPState() {
     const grn = useGRN({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, itemsMaster: items.itemsMaster});
 
     //all the sales business state
-    const dispatch = useDispatchHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
-    const logistics = useLogisticsHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
     const orders = useOrders({sessionToken: core.sessionToken, user: core.user, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, showErrorModal: core.showErrorModal, setCompanyForm: companies.setCompanyForm, setIsEditingCompany: companies.setIsEditingCompany});
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, setIsBillingSameAsCustomer: orders.setIsBillingSameAsCustomer});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
     const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
+
+    //all the logistcsi business state
+    const dispatch = useDispatchCalculator({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
+    const logistics = useLogisticsHub({sessionToken: core.sessionToken, setModalAlert: login.setModalAlert, showErrorModal: core.showErrorModal, addToast: core.addToast});
+    const truckPlanner = useDispatchPlannerHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
 
     //Global business state dependent
     const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -162,10 +166,11 @@ export default function useERPState() {
     };
 
     return {
-        ...core, ...dispatch, ...logistics, ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
+        ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
+        ...truckPlanner,  ...logistics, ...dispatch, //Logistics business states
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, ...indiaMap,//Admin business states
-        ...faq, ...items, ...production, ...login, ...analytics, //Global business states
+        ...faq, ...items, ...production, ...login, ...analytics, ...core, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }
