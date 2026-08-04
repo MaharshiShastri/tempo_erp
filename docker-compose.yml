@@ -49,7 +49,7 @@ services:
       - redis
     environment:
       RUN_MIGRATIONS: "false"
-
+  
   redis:
     image: redis:7
     ports:

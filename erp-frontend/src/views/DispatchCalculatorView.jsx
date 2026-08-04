@@ -1,4 +1,4 @@
-import { FiExternalLink, FiTruck } from "react-icons/fi";
+import { FiExternalLink, FiTruck, FiPrinter } from "react-icons/fi";
 import IndianCurrencyInput from "../components/shared/IndianCurrencyInput";
 import DispatchReport from "../components/DispatchReport";
 import html2canvas from "html2canvas";
@@ -216,7 +216,7 @@ export default function DispatchCalculatorView({state = {}, theme = "light", set
 
             {state?.resultsData?.options?.length > 0 && (
                 <div>
-                    <h4>Total Options: {state.resultsData.options.length}</h4>{" Download comparison report: "}<button className="btn btn-primary" onClick={generatePDF}>Download Dispatch Report</button>
+                    <h4>Total Options: {state.resultsData.options.length}</h4>{" Download comparison report: "}<button className="btn btn-primary" onClick={generatePDF}><FiPrinter />Download Dispatch Report</button>
                     <div style={{ display: "flex", gap: 15, overflowX: "auto" }}>
                         {state?.resultsData?.options.map((opt, idx) => {
                             const isBest = state.selectedTransport?.partner_name === opt.partner_name;

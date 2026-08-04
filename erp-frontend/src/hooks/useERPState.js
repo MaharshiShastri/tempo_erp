@@ -19,6 +19,7 @@ import useLogin from "./useLogin";
 import useAnalytics from "./analytics/useAnalytics";
 import useGeo from "./geographic/useGeo";
 import useDispatchPlannerHub from "./dispatch/useDispatchPlannerHub";
+import useQuotation from "./useQuotation";
 
 const API_HOST = window.location.hostname;
 
@@ -64,6 +65,7 @@ export default function useERPState() {
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, setIsBillingSameAsCustomer: orders.setIsBillingSameAsCustomer});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
     const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
+    const qoutation = useQuotation({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal});
 
     //all the logistcsi business state
     const dispatch = useDispatchCalculator({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
@@ -166,7 +168,7 @@ export default function useERPState() {
     };
 
     return {
-        ...companies, ...orders, ...billing, ...crm, ...leadTargets, //Sales Business states unwinding
+        ...companies, ...orders, ...billing, ...crm, ...leadTargets, ...qoutation, //Sales Business states unwinding
         ...truckPlanner,  ...logistics, ...dispatch, //Logistics business states
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, ...indiaMap,//Admin business states

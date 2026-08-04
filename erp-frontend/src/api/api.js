@@ -955,6 +955,26 @@ const API = {
 
     return await r.json();
   },
+
+  async generateQuote(sessionToken, payload){
+    const response = await fetch("/api/v1/companies/quotation",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sessionToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if(!response.ok){
+      const error = await response.json();
+      throw new Error(error.detail);
+    }
+
+    return await response.blob();
+  }
 };
 
 export default API;

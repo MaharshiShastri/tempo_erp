@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import re
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from decimal import Decimal
 
 from sqlalchemy import create_engine, select, update, delete, or_, and_, func, any_, case, desc, text
@@ -16,7 +16,7 @@ from database.models import (
     LogisticsZone, LogisticsZoneRate, LogisticsFuelMatrix, LogisticsODAMatrix, 
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
-    SystemNotification, TestItemMaster, StockLedger
+    SystemNotification, TestItemMaster, StockLedger, Quotation
 )
 from schemas.logistics_schema import FullPartnerProfile
 from services.item_matcher import resolve_item_code
@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -137,6 +137,26 @@ class PostgresRepository:
                 session.commit()
                 return {"email": email}
             return None
+
+    def get_user_business_contact(self, email: str, role: str | None = None):
+        with SessionLocal() as session:
+            stmt = (select(User.name, User.email, User.role, User.phone_business).where(User.email == email))
+            row = session.execute(stmt).mappings().first()
+
+            if not row:
+                print("User not found")
+                raise ValueError("User not found")
+
+            if role and row["role"] != role:
+                print("Incorrect role here")
+                raise PermissionError(f"User role '{row['role']} is not permitted")
+            
+            return {
+                "name": row["name"],
+                "email": row["email"],
+                "role": row["role"],
+                "business_phone": row["phone_business"],
+            }
     # --- AUTH & RBAC end---
 
     # --- GLOBAL ORDERS ENGINE start---
@@ -873,6 +893,16 @@ class PostgresRepository:
     # --- LOGISTICS PARTNER end---
 
     # --- ITEM MASTERY start---
+    def get_item_names(self):
+        with SessionLocal() as session:
+            stmt = (
+                select(ItemMaster.item_name).where(ItemMaster.item_name.is_not(None), ItemMaster.item_name != "")
+                .distinct()
+                .order_by(ItemMaster.item_name)
+            )   
+
+            return list(session.execute(stmt).scalars().all())
+        
     def get_item(self, item_code):
         with SessionLocal() as session:
             item = session.scalars(select(ItemMaster).where(ItemMaster.is_active == True, ItemMaster.item_code == item_code)).first()
@@ -1569,7 +1599,8 @@ class PostgresRepository:
 
                 actions = session.scalar(select(func.count()).select_from(SystemAuditLog).where(SystemAuditLog.user_email == user.email, SystemAuditLog.created_at.between(from_date, to_date)))
 
-
+                quotations = session.scalar(select(func.count()).select_from(Quotation).where(Quotation.sales_user_email == user.email, Quotation.generated_at.between(from_date, to_date)))
+                
                 performance_score = (float(order_value or 0) / 1000 + (crm_leads * 10) + (dispatches * 8) + (faqs * 3) + actions)
 
 
@@ -1595,6 +1626,8 @@ class PostgresRepository:
                     "dispatches_logged": dispatches,
 
                     "actions_logged": actions,
+
+                    "quotations": quotations,
 
                     "performance_score": performance_score
                 })
@@ -1793,6 +1826,70 @@ class PostgresRepository:
                 }
                 for row in rows
             ]
+
+    def get_today_quotation_analytics(self):
+        today = date.today()
+
+        start_of_day = datetime.combine(today, time.min)
+        end_of_day = datetime.combine(today, time.max)
+
+        stmt = (
+            select(Quotation)
+            .where(
+                Quotation.generated_at >= start_of_day,
+                Quotation.generated_at <= end_of_day,
+                Quotation.is_active.is_(True),
+            )
+            .order_by(Quotation.generated_at.asc())
+        )
+
+        with SessionLocal() as session:
+            quotations = session.execute(stmt).scalars().all()
+
+        return quotations
+    
+
+    def get_today_quotation_summary(self):
+        quotations = self.get_today_quotation_analytics()
+
+        summary = {
+            "total": len(quotations),
+            "dealer_quotes": sum(
+                1 for q in quotations if q.is_dealer
+            ),
+            "special_model_quotes": sum(
+                1 for q in quotations if q.is_special_model
+            ),
+            "standard_model_quotes": sum(
+                1 for q in quotations if not q.is_special_model
+            ),
+            "by_sales_user": {},
+            "by_product": {},
+        }
+
+        for quotation in quotations:
+
+            sales_user = quotation.sales_user_name or "Unknown"
+
+            summary["by_sales_user"].setdefault(sales_user, {
+                "email": quotation.sales_user_email,
+                "count": 0,
+            })
+
+            summary["by_sales_user"][sales_user]["count"] += 1
+
+            product = quotation.product_name or "Unknown"
+
+            summary["by_product"][product] = (
+                summary["by_product"].get(product, 0) + 1
+            )
+
+        return {
+            "date": date.today(),
+            "quotations": quotations,
+            "summary": summary,
+        }
+    
     # --- SALES ANALYTICS & KPIs end ---
     # --- Geo repository start --- 
     def get_state_summary(self, from_date, to_date, items=None, role=None):
@@ -1852,5 +1949,160 @@ class PostgresRepository:
                 ]
             raise PermissionError(f"Role'{role}' is not permitted to access")
     # --- Geo repository end ---
-# Declare the class instance exactly as requested
+    # --- Quotations start ---
+    def create_quotation(self, request, sales_user, document_path=None):
+        quotation = Quotation(quote_number=request.qoute_number,
+        product_name=request.product_name,
+
+        client_company=request.client_company,
+        client_address_line1=request.client_address_line1,
+        client_city=request.client_city,
+        client_postal_code=request.client_postal_code,
+
+        client_email=request.client_email,
+        buyer_name=request.buyer_name,
+        buyer_phone_number=request.buyer_phone_number,
+
+        enquiry_date=request.date_input,
+
+        supply=request.supply,
+        installation=request.installation,
+        freight=request.freight,
+
+        is_dealer=request.dealer,
+        is_special_model=request.special_model,
+        special_itinerary=request.special_itinerary,
+
+        sales_user_name=sales_user["name"],
+        sales_user_email=sales_user["email"],
+
+        document_path=str(document_path) if document_path else None,
+        )
+
+        self.db.add(quotation)
+        self.db.commit()
+        self.db.refresh(quotation)
+
+        return quotation
+
+    def get_quotation(self, quotation_id: int):
+        return(self.db.query(Quotation).filter(Quotation.id == quotation_id, Quotation.is_active.is_(True), ).first())
+
+    def get_quotation_number(self, quotation_num: str):
+        return(self.db.query(Quotation).filter(Quotation.quote_number == quotation_num, Quotation.is_active.is_(True),).first())
+
+    def get_quotations(self, skip: int=0, limit: int=100):
+        return(self.db.query(Quotation)
+               .filter(Quotation.is_active.is_(True))
+               .order_by(Quotation.generated_at.desc())
+               .offset(skip)
+               .limit(limit)
+               .all()
+               )
+
+    def update_quotation(self, quotation_id: int, updates: dict):
+        quotation = self.get_quotation(quotation_id)
+
+        if not quotation:
+            return None
+
+        allowed_fields = {
+            "product_name",
+            "client_company",
+            "client_address_line1",
+            "client_city",
+            "client_postal_code",
+            "client_email",
+            "buyer_name",
+            "buyer_phone_number",
+            "enquiry_date",
+            "supply",
+            "installation",
+            "freight",
+            "is_dealer",
+            "is_special_model",
+            "special_itinerary",
+            "document_path",
+        }
+
+        for field, value in updates.items():
+            if field in allowed_fields:
+                setattr(quotation, field, value)
+
+        self.db.commit()
+        self.db.refresh(quotation)
+
+        return quotation
+
+    def deactivate_quotation(self, quotation_id: int):
+        quotation = self.get_quotation(quotation_id)
+
+        if not quotation:
+            return None
+
+        quotation.is_active = False
+
+        self.db.commit()
+        self.db.refresh(quotation)
+
+        return quotation
+
+    def get_quotation_count_by_product(self):
+        results = (
+            self.db.query(Quotation.product_name,
+                          func.count(Quotation.id).label("quotation_count"),
+                          )
+                          .filter(Quotation.is_active.is_(True))
+                          .group_by(Quotation.product_name)
+                          .order_by(func.count(Quotation.id).desc())
+                          .all()
+        )
+
+        return [{
+            "product_name": row.product_name,
+            "quotation_count": row.quotation_count,
+        } for row in results
+        ]
+
+    def get_special_model_analytics(self):
+        standard = (
+            self.db.query(func.count(Quotation.id))
+            .filter(Quotation.is_active.is_(True), Quotation.is_special_model.is_(False),)
+            .scalar()
+            or 0
+        )
+
+        special = (
+            self.db.query(func.count(Quotation.id))
+            .filter(Quotation.is_active.is_(True), Quotation.is_special_model.is_(True),)
+            .scalar()
+            or 0
+        )
+
+        return {
+            "standard_models": standard,
+            "special_models": special,
+        }
+
+    def get_dealer_analytics(self):
+        dealer = (
+            self.db.query(func.count(Quotation.id))
+            .filter(Quotation.is_active.is_(True), Quotation.is_dealer.is_(True))
+            .scalar()
+            or 0
+        )
+
+        non_dealer = (
+            self.db.query(func.count(Quotation.id))
+            .filter(Quotation.is_active.is_(True), Quotation.is_dealer.is_(False))
+            .scalar()
+            or 0
+        )
+
+        return {
+            "dealer": dealer,
+            "non_dealer": non_dealer,
+        }
+
+    # --- Quotations end ---
 EDBR = PostgresRepository()

@@ -15,7 +15,7 @@ export default function SearchableMultiSelect({label, options = [], value=[], on
 
         <div style={{width:320}}>
 
-            <b>{label}</b>
+            <b>{label} ({options?.length})</b>
 
             <input className="form-input" placeholder={`Search ${label}`} value={search}onChange={e=>setSearch(e.target.value)}/>
 

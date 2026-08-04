@@ -72,3 +72,10 @@ def update_user_target(email: str, payload: SetTargetPayload, user: dict = Depen
             raise ValueError("User not found")
 
     return {"status": "success", "message": f"Quarterly target updated for {email}"}
+
+@router.get("/qoutation/analytics/today")
+def quotation_analytics_today(user: dict = Depends(verify_bearer_token)):
+    if user.get("role") not in ["Admin", "Chief Full Stack Developer"]:
+        raise HTTPException(status_code=403, detail="Not authorized.")
+
+    return EDBR.get_today_quotation_analytics()

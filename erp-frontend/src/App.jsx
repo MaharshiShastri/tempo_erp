@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe } from "react-icons/fi";
+import { FaFileWord } from "react-icons/fa";
 import useERPState from "./hooks/useERPState";
 import packageJson from "../package.json";
 import LoginView from "./views/LoginView";
@@ -39,6 +40,7 @@ import ProductionAnalyticsView from "./views/ProductionAnalyticsView";
 import InventoryAuditLogsView from "./views/InventoryAuditLogsView";
 import LogisticsPartnerReadOnlyView from "./views/LogisticsPartnerReadOnlyView";
 import DispatchPlannerView from "./views/DispatchPlannerView";
+import QuoteGenerationView from "./views/QuoteGenerationView";
 
 function App() {
     const state = useERPState();
@@ -219,6 +221,16 @@ function App() {
                                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+E</span>
                                         </a>
                                     )}
+                                    
+                                    {isSales && (
+                                        <a href="#QouteGenerator" className={`menu-item ${state.activeTab === 'qoute-generator' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('qoute-generator')}}>
+                                            <span><FaFileWord /></span>
+                                            {!sidebarCollapsed && <span>Quote Generator</span>}
+                                            <span style={{fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '1px 4px', borderRadius: '4px', marginLeft: 'auto'}}></span>
+                                        </a>
+                                    )
+
+                                    }
                                     {isSales && (
                                         <a href="#lead-generation" className={`menu-item ${state.activeTab === 'target' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('target')}}>
                                             <span>📊</span>
@@ -464,6 +476,7 @@ function App() {
                     {isFactory && state.activeTab==='audit' && <InventoryAuditLogsView state={state}/>}
                     {(isSales || isTransporter) && state.activeTab==='logistics-read' && <LogisticsPartnerReadOnlyView state={state}/>}
                     {isTransporter && state.activeTab==='dispatch-planner' && <DispatchPlannerView state={state}/>}
+                    {isSales && state.activeTab==='qoute-generator' && <QuoteGenerationView state={state}/>}
                 </div>
             </div>
 

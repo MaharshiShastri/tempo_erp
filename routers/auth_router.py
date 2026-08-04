@@ -76,3 +76,18 @@ def delete_system_user(email: str, user_profile: dict = Depends(verify_bearer_to
         return EDBR.delete_user(email)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/users/business_phone/{email}")
+def get_phone_number(email: str, user_profile: dict = Depends(verify_bearer_token)):
+    if user_profile['role'] != "Sales Representative":
+        raise HTTPException(status_code=403, detail="Only sales team can access business phone number")
+    try:
+        contact = EDBR.get_user_business_contact(email=email, role=user_profile['role'])
+
+        return contact
+
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

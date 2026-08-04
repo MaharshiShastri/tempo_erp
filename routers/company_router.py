@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from security import verify_bearer_token
 from .dependencies import check_department
 
@@ -52,4 +53,3 @@ def delete_company(company_id: str, user_profile: dict = Depends(verify_bearer_t
 @router.get("/search/", dependencies=[Depends(check_department("Sales Representative"))])
 def search_companies(q: str, user_profile: dict = Depends(verify_bearer_token)):
     return EDBR.search_companies(q)
-

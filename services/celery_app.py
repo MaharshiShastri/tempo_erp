@@ -22,7 +22,13 @@ celery.conf.beat_schedule = {
     "refresh-items-cache": {
         "task": "services.tasks.rebuild_item_cache",
         "schedule": crontab(hour=1, minute=0)
-    }
+    },
+
+    "send-quotation-analytics-daily": {
+        "task": "services.tasks.send_daily_quotation_analytics",
+        "schedule": crontab(hour=18, minute=15),
+    },
+    
 }
 
 celery.conf.timezone = "Asia/Kolkata"

@@ -707,3 +707,50 @@ class StockLedger(Base):
     operator_email: Mapped[str] = mapped_column(ForeignKey("users.email"))
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+class Quotation(Base):
+    __tablename__ = "quotations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+    quote_number: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
+
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+
+    client_company: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    client_address_line1: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    client_city: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    client_postal_code: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    client_email: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    buyer_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    buyer_phone_number: Mapped[str] = mapped_column(String(15), nullable=False)
+    
+    enquiry_date: Mapped[str] = mapped_column(Date, nullable=False,)
+
+    supply: Mapped[str] = mapped_column(String(255), nullable=False,)
+
+    installation: Mapped[str] = mapped_column(String(255), nullable=False,)
+
+    freight: Mapped[str] = mapped_column(String(255), nullable=False,)
+
+    is_dealer: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false",)
+
+    is_special_model: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false",)
+
+    special_itinerary: Mapped[str | None] = mapped_column(Text, nullable=True,)
+
+    sales_user_name: Mapped[str] = mapped_column(String(255), nullable=False,)
+
+    sales_user_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True,)
+
+    generated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True,)
+
+    document_path: Mapped[str | None] = mapped_column(String(1000), nullable=True,)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False,)
