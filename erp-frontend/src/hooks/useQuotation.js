@@ -24,7 +24,44 @@ export default function useQuotation({sessionToken, showErrorModal}){
     const [quoteDealer, setQuoteDealer] = useState(false);
 
     const [quoteSpecialModel, setQuoteSpecialModel] = useState(false);
-    const [quoteSpecialItinerary, setQuoteSpecialItinerary] = useState("");
+    
+    const [quoteSelectedItemCode, setQuoteSelectedItemCode] = useState([]);
+    const [quoteSpecialRows, setQuoteSpecialRows] = useState([["", ""], ]);
+    const [quoteSpecialColumns, setQuoteSpecialColumns] = useState(["Parameter", "Value"]);
+
+    const addSpecialRow = () =>{
+        setQuoteSpecialRows(prev=>[...prev, prev[0].map(()=> "")]);
+    };
+
+    const addSpecialColumn = () => {
+        setQuoteSpecialColumns(prev=>[...prev, `Column ${prev.length + 1}`,]);
+
+        setQuoteSpecialRows(prev=>prev.map(row=>[...row, ""]));
+    };
+
+    const updateSpecialCell = (rowIndex, columnIndex, value) => {
+        setQuoteSpecialRows(prev=>prev.map((row, rIndex)=>{
+            if(rIndex !== rowIndex){ return row;}
+
+            return row.map((cell, cIndex) => cIndex === columnIndex ? value : cell);
+        }));
+    };
+
+    const removeSpecialRow = (index) => {
+        setQuoteSpecialRows(prev =>
+            prev.filter((_, rowIndex) => rowIndex !== index)
+        );
+    };
+
+    const updateSpecialRow = (index, field, value) => {
+        setQuoteSpecialRows(prev =>
+            prev.map((row, rowIndex) =>
+                rowIndex === index
+                    ? { ...row, [field]: value }
+                    : row
+            )
+        );
+    };
 
     const handleGenerateQuote = async(e) => {
         e.preventDefault();
@@ -57,7 +94,9 @@ export default function useQuotation({sessionToken, showErrorModal}){
                     dealer: quoteDealer,
 
                     special_model: quoteSpecialModel,
-                    special_itinerary: quoteSpecialItinerary || null,
+                    special_columns: quoteSpecialColumns, 
+                    special_rows: quoteSpecialRows.map(row=>({values: row})),
+                    item_code: quoteSelectedItemCode?.[0] || null,
             });
             
         const url = window.URL.createObjectURL(blob);
@@ -84,6 +123,8 @@ export default function useQuotation({sessionToken, showErrorModal}){
     qouteCity, setQouteCity, clientQuoteEmail, setClientQuoteEmail, buyerQuoteName, setBuyerQuoteName, qouteDateInput, setQouteDateInput,
     qouteGenerating, setQouteGenerating, handleGenerateQuote, buyerQouteNum, setBuyerQouteNum, qouteNum, setQouteNum,
     qoutePostalCode, setQoutePostalCode, quoteSupply, setQuoteSupply, quoteInstallation, setQuoteInstallation, quoteFreight,
-    setQuoteFreight, quoteDealer, setQuoteDealer, quoteSpecialModel, setQuoteSpecialModel, quoteSpecialItinerary, setQuoteSpecialItinerary,
+    setQuoteFreight, quoteDealer, setQuoteDealer, quoteSpecialModel, setQuoteSpecialModel, quoteSpecialModel, setQuoteSpecialModel,
+    quoteSelectedItemCode, setQuoteSelectedItemCode, quoteSpecialRows, setQuoteSpecialRows, addSpecialRow, removeSpecialRow,
+    updateSpecialRow,
     }
 }

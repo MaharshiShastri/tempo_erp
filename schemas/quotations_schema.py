@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from datetime import date
 
+class SpecialModelRow(BaseModel):
+    values: list[str] = Field(default_factory=list)
+
+
 class QuoteGenerationRequest(BaseModel):
     product_name: str
 
@@ -16,6 +20,7 @@ class QuoteGenerationRequest(BaseModel):
     buyer_phone_number: str
 
     date_input: date
+
     supply: str
     installation: str
     freight: str
@@ -23,4 +28,8 @@ class QuoteGenerationRequest(BaseModel):
     dealer: bool = False
 
     special_model: bool = False
-    special_itinerary: str | None = None
+
+    item_code: str | None = None
+
+    special_columns: list[str] = Field(default_factory=list)
+    special_rows: list[SpecialModelRow] = Field(default_factory=list)

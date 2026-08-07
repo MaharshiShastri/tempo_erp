@@ -1,8 +1,7 @@
 import SearchableMultiselect from "../components/shared/SearchableMultiselect";
 import { useMemo } from "react";
 export default function QuoteGenerationView({state}){
-    const productGroups = useMemo(
-        () => [
+    const productGroups = useMemo(() => [
             ...new Set(
                 (state?.itemsMaster ?? [])
                     .map(item => item.item_name)
@@ -11,6 +10,18 @@ export default function QuoteGenerationView({state}){
         ].sort(),
         [state?.itemsMaster]
     );
+
+    const productItems = useMemo(()=>{
+        const selectedProduct = state?.quoteSelectedGroup?.[0];
+
+        if(!selectedProduct) {return [];}
+
+        return (state?.itemsMaster ?? [])
+        .filter(item => item.item_name === selectedProduct)
+        .filter(item => item.item_code)
+        .map(item=> item.item_code)
+        .sort();
+    }, [state?.itemsMaster, state?.quoteSelectedGroup]);
 
     return (
         <div className="frappe-card">
@@ -30,7 +41,11 @@ export default function QuoteGenerationView({state}){
                 <h4>Product Selection</h4>
 
                 <SearchableMultiselect label="Product Group" options={productGroups} value={state?.quoteSelectedGroup} onChange={state?.setQuoteSelectedGroup}/>
-
+                {state?.quoteSelectedGroup?.length === 1 && (
+                    <div style={{marginTop: 15}}>
+                        <SearchableMultiselect label="Item code" options={productItems} value={state?.quoteSelectedItemCode} onChange={state?.setQuoteSelectedItemCode} />
+                    </div>
+                )}
                 <h4 style={{ marginTop: 25 }}>Customer Details</h4>
 
                 <div className="form-grid-layout" style={{gridTemplateColumns:"repeat(2, 1fr)"}}>
@@ -133,25 +148,67 @@ export default function QuoteGenerationView({state}){
 
                     <div style={{marginTop: 20}}>
                         <label className="input-label">
-                            <input type="checkbox" checked={state?.quoteDealer} onChange={e=>state?.setQuoteDealer(e.target.value)} />
+                            <input type="checkbox" checked={state?.quoteDealer} onChange={e=>state?.setQuoteDealer(e.target.checked)} />
                             {" "}Dealer quotation
                         </label>
                     </div>
                     
                     <div style={{marginTop: 20}}>
                         <label className="input-label">
-                            <input type="checkbox" checked={state?.quoteSpecialModel} onChange={e=>state?.setQuoteSpecialModel(e.target.value)} />
+                            <input type="checkbox" checked={state?.quoteSpecialModel} onChange={e=>state?.setQuoteSpecialModel(e.target.checked)} />
                             {" "}Special Model
                         </label>
                     </div>
 
                     {state?.quoteSpecialModel && (
-                        <div style={{marginTop: 15}}>
-                            <label className="input-label">
-                                Special Model/Addtional Itinerary
-                            </label>
+                        <div style={{gridColumn: "1 / -1", marginTop: 20}}>
+                            <h4>Special Model Configuration</h4>
+                            <div style={{ overflowX: "auto" }}>
+                                <table className="quotation-config-table">
+                                    <thead>
+                                        <tr>
+                                            {state?.quoteSpecialColumns?.map((column, columnIndex) => (
+                                                <th key={columnIndex}>
+                                                    <input className="form-input" value={column} onChange={e => {const value = e.target.value; state?.setQuoteSpecialColumns(prev =>prev.map((item, index) =>index === columnIndex ? value: item));}} />
+                                                </th>
+                                            ))}
 
-                            <textarea required className="form-input" rows={4} value={state?.quoteSpecialItinerary} onChange={e=>state?.setQuoteSpecialItinerary(e.target.value)} />
+                                            <th style={{ width: 100 }}>
+                                                Action
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {state?.quoteSpecialRows?.map((row, rowIndex) => (
+                                            <tr key={rowIndex}>
+
+                                                {row.map((cell, columnIndex) => (
+                                                    <td key={columnIndex}>
+                                                        <input className="form-input" value={cell} placeholder="Enter value" onChange={e => state?.updateSpecialCell( rowIndex, columnIndex, e.target.value)} />
+                                                    </td>
+                                                ))}
+
+                                                <td>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => state?.removeSpecialRow(rowIndex)}disabled={ state?.quoteSpecialRows?.length === 1}>
+                                                        Remove
+                                                    </button>
+                                                </td>
+
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style={{display: "flex", gap: 10, marginTop: 10 }}>
+                                <button type="button" className="btn btn-primary" onClick={state?.addSpecialRow}>
+                                    + Add Row
+                                </button>
+
+                                <button type="button" className="btn btn-secondary" onClick={state?.addSpecialColumn}>
+                                    + Add Column
+                                </button>
+                            </div>
                         </div>
                     )}
 

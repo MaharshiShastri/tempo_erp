@@ -355,9 +355,14 @@ function App() {
                                         {!sidebarCollapsed && <span>Team Management</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+M</span>
                                     </a>
-                                    <a href="#tally" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-sync')}}>
+                                    <a href="#tally" className={`menu-item ${state.activeTab === 'tally-bill' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-bill')}}>
                                         <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
                                         {!sidebarCollapsed && <span>Fetch Tally Bill data</span>}
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
+                                    </a>
+                                    <a href="#tally-sync" className={`menu-item ${state.activeTab === 'tally-sync' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-sync')}}>
+                                        <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
+                                        {!sidebarCollapsed && <span>Fetch Tally Sync View</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+F</span>
                                     </a>
                                     <a href="#analytics" className={`menu-item ${state.activeTab === 'sales-analytics' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); state.setActiveTab('sales-analytics'); }}>
@@ -463,7 +468,7 @@ function App() {
                     {isSales && state.activeTab === 'crm-workspace' && <CRM_WorkspaceView state={state} />}
                     {isFactory && state.activeTab === 'grn-workspace' && (<GRN_WorkspaceView state={state} />)}
                     {isFactory && state.activeTab === 'items-upload' && <ItemMasterUploadView state={state} />}
-                    {isSuperUser && state.activeTab === 'tally-sync' && <TallyInvoiceImportWorkspaceView state={state}/>}
+                    {isSuperUser && state.activeTab === 'tally-sync' && <TallySyncView state={state}/>}
                     {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
                     {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}

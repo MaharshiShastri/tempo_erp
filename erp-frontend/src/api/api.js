@@ -503,7 +503,7 @@ const API = {
   },
   // Add this inside the API object in api.js
   async syncTallyData(payload, token) {
-    const r = await fetch("/api/v1/tally/sync", {
+    const r = await fetch("/api/v1/tally/preview", {
         method: "POST",
         headers: {"Content-Type": "application/json","Authorization": `Bearer ${token}`},
         body: JSON.stringify(payload),
@@ -957,7 +957,7 @@ const API = {
   },
 
   async generateQuote(sessionToken, payload){
-    const response = await fetch("/api/v1/companies/quotation",
+    const response = await fetch("/api/v1/quotations/quotation",
       {
         method: "POST",
         headers: {

@@ -1,436 +1,213 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from groq import Groq
-import os
 from typing import Optional
-import requests
 import logging
-import xml.etree.ElementTree as ET
-from security import verify_bearer_token
-from services.ai_tally_translator import llm_normalize_tally
 import json
+
+from security import verify_bearer_token
 from .dependencies import check_department
-import re
-import uuid
-from datetime import datetime, timedelta
 from database.repository import EDBR
 
+from services.tally_client import (
+    VOUCHER_TYPE_REPORTS,
+    NATIVE_REPORTS,
+    build_voucher_collection_xml,
+    build_native_report_xml,
+    send_to_tally,
+    tally_xml_to_json,
+    xml_to_staging_json,
+    voucher_to_preview_dict,
+    fetch_and_preview,
+    TALLY_HOST,
+)
+
 router = APIRouter(prefix="/api/v1/tally", tags=["Tally Integration"])
+logger = logging.getLogger(__name__)
 
-def parse_qty(qty):
-    if not qty:
-        return 0
-
-    m = re.search(r"[\d.]+", qty)
-    return float(m.group()) if m else 0
-def parse_rate(rate):
-    if not rate:
-        return 0
-
-    m = re.search(r"[\d.]+", rate)
-    return float(m.group()) if m else 0
-def parse_tally_date(date_str):
-    return datetime.strptime(date_str, "%Y%m%d").date()
-def convert_sales_order(voucher):
-
-    order_date = parse_tally_date(voucher["date"])
-
-    address = voucher.get("basicbuyeraddress", [])
-
-    if isinstance(address, list):
-        address = " ".join(
-            x for x in address
-            if isinstance(x, str)
-        )
-
-    payment_terms = voucher.get("basicorderterms", [])
-
-    if isinstance(payment_terms, list):
-        payment_terms = " ".join(
-            x for x in payment_terms
-            if isinstance(x, str)
-        )
-
-    order = {
-        "order_acceptance_id": str(uuid.uuid4()),
-        "order_acceptance_date": order_date,
-        "purchase_order_number": voucher.get("vouchernumber"),
-        "purchase_order_date": order_date,
-        "customer_code": voucher.get("partyledgername"),
-        "payment_terms": payment_terms,
-        "billing_name": voucher.get("partyledgername"),
-        "billing_address": address,
-        "due_date": order_date + timedelta(days=30),
-        "items": []
-    }
-
-    items = voucher.get("allinventoryentries", [])
-
-    if isinstance(items, dict):
-        items = [items]
-
-    for item in items:
-
-        desc = item.get("basicuserdescription", "")
-
-        if isinstance(desc, list):
-            desc = "\n".join(
-                x for x in desc
-                if isinstance(x, str)
-            )
-
-        order["items"].append({
-
-            "item_code": item.get("stockitemname"),
-
-            "additional_spec_text": desc,
-
-            "hsn_code": item.get("gsthsnname", ""),
-
-            "quantity": parse_qty(
-                item.get("billedqty")
-            ),
-
-            "rate": parse_rate(
-                item.get("rate")
-            ),
-
-            "discount_percentage": 0
-        })
-
-    return order
-def clean_tally_xml(xml: str) -> str:
-    # Remove decimal control character references
-    xml = re.sub(
-        r'&#(?:0|[1-8]|11|12|1[4-9]|2[0-9]|3[01]);',
-        '',
-        xml
-    )
-
-    # Remove hexadecimal control character references
-    xml = re.sub(
-        r'&#x(?:0?[0-8]|0?B|0?C|0?[E-F]|1[0-9A-F]);',
-        '',
-        xml,
-        flags=re.IGNORECASE
-    )
-
-    return xml
-
-def tally_xml_to_json(xml_string: str):
-    try:
-        root = ET.fromstring(xml_string)
-
-        def parse(node):
-            children = list(node)
-            if not children:
-                return node.text.strip() if node.text else ""
-
-            result = {}
-            for child in children:
-                if child.tag not in result:
-                    result[child.tag] = parse(child)
-                else:
-                    if not isinstance(result[child.tag], list):
-                        result[child.tag] = [result[child.tag]]
-                    result[child.tag].append(parse(child))
-            return result
-
-        return {root.tag: parse(root)}
-
-    except Exception as e:
-        return {"error": str(e), "raw": xml_string}
-
-def build_sales_order_list_xml(from_dt: str, to_dt: str):
-    """Fetches a lightweight list of Sales Order GUIDs within the date range."""
-    from_dt = from_dt.replace("-", "") 
-    to_dt = to_dt.replace("-", "") 
-    
-    return f"""
-    <ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>Export</TALLYREQUEST>
-        <TYPE>Collection</TYPE>
-        <ID>TSPL ALL Sales Vouchers</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>TEMPO INSTRUMENTS PRIVATE LIMITED</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
-<TDL>
-<TDLMESSAGE>
-  <COLLECTION NAME="TSPL ALL Sales Vouchers" ISMODIFY="No" ISFIXED="No" ISINITIALIZE="No" ISOPTION="No" ISINTERNAL="No">
-   <TYPE>Vouchers:VoucherType</TYPE>
-   <CHILDOF>$$VchTypeSales</CHILDOF>
-   <NATIVEMETHOD>Date, VoucherTypeName, VoucherNumber, Partyledgername</NATIVEMETHOD>
-  </COLLECTION>
-</TDLMESSAGE>
-</TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE><ENVELOPE>
-      <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>Export</TALLYREQUEST>
-        <TYPE>Collection</TYPE>
-        <ID>SalesVoucherList</ID>
-      </HEADER>
-      <BODY>
-        <DESC>
-          <STATICVARIABLES>
-            <SVFROMDATE>{from_dt}</SVFROMDATE>
-            <SVTODATE>{to_dt}</SVTODATE>
-          </STATICVARIABLES>
-          <TDL>
-            <TDLMESSAGE>
-              <COLLECTION NAME="SalesVoucherList" ISINITIALIZE="Yes">
-                <TYPE>Voucher</TYPE>
-                <FETCH>GUID, VoucherNumber, Date</FETCH>
-                <FILTERS>IsSalesVoucher</FILTERS>
-              </COLLECTION>
-              <SYSTEM TYPE="Formulae" NAME="IsSalesVoucher">
-                $VoucherTypeName = "Sales"
-              </SYSTEM>
-            </TDLMESSAGE>
-          </TDL>
-        </DESC>
-      </BODY>
-    </ENVELOPE>
-    """
-
-def build_single_voucher_xml(guid: str):
-    """Fetches the complete, exploded inventory and accounting details for a specific voucher."""
-    return f"""
-    <ENVELOPE>
-      <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>Export</TALLYREQUEST>
-        <TYPE>Object</TYPE>
-        <SUBTYPE>Voucher</SUBTYPE>
-        <ID>{guid}</ID>
-      </HEADER>
-      <BODY>
-        <DESC>
-          <STATICVARIABLES>
-            <EXPLODEFLAG>Yes</EXPLODEFLAG>
-            <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-          </STATICVARIABLES>
-        </DESC>
-      </BODY>
-    </ENVELOPE>
-    """
 
 class TallyQueryPayload(BaseModel):
-    report_name: str = "Sales Order"  # e.g., Day Book, Trial Balance, Stock Summary
-    from_date: Optional[str] = None  # Format YYYYMMDD or YYYY-MM-DD
+    report_name: str = "Sales Order"  # e.g. Sales Order, Day Book, Trial Balance
+    from_date: Optional[str] = None   # 'YYYY-MM-DD' or 'YYYYMMDD'
     to_date: Optional[str] = None
     ledger_name: Optional[str] = None
-    tally_url: str = "http://localhost:9000"
+    tally_url: str = TALLY_HOST
 
 
-def build_dynamic_tally_xml(payload: TallyQueryPayload) -> str:
-    # Clean dates: Tally expects strictly YYYYMMDD (e.g. "20260401")
-    from_dt = payload.from_date.replace("-", "") if payload.from_date else ""
-    to_dt = payload.to_date.replace("-", "") if payload.to_date else ""
-
-    static_vars = []
-    if from_dt:
-        static_vars.append(f"<SVFROMDATE>{from_dt}</SVFROMDATE>")
-    if to_dt:
-        static_vars.append(f"<SVTODATE>{to_dt}</SVTODATE>")
-    if payload.ledger_name:
-        static_vars.append(f"<LEDGERNAME>{payload.ledger_name}</LEDGERNAME>")
-    if payload.report_name == "Sales Order":
-        return build_sales_order_list_xml(payload)
-    
-    # Explode flag ensures detailed rows are expanded in reports like Trial Balance
-    static_vars.append("<EXPLODEFLAG>Yes</EXPLODEFLAG>")
-
-    static_vars_xml = "\n".join(static_vars)
-
-    return f"""<ENVELOPE>
-      <HEADER>
-        <TALLYREQUEST>Export Data</TALLYREQUEST>
-      </HEADER>
-      <BODY>
-        <EXPORTDATA>
-          <REQUESTDESC>
-            <REPORTNAME>{payload.report_name}</REPORTNAME>
-            <STATICVARIABLES>
-              {static_vars_xml}
-            </STATICVARIABLES>
-          </REQUESTDESC>
-        </EXPORTDATA>
-      </BODY>
-    </ENVELOPE>"""
+def _require_date_range(payload: TallyQueryPayload):
+    if not payload.from_date or not payload.to_date:
+        raise HTTPException(
+            status_code=400,
+            detail="from_date and to_date are both required for this report.",
+        )
 
 
-@router.post("/sync")
-def proxy_tally_request(payload: TallyQueryPayload):
+# ---------------------------------------------------------------------------
+# /preview -- fetch + convert only, NOTHING is written to the database.
+# This is the "let me see the converted JSON before I commit it" step.
+# ---------------------------------------------------------------------------
+@router.post("/preview")
+def preview_tally_data(
+    payload: TallyQueryPayload, user: dict = Depends(verify_bearer_token)
+):
+    report_name = payload.report_name
 
-    xml = """
-    <ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>
-    </HEADER>
+    if report_name in VOUCHER_TYPE_REPORTS:
+        _require_date_range(payload)
+        voucher_type = VOUCHER_TYPE_REPORTS[report_name]
+        try:
+            result = fetch_and_preview(
+                voucher_type=voucher_type,
+                from_date=payload.from_date,
+                to_date=payload.to_date,
+                tally_url=payload.tally_url,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        except Exception:
+            logger.exception("Tally preview fetch failed")
+            raise HTTPException(status_code=502, detail="Failed to reach Tally.")
 
-    <BODY>
-        <DESC>
+        return {
+            "report_name": report_name,
+            "normalized": result["normalized"],
+            "raw": result["raw"],
+            "row_count": len(result["normalized"]),
+        }
 
-            <STATICVARIABLES>
-                <SVFROMDATE>20260401</SVFROMDATE>
-                <SVTODATE>20260731</SVTODATE>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-            </STATICVARIABLES>
+    if report_name in NATIVE_REPORTS:
+        xml_payload = build_native_report_xml(
+            report_name=report_name,
+            from_date=payload.from_date,
+            to_date=payload.to_date,
+            ledger_name=payload.ledger_name,
+        )
+        try:
+            raw_xml = send_to_tally(xml_payload, payload.tally_url)
+        except ValueError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        except Exception:
+            logger.exception("Tally preview fetch failed")
+            raise HTTPException(status_code=502, detail="Failed to reach Tally.")
 
-            <TDL>
+        # Native reports don't have a shared voucher schema -- return the
+        # generic structure-preserving parse for inspection/display only.
+        # (No staging path exists for these yet.)
+        return {
+            "report_name": report_name,
+            "normalized": tally_xml_to_json(raw_xml),
+            "raw": raw_xml,
+        }
 
-                <TDLMESSAGE>
-
-                    <COLLECTION NAME="TempoSalesOrders">
-
-                        <TYPE>Voucher</TYPE>
-
-                        <FETCH>
-                            GUID,
-                            DATE,
-                            VOUCHERNUMBER,
-                            VOUCHERTYPENAME,
-                            PARTYLEDGERNAME,
-                            BASICBUYERADDRESS,
-                            BASICORDERTERMS,
-                            ALLINVENTORYENTRIES.*
-                        </FETCH>
-
-                        <FILTER>OnlySalesOrders</FILTER>
-
-                    </COLLECTION>
-
-                    <SYSTEM TYPE="Formulae"
-                            NAME="OnlySalesOrders">
-
-                        $VoucherTypeName = "Sales Order"
-
-                    </SYSTEM>
-
-                </TDLMESSAGE>
-
-            </TDL>
-
-        </DESC>
-    </BODY>
-</ENVELOPE>
-    """
-
-    r = requests.post(
-        payload.tally_url,
-        data=xml,
-        headers={
-            "Content-Type": "text/xml"
-        },
-        timeout=30
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unknown report_name '{report_name}'. "
+        f"Valid options: {sorted(VOUCHER_TYPE_REPORTS) + sorted(NATIVE_REPORTS)}",
     )
 
-    print(r.status_code)
-    print(r.headers.get("Content-Type"))
-    print(r.text[:500])
+
+# ---------------------------------------------------------------------------
+# /sync-and-stage -- fetch, convert, AND commit to the staging tables in one
+# call. Only valid for voucher-type reports (Sales Order, Purchase Order,
+# Sales, Purchase, Day Book) since those are the only ones with a staging
+# schema (StagingOrderHeader / StagingOrderItem via EDBR.ingest_tally_json).
+# ---------------------------------------------------------------------------
+@router.post("/sync-and-stage", dependencies=[Depends(check_department("Admin"))])
+def sync_and_stage_tally_data(payload: TallyQueryPayload, user: dict = Depends(verify_bearer_token)):
+    report_name = payload.report_name
+    if report_name not in VOUCHER_TYPE_REPORTS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"'{report_name}' has no staging schema to commit into. "
+                f"Only these can be staged: {sorted(VOUCHER_TYPE_REPORTS)}. "
+                "Use /preview for other report types."
+            ),
+        )
+
+    _require_date_range(payload)
+    voucher_type = VOUCHER_TYPE_REPORTS[report_name]
+
+    xml_payload = build_voucher_collection_xml(
+        voucher_type=voucher_type,
+        from_date=payload.from_date,
+        to_date=payload.to_date,
+    )
+    try:
+        raw_xml = send_to_tally(xml_payload, payload.tally_url)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        logger.exception("Tally fetch failed during sync-and-stage")
+        raise HTTPException(status_code=502, detail="Failed to reach Tally.")
+
+    staging_json = xml_to_staging_json(raw_xml)
+
+    try:
+        inserted_count = EDBR.ingest_tally_json(staging_json)
+    except Exception as e:
+        logger.exception("Staging ingestion failed")
+        raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
 
     return {
-        "status": r.status_code,
-        "content_type": r.headers.get("Content-Type"),
-        "body": r.text
+        "status": "success",
+        "report_name": report_name,
+        "orders_found": len(staging_json.get("tallymessage", [])),
+        "orders_staged": inserted_count,
     }
-    
+
+
+# ---------------------------------------------------------------------------
+# /upload-xml -- deterministic replacement for the old Groq-based translator.
+# Same input (a previously-exported Tally XML file), same output shape the
+# frontend already expects (extracted_orders), but parsed locally instead
+# of round-tripping through an LLM -- faster, free, and won't rewrite your
+# numbers.
+# ---------------------------------------------------------------------------
 @router.post("/upload-xml", dependencies=[Depends(check_department("Admin"))])
 async def upload_tally_xml(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
     if not file.filename.lower().endswith(".xml"):
         raise HTTPException(status_code=400, detail="Only Tally XML files are supported.")
-        
+
     content = await file.read()
-    xml_text = clean_tally_xml(content.decode("utf-8", errors="replace"))
+    xml_text = content.decode("utf-8", errors="replace")
 
     try:
-        root = ET.fromstring(content)        
-        sales_orders_raw = []
-        
-        # 1. EXTRACT: Find only Sales Order Vouchers to save LLM tokens
-        for voucher in root.findall(".//VOUCHER"):
-            vch_type = voucher.attrib.get("VCHTYPE", "")
-            vch_type_name = voucher.findtext("VOUCHERTYPENAME", "")
-            
-            if "Sales Order" in vch_type or "Sales Order" in vch_type_name:
-                # Convert just this specific voucher XML to a Python dictionary
-                voucher_xml_str = ET.tostring(voucher, encoding='unicode')
-                sales_orders_raw.append(tally_xml_to_json(voucher_xml_str))
-                
-        if not sales_orders_raw:
-            return {"status": "success", "extracted_orders": []}
-
-        # 2. TRANSFORM: Pass the condensed array to Groq for strict schema mapping
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        prompt = f"""
-        You are a Tally ERP to Modern ERP data translator.
-        Translate the following array of Tally Sales Orders into our strictly typed JSON schema.
-        
-        REQUIREMENTS:
-        - order_acceptance_id: Generate a random UUID string for each order.
-        - order_acceptance_date: Convert Tally date (YYYYMMDD) to YYYY-MM-DD.
-        - purchase_order_number: Extract from <VOUCHERNUMBER>.
-        - purchase_order_date: Same as order_acceptance_date.
-        - customer_code: Extract from <PARTYLEDGERNAME>.
-        - billing_name: Extract from <BASICBUYERNAME> or <PARTYLEDGERNAME>.
-        - billing_address: Combine <BASICBUYERADDRESS.LIST> into a single string.
-        - due_date: Add 30 days to the order_acceptance_date (YYYY-MM-DD format).
-        - items: Map from <ALLINVENTORYENTRIES.LIST>. 
-            - item_code: <STOCKITEMNAME>
-            - additional_spec_text: "Imported from Tally XML"
-            - hsn_code: ""
-            - quantity: Extract numeric value from <BILLEDQTY> (e.g., "5.000 NOS" -> 5)
-            - unit_measure: Extract unit from <BILLEDQTY> (e.g., "5.000 NOS" -> "NOS")
-            - rate: Extract from <RATE>
-            - discount_percentage: 0.0
-
-        Return ONLY a JSON object with a single key 'orders' containing the array of mapped objects.
-        
-        Tally Raw Data:
-        {json.dumps(sales_orders_raw)}
-        """
-
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.1
-        )
-        
-        ai_mapped_json = json.loads(completion.choices[0].message.content)
-        
-        return {
-            "status": "success", 
-            "extracted_orders": ai_mapped_json.get("orders", [])
-        }
-
+        staging_json = xml_to_staging_json(xml_text)
     except Exception as e:
-        logging.error(f"Tally XML Upload Error: {str(e)}")
+        logger.error("Tally XML Upload Error: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Failed to parse Tally XML: {str(e)}")
-    
+
+    sales_orders = [
+        v for v in staging_json["tallymessage"] if v.get("vouchertypename") == "Sales Order"
+    ]
+
+    if not sales_orders:
+        return {"status": "success", "extracted_orders": []}
+
+    extracted_orders = [voucher_to_preview_dict(v) for v in sales_orders]
+
+    return {"status": "success", "extracted_orders": extracted_orders}
+
+
+# ---------------------------------------------------------------------------
+# /upload-json, /upload-bills -- unchanged, already-tested staging commit
+# paths. Left exactly as they were; they consume the same {"tallymessage":
+# [...]} / daybook shapes this module now produces natively via /preview
+# and /sync-and-stage, so a file exported from those endpoints' "raw" field
+# can be re-uploaded here too if you want a manual review step in between.
+# ---------------------------------------------------------------------------
 @router.post("/upload-json", dependencies=[Depends(check_department("Admin"))])
 async def upload_tally_json(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
     if not file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=400, detail="Only JSON files are supported.")
 
     content = await file.read()
-    
+
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format.")
 
-    # Delegate the parsing and DB staging to your new staging engine method
     try:
         inserted_count = EDBR.ingest_tally_json(data)
     except Exception as e:
@@ -442,25 +219,22 @@ async def upload_tally_json(file: UploadFile = File(...), user: dict = Depends(v
         "orders_staged": inserted_count,
     }
 
+
 @router.post("/upload-bills", dependencies=[Depends(check_department("Admin"))])
-async def upload_bill_tally(file: UploadFile = File(...), user: dict=Depends(verify_bearer_token)):
+async def upload_bill_tally(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):
     if not file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=400, detail="Only JSON files are supported.")
 
     content = await file.read()
-    
+
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format.")
 
-    # Delegate the parsing and DB staging to your new staging engine method
     try:
         inserted_count = EDBR.extract_daybook_json(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database insertion failed: {str(e)}")
 
-    return {
-        "status": "success",
-        "extracted_bills": inserted_count
-    }
+    return {"status": "success", "extracted_bills": inserted_count}
