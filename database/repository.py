@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOsAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1844,56 +1844,80 @@ class PostgresRepository:
         )
 
         with SessionLocal() as session:
-            quotations = session.execute(stmt).scalars().all()
+            quotations = session.scalars(stmt).all()
 
-        return quotations
+            return quotations
     
 
     def get_today_quotation_summary(self):
         quotations = self.get_today_quotation_analytics()
-
+        today = date.today()
         summary = {
             "total": len(quotations),
+
             "dealer_quotes": sum(
-                1 for q in quotations if q.is_dealer
+                1
+                for quotation in quotations
+                if quotation.is_dealer
             ),
+
             "special_model_quotes": sum(
-                1 for q in quotations if q.is_special_model
+                1
+                for quotation in quotations
+                if quotation.is_special_model
             ),
+
             "standard_model_quotes": sum(
-                1 for q in quotations if not q.is_special_model
+                1
+                for quotation in quotations
+                if not quotation.is_special_model
             ),
+
             "by_sales_user": {},
+
             "by_product": {},
         }
 
         for quotation in quotations:
 
-            sales_user = quotation.sales_user_name or "Unknown"
+            # -----------------------------
+            # Sales user
+            # -----------------------------
 
-            summary["by_sales_user"].setdefault(sales_user, {
-                "email": quotation.sales_user_email,
-                "count": 0,
-            })
+            sales_user = (
+                quotation.sales_user_name
+                or "Unknown"
+            )
+
+            if sales_user not in summary["by_sales_user"]:
+                summary["by_sales_user"][sales_user] = {
+                    "email": quotation.sales_user_email or "",
+                    "count": 0,
+                }
 
             summary["by_sales_user"][sales_user]["count"] += 1
 
-            product = quotation.product_name or "Unknown"
+            # -----------------------------
+            # Product
+            # -----------------------------
+
+            product = (
+                quotation.product_name
+                or "Unknown"
+            )
 
             summary["by_product"][product] = (
                 summary["by_product"].get(product, 0) + 1
             )
 
         return {
-            "date": date.today(),
+            "date": today,
             "quotations": quotations,
             "summary": summary,
         }
-    
     # --- SALES ANALYTICS & KPIs end ---
     # --- Geo repository start --- 
     def get_state_summary(self, from_date, to_date, items=None, role=None):
-        print("The current role is: ", role)
         with SessionLocal() as session:
             if role in ["Admin", "Sales Representative", "Chief Full Stack Developer"]:
                 stmt = (select(
@@ -1950,159 +1974,242 @@ class PostgresRepository:
             raise PermissionError(f"Role'{role}' is not permitted to access")
     # --- Geo repository end ---
     # --- Quotations start ---
+
     def create_quotation(self, request, sales_user, document_path=None):
-        quotation = Quotation(quote_number=request.qoute_number,
-        product_name=request.product_name,
+        with SessionLocal() as session:
+            quotation = Quotation(
+                quote_number=request.qoute_number,
+                product_name=request.product_name,
 
-        client_company=request.client_company,
-        client_address_line1=request.client_address_line1,
-        client_city=request.client_city,
-        client_postal_code=request.client_postal_code,
+                client_company=request.client_company,
+                client_address_line1=request.client_address_line1,
+                client_city=request.client_city,
+                client_postal_code=request.client_postal_code,
 
-        client_email=request.client_email,
-        buyer_name=request.buyer_name,
-        buyer_phone_number=request.buyer_phone_number,
+                client_email=request.client_email,
+                buyer_name=request.buyer_name,
+                buyer_phone_number=request.buyer_phone_number,
 
-        enquiry_date=request.date_input,
+                enquiry_date=request.date_input,
 
-        supply=request.supply,
-        installation=request.installation,
-        freight=request.freight,
+                supply=request.supply,
+                installation=request.installation,
+                freight=request.freight,
 
-        is_dealer=request.dealer,
-        is_special_model=request.special_model,
-        special_itinerary=request.special_itinerary,
+                is_dealer=request.dealer,
+                is_special_model=request.special_model,
 
-        sales_user_name=sales_user["name"],
-        sales_user_email=sales_user["email"],
+                sales_user_name=sales_user["name"],
+                sales_user_email=sales_user["email"],
 
-        document_path=str(document_path) if document_path else None,
-        )
+                document_path=(
+                    str(document_path)
+                    if document_path
+                    else None
+                ),
+            )
 
-        self.db.add(quotation)
-        self.db.commit()
-        self.db.refresh(quotation)
+            session.add(quotation)
+            session.commit()
+            session.refresh(quotation)
 
-        return quotation
+            return quotation
+
 
     def get_quotation(self, quotation_id: int):
-        return(self.db.query(Quotation).filter(Quotation.id == quotation_id, Quotation.is_active.is_(True), ).first())
+        with SessionLocal() as session:
+            stmt = (
+                select(Quotation)
+                .where(
+                    Quotation.id == quotation_id,
+                    Quotation.is_active.is_(True),
+                )
+            )
+
+            return session.scalars(stmt).first()
+
 
     def get_quotation_number(self, quotation_num: str):
-        return(self.db.query(Quotation).filter(Quotation.quote_number == quotation_num, Quotation.is_active.is_(True),).first())
+        with SessionLocal() as session:
+            stmt = (
+                select(Quotation)
+                .where(
+                    Quotation.quote_number == quotation_num,
+                    Quotation.is_active.is_(True),
+                )
+            )
 
-    def get_quotations(self, skip: int=0, limit: int=100):
-        return(self.db.query(Quotation)
-               .filter(Quotation.is_active.is_(True))
-               .order_by(Quotation.generated_at.desc())
-               .offset(skip)
-               .limit(limit)
-               .all()
-               )
+            return session.scalars(stmt).first()
+
+
+    def get_quotations(self, skip: int = 0, limit: int = 100):
+        with SessionLocal() as session:
+            stmt = (
+                select(Quotation)
+                .where(
+                    Quotation.is_active.is_(True)
+                )
+                .order_by(
+                    Quotation.generated_at.desc()
+                )
+                .offset(skip)
+                .limit(limit)
+            )
+
+            quotations = session.scalars(stmt).all()
+
+            return quotations
+
 
     def update_quotation(self, quotation_id: int, updates: dict):
-        quotation = self.get_quotation(quotation_id)
+        with SessionLocal() as session:
+            quotation = session.get(Quotation, quotation_id)
 
-        if not quotation:
-            return None
+            if not quotation or not quotation.is_active:
+                return None
 
-        allowed_fields = {
-            "product_name",
-            "client_company",
-            "client_address_line1",
-            "client_city",
-            "client_postal_code",
-            "client_email",
-            "buyer_name",
-            "buyer_phone_number",
-            "enquiry_date",
-            "supply",
-            "installation",
-            "freight",
-            "is_dealer",
-            "is_special_model",
-            "special_itinerary",
-            "document_path",
-        }
+            allowed_fields = {
+                "product_name",
+                "client_company",
+                "client_address_line1",
+                "client_city",
+                "client_postal_code",
+                "client_email",
+                "buyer_name",
+                "buyer_phone_number",
+                "enquiry_date",
+                "supply",
+                "installation",
+                "freight",
+                "is_dealer",
+                "is_special_model",
+                "document_path",
+            }
 
-        for field, value in updates.items():
-            if field in allowed_fields:
-                setattr(quotation, field, value)
+            for field, value in updates.items():
+                if field in allowed_fields:
+                    setattr(quotation, field, value)
 
-        self.db.commit()
-        self.db.refresh(quotation)
+            session.commit()
+            session.refresh(quotation)
 
-        return quotation
+            return quotation
+
 
     def deactivate_quotation(self, quotation_id: int):
-        quotation = self.get_quotation(quotation_id)
+        with SessionLocal() as session:
+            quotation = session.get(
+                Quotation,
+                quotation_id,
+            )
 
-        if not quotation:
-            return None
+            if not quotation or not quotation.is_active:
+                return None
 
-        quotation.is_active = False
+            quotation.is_active = False
 
-        self.db.commit()
-        self.db.refresh(quotation)
+            session.commit()
+            session.refresh(quotation)
 
-        return quotation
+            return quotation
+
 
     def get_quotation_count_by_product(self):
-        results = (
-            self.db.query(Quotation.product_name,
-                          func.count(Quotation.id).label("quotation_count"),
-                          )
-                          .filter(Quotation.is_active.is_(True))
-                          .group_by(Quotation.product_name)
-                          .order_by(func.count(Quotation.id).desc())
-                          .all()
-        )
+        with SessionLocal() as session:
+            stmt = (
+                select(
+                    Quotation.product_name,
+                    func.count(Quotation.id).label(
+                        "quotation_count"
+                    ),
+                )
+                .where(
+                    Quotation.is_active.is_(True)
+                )
+                .group_by(
+                    Quotation.product_name
+                )
+                .order_by(
+                    func.count(Quotation.id).desc()
+                )
+            )
 
-        return [{
-            "product_name": row.product_name,
-            "quotation_count": row.quotation_count,
-        } for row in results
-        ]
+            rows = session.execute(stmt).all()
+
+            return [
+                {
+                    "product_name": row.product_name,
+                    "quotation_count": row.quotation_count,
+                }
+                for row in rows
+            ]
+
 
     def get_special_model_analytics(self):
-        standard = (
-            self.db.query(func.count(Quotation.id))
-            .filter(Quotation.is_active.is_(True), Quotation.is_special_model.is_(False),)
-            .scalar()
-            or 0
-        )
+        with SessionLocal() as session:
 
-        special = (
-            self.db.query(func.count(Quotation.id))
-            .filter(Quotation.is_active.is_(True), Quotation.is_special_model.is_(True),)
-            .scalar()
-            or 0
-        )
+            standard_stmt = (
+                select(func.count(Quotation.id))
+                .where(
+                    Quotation.is_active.is_(True),
+                    Quotation.is_special_model.is_(False),
+                )
+            )
 
-        return {
-            "standard_models": standard,
-            "special_models": special,
-        }
+            special_stmt = (
+                select(func.count(Quotation.id))
+                .where(
+                    Quotation.is_active.is_(True),
+                    Quotation.is_special_model.is_(True),
+                )
+            )
+
+            standard = session.scalar(
+                standard_stmt
+            ) or 0
+
+            special = session.scalar(
+                special_stmt
+            ) or 0
+
+            return {
+                "standard_models": standard,
+                "special_models": special,
+            }
+
 
     def get_dealer_analytics(self):
-        dealer = (
-            self.db.query(func.count(Quotation.id))
-            .filter(Quotation.is_active.is_(True), Quotation.is_dealer.is_(True))
-            .scalar()
-            or 0
-        )
+        with SessionLocal() as session:
 
-        non_dealer = (
-            self.db.query(func.count(Quotation.id))
-            .filter(Quotation.is_active.is_(True), Quotation.is_dealer.is_(False))
-            .scalar()
-            or 0
-        )
+            dealer_stmt = (
+                select(func.count(Quotation.id))
+                .where(
+                    Quotation.is_active.is_(True),
+                    Quotation.is_dealer.is_(True),
+                )
+            )
 
-        return {
-            "dealer": dealer,
-            "non_dealer": non_dealer,
-        }
+            non_dealer_stmt = (
+                select(func.count(Quotation.id))
+                .where(
+                    Quotation.is_active.is_(True),
+                    Quotation.is_dealer.is_(False),
+                )
+            )
+
+            dealer = session.scalar(
+                dealer_stmt
+            ) or 0
+
+            non_dealer = session.scalar(
+                non_dealer_stmt
+            ) or 0
+
+            return {
+                "dealer": dealer,
+                "non_dealer": non_dealer,
+            }
+
 
     # --- Quotations end ---
 EDBR = PostgresRepository()

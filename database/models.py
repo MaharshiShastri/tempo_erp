@@ -733,17 +733,15 @@ class Quotation(Base):
     
     enquiry_date: Mapped[str] = mapped_column(Date, nullable=False,)
 
-    supply: Mapped[str] = mapped_column(String(255), nullable=False,)
+    supply: Mapped[str] = mapped_column(Text, nullable=False,)
 
-    installation: Mapped[str] = mapped_column(String(255), nullable=False,)
+    installation: Mapped[str] = mapped_column(Text, nullable=False,)
 
-    freight: Mapped[str] = mapped_column(String(255), nullable=False,)
+    freight: Mapped[str] = mapped_column(Text, nullable=False,)
 
     is_dealer: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false",)
 
     is_special_model: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false",)
-
-    special_itinerary: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
     sales_user_name: Mapped[str] = mapped_column(String(255), nullable=False,)
 

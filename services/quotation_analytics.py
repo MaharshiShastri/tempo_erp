@@ -525,7 +525,7 @@ def generate_today_quotation_pdf(data):
     return output_path
 
 
-def generate_today_quotation_analytics_pdf():
+def generate_today_quotation_analytics_pdf() -> Path:
     analytics = EDBR.get_today_quotation_summary()
 
     generate_today_quotation_pdf(analytics)
@@ -534,4 +534,5 @@ def generate_today_quotation_analytics_pdf():
     today = date.today()
     
     output_path = ANALYTICS_OUTPUT_DIR / f"Quotation_Analytics_{today.isoformat()}.pdf"
-    
+
+    return output_path

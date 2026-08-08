@@ -45,7 +45,18 @@ export default function useQuotation({sessionToken, showErrorModal}){
 
             return row.map((cell, cIndex) => cIndex === columnIndex ? value : cell);
         }));
+    }; 
+
+    const updateSpecialColumn = (columnIndex, value) => {
+        setQuoteSpecialColumns(prev =>
+            prev.map((column, index) =>
+                index === columnIndex
+                    ? value
+                    : column
+            )
+        );
     };
+
 
     const removeSpecialRow = (index) => {
         setQuoteSpecialRows(prev =>
@@ -53,20 +64,15 @@ export default function useQuotation({sessionToken, showErrorModal}){
         );
     };
 
-    const updateSpecialRow = (index, field, value) => {
-        setQuoteSpecialRows(prev =>
-            prev.map((row, rowIndex) =>
-                rowIndex === index
-                    ? { ...row, [field]: value }
-                    : row
-            )
-        );
-    };
-
     const handleGenerateQuote = async(e) => {
         e.preventDefault();
         if(quoteSelectedGroup.length !== 1){
             showErrorModal("Quote Generation", "Please select only one product group.");
+            return;
+        }
+
+        if (quoteSpecialModel && quoteSelectedItemCode.length !== 1) {
+            showErrorModal("Quote Generation", "Please select an item code for the special model.");
             return;
         }
 
@@ -118,13 +124,30 @@ export default function useQuotation({sessionToken, showErrorModal}){
             setQouteGenerating(false);
         }
     }
+
+    const handleSpecialModelChange = (checked) => {
+        setQuoteSpecialModel(checked);
+
+        if (!checked) {
+            setQuoteSpecialRows([
+                ["", ""],
+            ]);
+
+            setQuoteSpecialColumns([
+                "Parameter",
+                "Value",
+            ]);
+
+            setQuoteSelectedItemCode([]);
+        }
+    };
     
     return {quoteSelectedGroup, setQuoteSelectedGroup, clientQuoteCompany, setClientQuoteCompany, qouteAddress, setQouteAddress,
     qouteCity, setQouteCity, clientQuoteEmail, setClientQuoteEmail, buyerQuoteName, setBuyerQuoteName, qouteDateInput, setQouteDateInput,
     qouteGenerating, setQouteGenerating, handleGenerateQuote, buyerQouteNum, setBuyerQouteNum, qouteNum, setQouteNum,
     qoutePostalCode, setQoutePostalCode, quoteSupply, setQuoteSupply, quoteInstallation, setQuoteInstallation, quoteFreight,
     setQuoteFreight, quoteDealer, setQuoteDealer, quoteSpecialModel, setQuoteSpecialModel, quoteSpecialModel, setQuoteSpecialModel,
-    quoteSelectedItemCode, setQuoteSelectedItemCode, quoteSpecialRows, setQuoteSpecialRows, addSpecialRow, removeSpecialRow,
-    updateSpecialRow,
+    quoteSelectedItemCode, setQuoteSelectedItemCode, quoteSpecialColumns, setQuoteSpecialColumns, quoteSpecialRows, setQuoteSpecialRows,
+    addSpecialRow, addSpecialColumn, updateSpecialCell, removeSpecialRow, handleSpecialModelChange, updateSpecialColumn, removeSpecialRow,
     }
 }

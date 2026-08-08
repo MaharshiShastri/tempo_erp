@@ -38,8 +38,3 @@ def send_daily_quotation_analytics():
         "status": "sent",
         "pdf": str(pdf_path),
     }
-
-@celery.task(name="services.tasks.test_quotation_email")
-def test_quotation_email():
-    pdf_path = Path("/app/generated_analytics/Quotation_Analytics_2026-08-04.pdf")
-    send_quotation_analytics_email(pdf_path)

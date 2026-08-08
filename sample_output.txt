@@ -1,0 +1,20 @@
+(tempo_erp) PS D:\tempo_crm\tempo_erp> python .\insert_item_master.py
+
+2026-08-07 11:37:09,768 INFO database.repository - DB URI: postgresql://postgres:TempoInstruments@localhost:5433/testing_DB
+
+Fetching Item Master from Tally...
+
+Got 10831 raw items from Tally.
+
+=== Sample mapped rows (first 3) ===
+
+{'item_code': '', 'item_name': '', 'item_group': '01- Misc.', 'rate': 0.0, 'unit_measure': 'Not Applicable', 'additional_spec_text': '', 'hsn_code': 'Not Found', 'revision_no': '', 'available_stock': 0}
+
+{'item_code': '', 'item_name': '', 'item_group': '01- Misc.', 'rate': 0.0, 'unit_measure': 'Nos.', 'additional_spec_text': '', 'hsn_code': 'Not Found', 'revision_no': '', 'available_stock': 0}
+
+{'item_code': '', 'item_name': '', 'item_group': '01- Misc.', 'rate': 0.0, 'unit_measure': 'Nos.', 'additional_spec_text': '', 'hsn_code': 'Not Found', 'revision_no': '', 'available_stock': 0}
+
+About to insert 10831 items into ItemMaster. Proceed? [y/N] n
+
+Aborted -- nothing inserted. 
+As you can see, we need to filter in the item_group 

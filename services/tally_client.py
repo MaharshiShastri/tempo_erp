@@ -27,8 +27,10 @@ import xml.etree.ElementTree as ET
 
 import requests
 
-TALLY_HOST = os.environ.get("TALLY_HOST", "http://192.168.0.119:9000")
-TALLY_COMPANY = os.environ.get("TALLY_COMPANY", "TEMPO INSTRUMENTS PRIVATE LIMITED - (from 1-Apr-25)")
+TALLY_HOST = os.environ.get("TALLY_HOST", "http://localhost:9000")
+TALLY_COMPANY = os.environ.get(
+    "TALLY_COMPANY", "TEMPO INSTRUMENTS PRIVATE LIMITED - (from 1-Apr-25)"
+)
 TALLY_TIMEOUT_SECONDS = int(os.environ.get("TALLY_TIMEOUT_SECONDS", "120"))
 
 # Report names that are genuine ad-hoc voucher-type pulls (family #1).
@@ -55,7 +57,7 @@ NATIVE_REPORTS = {
 FETCH_FIELDS = (
     "GUID,DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,PARTYNAME,"
     "PARTYGSTIN,REFERENCE,REFERENCEDATE,BASICBUYERADDRESS,BASICORDERTERMS,"
-    "BASICDUEDATEOFPYMT,BASICSHIPPEDBY,NARRATION,"
+    "BASICDUEDATEOFPYMT,BASICSHIPPEDBY,STATENAME,PLACEOFSUPPLY,NARRATION,"
     "ALLINVENTORYENTRIES.LIST,LEDGERENTRIES.LIST"
 )
 
@@ -65,10 +67,20 @@ FETCH_FIELDS = (
 # ---------------------------------------------------------------------------
 
 def _xml_escape(value: str) -> str:
-    return (value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;"))
+    return (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
 
-def build_voucher_collection_xml(voucher_type: str | None, from_date: str, to_date: str,company: str = TALLY_COMPANY,) -> str:
+def build_voucher_collection_xml(
+    voucher_type: str | None,
+    from_date: str,
+    to_date: str,
+    company: str = TALLY_COMPANY,
+) -> str:
     """
     from_date / to_date: 'YYYY-MM-DD' or 'YYYYMMDD'.
     voucher_type=None -> no type filter, returns every voucher in range
@@ -103,7 +115,13 @@ def build_voucher_collection_xml(voucher_type: str | None, from_date: str, to_da
     )
 
 
-def build_native_report_xml(report_name: str, from_date: str | None = None, to_date: str | None = None, ledger_name: str | None = None, company: str = TALLY_COMPANY,) -> str:
+def build_native_report_xml(
+    report_name: str,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    ledger_name: str | None = None,
+    company: str = TALLY_COMPANY,
+) -> str:
     """
     Built-in Tally report export (Trial Balance, Balance Sheet, P&L, Stock
     Summary, List of Accounts, Ledger Vouchers). Report names must match
@@ -148,7 +166,12 @@ def build_single_voucher_xml(guid: str) -> str:
 # ---------------------------------------------------------------------------
 
 def send_to_tally(xml_payload: str, tally_url: str = TALLY_HOST) -> str:
-    response = requests.post(tally_url, data=xml_payload.encode("utf-8"), headers={"Content-Type": "text/xml"}, timeout=TALLY_TIMEOUT_SECONDS,)
+    response = requests.post(
+        tally_url,
+        data=xml_payload.encode("utf-8"),
+        headers={"Content-Type": "text/xml"},
+        timeout=TALLY_TIMEOUT_SECONDS,
+    )
     response.raise_for_status()
     text = response.text
     if "<LINEERROR>" in text or "Unknown Request" in text:
@@ -161,7 +184,18 @@ def send_to_tally(xml_payload: str, tally_url: str = TALLY_HOST) -> str:
 # ---------------------------------------------------------------------------
 
 _CONTROL_CHAR_DECIMAL = re.compile(r"&#(?:0|[1-8]|11|12|1[4-9]|2[0-9]|3[01]);")
-_CONTROL_CHAR_HEX = re.compile(r"&#x(?:0?[0-8]|0?B|0?C|0?[E-F]|1[0-9A-F]);", re.IGNORECASE)
+_CONTROL_CHAR_HEX = re.compile(
+    r"&#x(?:0?[0-8]|0?B|0?C|0?[E-F]|1[0-9A-F]);", re.IGNORECASE
+)
+# Matches a bare "&" that is NOT already the start of a valid XML entity
+# (&amp; &lt; &gt; &apos; &quot; or a numeric reference like &#39; / &#x27;).
+# Escaping ONLY these bare ampersands -- rather than every "&" -- avoids
+# double-escaping entities Tally already encoded correctly. The earlier
+# version blindly escaped every "&" then tried to patch just the "&amp;"
+# case back with a string replace, which missed &apos;/&quot;/etc entirely
+# (e.g. an apostrophe in an item name came back as literal text "&apos;"
+# instead of "'").
+_BARE_AMPERSAND = re.compile(r"&(?!amp;|lt;|gt;|apos;|quot;|#\d+;|#x[0-9A-Fa-f]+;)")
 
 
 def clean_tally_xml(xml_text: str) -> str:
@@ -170,21 +204,38 @@ def clean_tally_xml(xml_text: str) -> str:
     - Illegal control-character entity references (&#4; etc.)
     - Custom "UDF:FieldName" tags with an undeclared namespace prefix
       (ElementTree raises 'unbound prefix' on these)
-    - Loose & that isn't part of a valid entity
+    - Genuinely bare & that isn't part of any entity (rare, but possible
+      in free-text fields like narration)
     """
     cleaned = _CONTROL_CHAR_DECIMAL.sub("", xml_text)
     cleaned = _CONTROL_CHAR_HEX.sub("", cleaned)
     cleaned = cleaned.replace("UDF:", "UDF_")
-    cleaned = cleaned.replace("&", "&amp;").replace("&amp;amp;", "&amp;")
+    cleaned = _BARE_AMPERSAND.sub("&amp;", cleaned)
     return cleaned
 
 
 def _parse_node(node):
     children = list(node)
     if not children:
+        # Plain leaf field (e.g. <DATE TYPE="Date">20260624</DATE>,
+        # <PARENT TYPE="String">Group Name</PARENT>). The TYPE attribute
+        # here is just Tally's internal type metadata, not meaningful
+        # data -- always ignore it and return the text value directly.
+        # (A previous version of this function captured leaf attributes
+        # too, which turned every typed field into a {"type":...,
+        # "_text":...} dict instead of a plain value -- that was wrong
+        # and has been reverted.)
         return node.text.strip() if node.text else ""
 
-    result = {}
+    # IMPORTANT: Tally puts a master OBJECT's primary NAME (and sometimes
+    # RESERVEDNAME etc.) as an XML ATTRIBUTE on the object's own tag, e.g.
+    # <STOCKITEM NAME="TI-641-..." RESERVEDNAME="">, NOT as a child element
+    # -- even when NAME is explicitly requested in FETCH. Voucher-type
+    # collections do the same (<VOUCHERTYPE NAME="Sales Order">). This
+    # only applies to nodes that HAVE children (i.e. real objects, not
+    # plain value fields) -- capturing attributes on leaf value fields is
+    # what caused the regression above, so that's deliberately NOT done.
+    result = dict(node.attrib)
     for child in children:
         if child.tag not in result:
             result[child.tag] = _parse_node(child)
@@ -294,6 +345,117 @@ def _join_text_list(value):
     return " ".join(str(x) for x in items if isinstance(x, str)).strip()
 
 
+def build_stock_item_collection_xml(company: str = TALLY_COMPANY) -> str:
+    """
+    Item Master pull. Different Tally object entirely (TYPE=StockItem, not
+    Voucher) -- no date range, since masters don't have a transaction date.
+
+    Deliberately NOT filtering server-side via TDL here (a $$Left/$$Mid
+    string-function filter was tried and had no measurable effect --
+    consistent with how unreliable ad-hoc TDL filter formulas have been
+    throughout this project). Filtering by name prefix / item group now
+    happens in Python instead, via filter_item_master_rows() below --
+    slower per-request but predictable, and the full stock item master
+    (~10k rows, no nested entries) is small enough that pulling it
+    unfiltered isn't actually a real cost.
+    """
+    company_esc = _xml_escape(company)
+    fetch_fields = (
+        "NAME,PARTNO,PARENT,BASEUNITS,GSTHSNNAME,GSTHSNCODE,GSTRATE,"
+        "CLOSINGBALANCE,DESCRIPTION"
+    )
+
+    return (
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>"
+        "<TYPE>COLLECTION</TYPE><ID>ItemMasterCollection</ID></HEADER><BODY><DESC>"
+        "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
+        f"<SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY></STATICVARIABLES>"
+        "<TDL><TDLMESSAGE>"
+        '<COLLECTION NAME="ItemMasterCollection" ISMODIFY="No">'
+        f"<TYPE>StockItem</TYPE><FETCH>{fetch_fields}</FETCH></COLLECTION>"
+        "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"
+    )
+
+
+def fetch_item_master(company: str = TALLY_COMPANY, tally_url: str = TALLY_HOST) -> str:
+    payload = build_stock_item_collection_xml(company)
+    return send_to_tally(payload, tally_url)
+
+
+def xml_to_item_master_json(xml_text: str) -> list[dict]:
+    """Parse a StockItem collection response into a flat list of normalized
+    (but not yet ItemMaster-shaped) item dicts. Use stock_item_to_master_dict()
+    to convert to the actual ItemMaster column shape.
+
+    Some STOCKITEM entries in Tally have no child fields at all (parse as
+    a plain string rather than a dict) -- these are skipped rather than
+    passed through, since they carry no usable data anyway.
+    """
+    root = ET.fromstring(clean_tally_xml(xml_text))
+    items = root.findall(".//STOCKITEM")
+    item_dicts = [_parse_node(v) for v in items]
+    normalized = [normalize_keys(v) for v in item_dicts]
+    return [v for v in normalized if isinstance(v, dict)]
+
+
+def filter_item_master_rows(
+    items: list[dict],
+    name_prefix: str | None = "TI",
+    allowed_groups: set[str] | None = None,
+) -> list[dict]:
+    """
+    items: output of xml_to_item_master_json().
+    name_prefix: keep only items whose name starts with this (case-insensitive).
+        Pass None to skip name filtering.
+    allowed_groups: if given, keep only items whose item_group (Tally's
+        PARENT field) is in this set. Left unset for now -- the sample
+        data showed junk entries under "01- Misc.", but I don't know your
+        real product group name(s) to build an allow-list. Pass e.g.
+        {"Finished Goods", "TI Products"} once you confirm the actual
+        group name(s) real products sit under in Tally.
+    """
+    filtered = []
+    for item in items:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        if name_prefix and not name.upper().startswith(name_prefix.upper()):
+            continue
+        if allowed_groups and item.get("parent") not in allowed_groups:
+            continue
+        filtered.append(item)
+    return filtered
+
+
+def stock_item_to_master_dict(item: dict) -> dict:
+    """
+    item: one normalized entry from xml_to_item_master_json().
+    Produces a dict matching ItemMaster's actual columns.
+
+    Fields Tally has no equivalent for (revision_no, additional_spec_text)
+    are left blank/default -- these appear to be manually-maintained fields
+    in your ERP, not sourced from Tally. `rate` also defaults to 0.00 since
+    Tally's stock item master doesn't carry a single canonical selling
+    rate the way a price list would -- if you have a specific price list
+    to pull from instead, tell me and I'll add a separate fetch for it.
+    """
+    item_code = item.get("partno") or item.get("name", "")
+    item_name = item.get("name", "")
+
+    return {
+        "item_code": item_code.strip(),
+        "item_name": item_name.strip(),
+        "item_group": item.get("parent", ""),
+        "rate": 0.00,  # see caveat above
+        "unit_measure": item.get("baseunits", "NOS"),
+        "additional_spec_text": item.get("description", ""),
+        "hsn_code": item.get("gsthsncode") or item.get("gsthsnname", ""),
+        "revision_no": "",
+        "available_stock": int(_parse_qty(item.get("closingbalance"))),
+    }
+
+
+
 def voucher_to_preview_dict(voucher: dict) -> dict:
     """
     voucher: one already-normalized entry from xml_to_staging_json()'s
@@ -334,6 +496,61 @@ def voucher_to_preview_dict(voucher: dict) -> dict:
         "billing_address": address,
         "payment_terms": payment_terms,
         "reference": voucher.get("reference"),
+        "items": items,
+    }
+
+
+def voucher_to_bill_preview_dict(voucher: dict) -> dict:
+    """
+    voucher: one already-normalized entry from xml_to_staging_json()'s
+    "tallymessage" list, fetched with voucher_type="Sales" (the actual
+    billing/invoice voucher type, not "Sales Order").
+
+    Produces a shape aligned with your real BillHeader/BillItem columns.
+    Deliberately does NOT resolve item_code or order_item_id here -- those
+    require database lookups against ItemMaster/OrderItem, which belong in
+    order_billing_linker.py, not this pure-XML-parsing layer. Each item
+    keeps "stockitemname" (raw Tally text) alongside "product_name" so the
+    linker has the raw string to match against.
+
+    PROTOTYPE NOTE: order_acceptance_id below is left unresolved (None) --
+    order_billing_linker.link_bill_preview_to_order() fills it in via a
+    confirmed OrderHeader lookup (Sales invoice REFERENCE ==
+    OrderHeader.purchase_order_number). This function only shapes what
+    came out of Tally; the linker owns the database lookup.
+    """
+    date_str = voucher.get("date", "")
+    bill_date = None
+    if date_str:
+        from datetime import datetime
+        try:
+            bill_date = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
+        except ValueError:
+            bill_date = date_str
+
+    items = []
+    for item in _as_list(voucher.get("allinventoryentries")):
+        stockitemname = item.get("stockitemname", "")
+        items.append(
+            {
+                "stockitemname": stockitemname,   # raw Tally text, for linker matching
+                "item_code": None,                # resolved by the linker via ItemMaster
+                "order_item_id": None,             # resolved by the linker via OrderItem
+                "product_name": stockitemname,
+                "hsn_code": item.get("gsthsnname", ""),
+                "quantity_shipped": int(_parse_qty(item.get("billedqty") or item.get("actualqty"))),
+                "rate": _parse_rate(item.get("rate")),
+                "amount": abs(_parse_rate(item.get("amount"))),
+            }
+        )
+
+    return {
+        "bill_num": voucher.get("vouchernumber"),
+        "bill_date": bill_date,
+        "order_acceptance_id": None,  # resolved by the linker
+        "indian_state": voucher.get("statename", ""),
+        "_reference": voucher.get("reference"),  # kept for the linker to match on; not a BillHeader column
+        "_party_ledger": voucher.get("partyledgername"),  # for display/debugging only
         "items": items,
     }
 

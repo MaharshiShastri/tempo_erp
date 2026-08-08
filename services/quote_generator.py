@@ -298,6 +298,16 @@ def replace_product_group_placeholder(target_doc, source_blocks, product_name, p
 # ============================================================
 # Special-model table
 # ============================================================
+def get_special_row_values(row_data):
+    if isinstance(row_data, dict):
+        return row_data.get("values", [])
+
+    values = getattr(row_data, "values", None)
+
+    if values is not None:
+        return values
+
+    return []
 
 def create_special_model_table(target_doc, columns, rows,):
     """
@@ -415,13 +425,7 @@ def create_special_model_table(target_doc, columns, rows,):
 
     for row_data in rows:
 
-        values = list(
-            getattr(row_data, "values", None)
-            or row_data.get("values", [])
-            if isinstance(row_data, dict)
-            else []
-        )
-
+        values = get_special_row_values(row_data)
         # Always make row length match column length
         values = [str(value or "") for value in values]
 
