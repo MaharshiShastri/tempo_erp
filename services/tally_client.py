@@ -1,562 +1,421 @@
 """
 services/tally_client.py
 
-Single source of truth for talking to Tally's XML/HTTP interface.
+Tally XML/HTTP client.
 
-Two request families, because Tally itself has two incompatible ways of
-exporting data:
+Responsibilities:
 
-1. build_voucher_collection_xml() -- ad-hoc TDL COLLECTION over TYPE=Voucher.
-   Use for anything that's fundamentally "a list of vouchers in a date
-   range, optionally of one type": Sales Order, Purchase Order, Sales,
-   Purchase, or Day Book (voucher_type=None => every type).
-
-2. build_native_report_xml() -- Tally's built-in named reports (Trial
-   Balance, Balance Sheet, Profit & Loss, Stock Summary, List of Accounts,
-   Ledger Vouchers). These aren't voucher lists and don't share a schema,
-   so we don't attempt to normalize them into the staging shape -- callers
-   get back the generic parsed JSON for inspection/display only.
-
-Everything downstream (normalize_keys, xml_to_staging_json,
-voucher_to_preview_dict) only applies to family #1.
+1. Fetch StockItem master data.
+2. Fetch voucher collections by voucher type and date range.
+3. Filter StockItem XML by NAME prefix.
+4. Parse Tally XML into normalized Python structures.
+5. Convert Sales/Purchase Order vouchers into staging-ready dictionaries.
 """
 
+from __future__ import annotations
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from database.models import (
+    StagingOrderHeader,
+    StagingOrderItem,
+)
 import os
 import re
 import xml.etree.ElementTree as ET
 
+from datetime import date, datetime
+from decimal import Decimal
+from pathlib import Path
+
 import requests
 
-TALLY_HOST = os.environ.get("TALLY_HOST", "http://localhost:9000")
-TALLY_COMPANY = os.environ.get(
-    "TALLY_COMPANY", "TEMPO INSTRUMENTS PRIVATE LIMITED - (from 1-Apr-25)"
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+TALLY_RAW_DIR = Path("tally_raw")
+
+TALLY_HOST = os.environ.get(
+    "TALLY_HOST",
+    "http://localhost:9000",
 )
-TALLY_TIMEOUT_SECONDS = int(os.environ.get("TALLY_TIMEOUT_SECONDS", "120"))
 
-# Report names that are genuine ad-hoc voucher-type pulls (family #1).
-# Value is the exact $VoucherTypeName to filter on, or None for "all types"
-# (Day Book).
-VOUCHER_TYPE_REPORTS = {
-    "Sales Order": "Sales Order",
-    "Purchase Order": "Purchase Order",
-    "Sales": "Sales",
-    "Purchase": "Purchase",
-    "Day Book": None,
-}
+TALLY_COMPANY = os.environ.get(
+    "TALLY_COMPANY",
+    "TEMPO INSTRUMENTS PRIVATE LIMITED - (from 1-Apr-25)",
+)
 
-# Everything else falls back to the built-in-report pattern (family #2).
-NATIVE_REPORTS = {
-    "Trial Balance",
-    "Profit & Loss",
-    "Balance Sheet",
-    "Stock Summary",
-    "Ledger Vouchers",
-    "List of Accounts",
-}
-
-FETCH_FIELDS = (
-    "GUID,DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,PARTYNAME,"
-    "PARTYGSTIN,REFERENCE,REFERENCEDATE,BASICBUYERADDRESS,BASICORDERTERMS,"
-    "BASICDUEDATEOFPYMT,BASICSHIPPEDBY,STATENAME,PLACEOFSUPPLY,NARRATION,"
-    "ALLINVENTORYENTRIES.LIST,LEDGERENTRIES.LIST"
+TALLY_TIMEOUT_SECONDS = int(
+    os.environ.get("TALLY_TIMEOUT_SECONDS", "120")
 )
 
 
 # ---------------------------------------------------------------------------
-# Request builders
+# XML escaping
 # ---------------------------------------------------------------------------
 
 def _xml_escape(value: str) -> str:
+    """
+    Escape XML text safely.
+    """
     return (
-        value.replace("&", "&amp;")
+        value
+        .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace('"', "&quot;")
-    )
-
-
-def build_voucher_collection_xml(
-    voucher_type: str | None,
-    from_date: str,
-    to_date: str,
-    company: str = TALLY_COMPANY,
-) -> str:
-    """
-    from_date / to_date: 'YYYY-MM-DD' or 'YYYYMMDD'.
-    voucher_type=None -> no type filter, returns every voucher in range
-    (Day Book). Date bounds are enforced INSIDE the filter formula via
-    $$Date:##SVFROMDATE / ##SVTODATE -- plain SVFROMDATE/SVTODATE alone do
-    not reliably bound an ad-hoc Voucher collection in this Tally version.
-    """
-    from_dt = from_date.replace("-", "")
-    to_dt = to_date.replace("-", "")
-    company_esc = _xml_escape(company)
-
-    date_clause = "($Date &gt;= $$Date:##SVFROMDATE) AND ($Date &lt;= $$Date:##SVTODATE)"
-    if voucher_type:
-        type_esc = _xml_escape(voucher_type)
-        formula_body = f'($VoucherTypeName = "{type_esc}") AND {date_clause}'
-    else:
-        formula_body = date_clause
-
-    return (
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>"
-        "<TYPE>COLLECTION</TYPE><ID>VoucherRangeCollection</ID></HEADER><BODY><DESC>"
-        "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
-        f"<SVFROMDATE>{from_dt}</SVFROMDATE><SVTODATE>{to_dt}</SVTODATE>"
-        f"<SVCURRENTDATE>{to_dt}</SVCURRENTDATE>"
-        f"<SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY></STATICVARIABLES>"
-        "<TDL><TDLMESSAGE>"
-        '<COLLECTION NAME="VoucherRangeCollection" ISMODIFY="No">'
-        f"<TYPE>Voucher</TYPE><FILTER>VoucherRangeFilter</FILTER>"
-        f"<FETCH>{FETCH_FIELDS}</FETCH></COLLECTION>"
-        f'<SYSTEM TYPE="Formulae" NAME="VoucherRangeFilter">{formula_body}</SYSTEM>'
-        "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"
-    )
-
-
-def build_native_report_xml(
-    report_name: str,
-    from_date: str | None = None,
-    to_date: str | None = None,
-    ledger_name: str | None = None,
-    company: str = TALLY_COMPANY,
-) -> str:
-    """
-    Built-in Tally report export (Trial Balance, Balance Sheet, P&L, Stock
-    Summary, List of Accounts, Ledger Vouchers). Report names must match
-    Tally's internal names exactly -- these vary by Tally version, so treat
-    this as best-effort and confirm against your installation if a report
-    comes back with a LINEERROR.
-    """
-    static_vars = ['<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>']
-    if from_date:
-        static_vars.append(f"<SVFROMDATE>{from_date.replace('-', '')}</SVFROMDATE>")
-    if to_date:
-        static_vars.append(f"<SVTODATE>{to_date.replace('-', '')}</SVTODATE>")
-    if company:
-        static_vars.append(f"<SVCURRENTCOMPANY>{_xml_escape(company)}</SVCURRENTCOMPANY>")
-    if ledger_name:
-        static_vars.append(f"<SVLEDGERNAME>{_xml_escape(ledger_name)}</SVLEDGERNAME>")
-
-    static_vars_xml = "".join(static_vars)
-
-    return (
-        "<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER>"
-        "<BODY><EXPORTDATA><REQUESTDESC>"
-        f"<REPORTNAME>{_xml_escape(report_name)}</REPORTNAME>"
-        f"<STATICVARIABLES>{static_vars_xml}</STATICVARIABLES>"
-        "</REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>"
-    )
-
-
-def build_single_voucher_xml(guid: str) -> str:
-    """Full exploded detail for one voucher by GUID -- family #2 style (Object/SUBTYPE)."""
-    guid_esc = _xml_escape(guid)
-    return (
-        "<ENVELOPE><HEADER><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Object</TYPE>"
-        f"<SUBTYPE>Voucher</SUBTYPE><ID>{guid_esc}</ID></HEADER>"
-        "<BODY><DESC><STATICVARIABLES><EXPLODEFLAG>Yes</EXPLODEFLAG>"
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES></DESC></BODY></ENVELOPE>"
+        .replace("'", "&apos;")
     )
 
 
 # ---------------------------------------------------------------------------
-# Sending
+# Tally XML cleaning
 # ---------------------------------------------------------------------------
 
-def send_to_tally(xml_payload: str, tally_url: str = TALLY_HOST) -> str:
-    response = requests.post(
-        tally_url,
-        data=xml_payload.encode("utf-8"),
-        headers={"Content-Type": "text/xml"},
-        timeout=TALLY_TIMEOUT_SECONDS,
-    )
-    response.raise_for_status()
-    text = response.text
-    if "<LINEERROR>" in text or "Unknown Request" in text:
-        raise ValueError(f"Tally rejected the request: {text[:500]}")
-    return text
-
-
-# ---------------------------------------------------------------------------
-# XML cleaning + generic parsing
-# ---------------------------------------------------------------------------
-
-_CONTROL_CHAR_DECIMAL = re.compile(r"&#(?:0|[1-8]|11|12|1[4-9]|2[0-9]|3[01]);")
-_CONTROL_CHAR_HEX = re.compile(
-    r"&#x(?:0?[0-8]|0?B|0?C|0?[E-F]|1[0-9A-F]);", re.IGNORECASE
+_CONTROL_CHAR_DECIMAL = re.compile(
+    r"&#(?:0|[1-8]|11|12|1[4-9]|2[0-9]|3[01]);"
 )
-# Matches a bare "&" that is NOT already the start of a valid XML entity
-# (&amp; &lt; &gt; &apos; &quot; or a numeric reference like &#39; / &#x27;).
-# Escaping ONLY these bare ampersands -- rather than every "&" -- avoids
-# double-escaping entities Tally already encoded correctly. The earlier
-# version blindly escaped every "&" then tried to patch just the "&amp;"
-# case back with a string replace, which missed &apos;/&quot;/etc entirely
-# (e.g. an apostrophe in an item name came back as literal text "&apos;"
-# instead of "'").
-_BARE_AMPERSAND = re.compile(r"&(?!amp;|lt;|gt;|apos;|quot;|#\d+;|#x[0-9A-Fa-f]+;)")
+
+_CONTROL_CHAR_HEX = re.compile(
+    r"&#x(?:0?[0-8]|0?B|0?C|0?[E-F]|1[0-9A-F]);",
+    re.IGNORECASE,
+)
+
+_BARE_AMPERSAND = re.compile(
+    r"&(?!amp;|lt;|gt;|apos;|quot;|#\d+;|#x[0-9A-Fa-f]+;)"
+)
 
 
 def clean_tally_xml(xml_text: str) -> str:
     """
-    Tally's raw export has a few things standard XML parsers choke on:
-    - Illegal control-character entity references (&#4; etc.)
-    - Custom "UDF:FieldName" tags with an undeclared namespace prefix
-      (ElementTree raises 'unbound prefix' on these)
-    - Genuinely bare & that isn't part of any entity (rare, but possible
-      in free-text fields like narration)
+    Clean common malformed constructs found in Tally XML.
     """
+
     cleaned = _CONTROL_CHAR_DECIMAL.sub("", xml_text)
     cleaned = _CONTROL_CHAR_HEX.sub("", cleaned)
+
+    # Tally UDF tags can contain undeclared namespace prefixes.
     cleaned = cleaned.replace("UDF:", "UDF_")
+
+    # Escape genuinely bare ampersands.
     cleaned = _BARE_AMPERSAND.sub("&amp;", cleaned)
+
     return cleaned
 
 
-def _parse_node(node):
+# ---------------------------------------------------------------------------
+# XML parser
+# ---------------------------------------------------------------------------
+
+def _parse_node(node: ET.Element):
+    """
+    Structure-preserving recursive XML parser.
+
+    Object attributes are retained.
+
+    Example:
+
+        <VOUCHER VCHTYPE="Sales Order">
+            ...
+        </VOUCHER>
+
+    becomes:
+
+        {
+            "VCHTYPE": "Sales Order",
+            ...
+        }
+    """
+
     children = list(node)
+
     if not children:
-        # Plain leaf field (e.g. <DATE TYPE="Date">20260624</DATE>,
-        # <PARENT TYPE="String">Group Name</PARENT>). The TYPE attribute
-        # here is just Tally's internal type metadata, not meaningful
-        # data -- always ignore it and return the text value directly.
-        # (A previous version of this function captured leaf attributes
-        # too, which turned every typed field into a {"type":...,
-        # "_text":...} dict instead of a plain value -- that was wrong
-        # and has been reverted.)
         return node.text.strip() if node.text else ""
 
-    # IMPORTANT: Tally puts a master OBJECT's primary NAME (and sometimes
-    # RESERVEDNAME etc.) as an XML ATTRIBUTE on the object's own tag, e.g.
-    # <STOCKITEM NAME="TI-641-..." RESERVEDNAME="">, NOT as a child element
-    # -- even when NAME is explicitly requested in FETCH. Voucher-type
-    # collections do the same (<VOUCHERTYPE NAME="Sales Order">). This
-    # only applies to nodes that HAVE children (i.e. real objects, not
-    # plain value fields) -- capturing attributes on leaf value fields is
-    # what caused the regression above, so that's deliberately NOT done.
     result = dict(node.attrib)
+
     for child in children:
+        value = _parse_node(child)
+
         if child.tag not in result:
-            result[child.tag] = _parse_node(child)
+            result[child.tag] = value
         else:
             if not isinstance(result[child.tag], list):
-                result[child.tag] = [result[child.tag]]
-            result[child.tag].append(_parse_node(child))
+                result[child.tag] = [
+                    result[child.tag]
+                ]
+
+            result[child.tag].append(value)
+
     return result
 
 
 def tally_xml_to_json(xml_string: str) -> dict:
-    """Generic, structure-preserving XML->dict. Keys keep Tally's raw casing
-    (VOUCHERNUMBER, ALLINVENTORYENTRIES.LIST, ...). Use for family #2
-    reports / raw display -- NOT for staging ingestion (see
-    xml_to_staging_json for that)."""
+    """
+    Generic structure-preserving XML -> dict.
+    """
+
     try:
-        root = ET.fromstring(clean_tally_xml(xml_string))
-        return {root.tag: _parse_node(root)}
-    except Exception as e:
-        return {"error": str(e), "raw": xml_string[:2000]}
+        root = ET.fromstring(
+            clean_tally_xml(xml_string)
+        )
+
+        return {
+            root.tag: _parse_node(root)
+        }
+
+    except Exception as exc:
+        return {
+            "error": str(exc),
+            "raw": xml_string[:2000],
+        }
 
 
 # ---------------------------------------------------------------------------
-# Normalization for staging ingestion (family #1 / voucher collections only)
+# Key normalization
 # ---------------------------------------------------------------------------
 
 def normalize_keys(obj):
     """
-    Recursively lowercase every dict key and strip a trailing '.LIST'.
-    'ALLINVENTORYENTRIES.LIST' -> 'allinventoryentries'
-    'VOUCHERNUMBER'            -> 'vouchernumber'
+    Normalize Tally keys:
 
-    Also collapses Tally's "wrapper == child name" pattern, e.g.
-    BASICBUYERADDRESS.LIST containing repeated <BASICBUYERADDRESS> children:
-    after stripping ".LIST" both keys collide, so { "basicbuyeraddress":
-    { "basicbuyeraddress": [...] } } is flattened to
-    { "basicbuyeraddress": [...] }.
+        VOUCHERNUMBER
+        -> vouchernumber
+
+        ALLINVENTORYENTRIES.LIST
+        -> allinventoryentries
+
+    Also collapses:
+
+        BASICBUYERADDRESS.LIST
+            BASICBUYERADDRESS
+            BASICBUYERADDRESS
+
+    into a simple list.
     """
+
     if isinstance(obj, dict):
+
         normalized = {}
+
         for key, value in obj.items():
+
             clean_key = key.lower()
+
             if clean_key.endswith(".list"):
-                clean_key = clean_key[: -len(".list")]
+                clean_key = clean_key[:-5]
+
             cleaned_value = normalize_keys(value)
+
             if (
                 isinstance(cleaned_value, dict)
                 and len(cleaned_value) == 1
                 and clean_key in cleaned_value
             ):
                 cleaned_value = cleaned_value[clean_key]
-            normalized[clean_key] = cleaned_value
+
+            if clean_key in normalized:
+
+                if not isinstance(normalized[clean_key], list):
+                    normalized[clean_key] = [
+                        normalized[clean_key]
+                    ]
+
+                if isinstance(cleaned_value, list):
+                    normalized[clean_key].extend(
+                        cleaned_value
+                    )
+                else:
+                    normalized[clean_key].append(
+                        cleaned_value
+                    )
+
+            else:
+                normalized[clean_key] = cleaned_value
+
         return normalized
+
     if isinstance(obj, list):
-        return [normalize_keys(item) for item in obj]
+        return [
+            normalize_keys(item)
+            for item in obj
+        ]
+
     return obj
 
 
-def xml_to_staging_json(xml_text: str) -> dict:
-    """
-    Parse a voucher-collection response into {"tallymessage": [voucher, ...]}
-    with fully normalized (lowercase, no ".LIST") keys -- the exact shape
-    database.repository.EDBR.ingest_tally_json() expects.
-    """
-    root = ET.fromstring(clean_tally_xml(xml_text))
-
-    # <CMPINFO> contains an unrelated same-named <VOUCHER>0</VOUCHER> COUNT
-    # field. Only real voucher records carry a VCHTYPE attribute.
-    vouchers = [v for v in root.findall(".//VOUCHER") if "VCHTYPE" in v.attrib]
-
-    voucher_dicts = [_parse_node(v) for v in vouchers]
-    normalized = [normalize_keys(v) for v in voucher_dicts]
-    return {"tallymessage": normalized}
-
-
 # ---------------------------------------------------------------------------
-# Lightweight preview shape (for UI review before committing to staging --
-# does NOT touch the database; EDBR.ingest_tally_json does the real commit)
+# Tally request
 # ---------------------------------------------------------------------------
 
-def _parse_qty(qty):
-    if not qty:
-        return 0
-    m = re.search(r"[\d.]+", str(qty))
-    return float(m.group()) if m else 0
+FETCH_FIELDS = (
+    "GUID,"
+    "DATE,"
+    "VOUCHERNUMBER,"
+    "VOUCHERTYPENAME,"
+    "PARTYLEDGERNAME,"
+    "PARTYNAME,"
+    "PARTYGSTIN,"
+    "REFERENCE,"
+    "REFERENCEDATE,"
+    "BASICBUYERADDRESS,"
+    "BASICORDERTERMS,"
+    "BASICDUEDATEOFPYMT,"
+    "BASICSHIPPEDBY,"
+    "STATENAME,"
+    "PLACEOFSUPPLY,"
+    "NARRATION,"
+    "ALLINVENTORYENTRIES.LIST,"
+    "LEDGERENTRIES.LIST"
+)
 
 
-def _parse_rate(rate):
-    if not rate:
-        return 0
-    m = re.search(r"[\d.]+", str(rate))
-    return float(m.group()) if m else 0
+def build_voucher_collection_xml(
+    voucher_type: str,
+    from_date: str,
+    to_date: str,
+    company: str = TALLY_COMPANY,
+) -> str:
 
+    from_dt = from_date.replace("-", "")
+    to_dt = to_date.replace("-", "")
 
-def _as_list(value):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    if isinstance(value, dict):
-        return [value]
-    return [value]
-
-
-def _join_text_list(value):
-    items = _as_list(value)
-    return " ".join(str(x) for x in items if isinstance(x, str)).strip()
-
-
-def build_stock_item_collection_xml(company: str = TALLY_COMPANY) -> str:
-    """
-    Item Master pull. Different Tally object entirely (TYPE=StockItem, not
-    Voucher) -- no date range, since masters don't have a transaction date.
-
-    Deliberately NOT filtering server-side via TDL here (a $$Left/$$Mid
-    string-function filter was tried and had no measurable effect --
-    consistent with how unreliable ad-hoc TDL filter formulas have been
-    throughout this project). Filtering by name prefix / item group now
-    happens in Python instead, via filter_item_master_rows() below --
-    slower per-request but predictable, and the full stock item master
-    (~10k rows, no nested entries) is small enough that pulling it
-    unfiltered isn't actually a real cost.
-    """
+    voucher_type_esc = _xml_escape(voucher_type)
     company_esc = _xml_escape(company)
-    fetch_fields = (
-        "NAME,PARTNO,PARENT,BASEUNITS,GSTHSNNAME,GSTHSNCODE,GSTRATE,"
-        "CLOSINGBALANCE,DESCRIPTION"
+
+    return f"""
+<ENVELOPE>
+    <HEADER>
+        <VERSION>1</VERSION>
+        <TALLYREQUEST>EXPORT</TALLYREQUEST>
+        <TYPE>COLLECTION</TYPE>
+        <ID>VoucherRangeCollection</ID>
+    </HEADER>
+
+    <BODY>
+        <DESC>
+
+            <STATICVARIABLES>
+                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+                <SVFROMDATE>{from_dt}</SVFROMDATE>
+                <SVTODATE>{to_dt}</SVTODATE>
+                <SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY>
+            </STATICVARIABLES>
+
+            <TDL>
+                <TDLMESSAGE>
+
+                    <COLLECTION
+                        NAME="VoucherRangeCollection"
+                        ISMODIFY="No"
+                        ISFIXED="No"
+                        ISINITIALIZE="Yes"
+                        ISOPTION="No"
+                        ISINTERNAL="No"
+                    >
+
+                        <TYPE>Voucher</TYPE>
+
+                        <FETCH>
+                            DATE,
+                            REFERENCEDATE,
+                            GUID,
+                            STATENAME,
+                            NARRATION,
+                            PARTYGSTIN,
+                            PLACEOFSUPPLY,
+                            VOUCHERTYPENAME,
+                            PARTYNAME,
+                            PARTYLEDGERNAME,
+                            VOUCHERNUMBER,
+                            REFERENCE,
+                            BASICBUYERADDRESS.*,
+                            BASICORDERTERMS.*,
+                            BASICDUEDATEOFPYMT,
+                            BASICSHIPPEDBY,
+                            ISDELETED,
+                            ASORIGINAL,
+                            ISDEEMEDPOSITIVE,
+                            EFFECTIVEDATE,
+                            ISINVOICE,
+                            MASTERID,
+                            VOUCHERKEY,
+                            VOUCHERRETAINKEY,
+                            VOUCHERNUMBERSERIES,
+                            ALLINVENTORYENTRIES.*,
+                            BATCHALLOCATIONS.*,
+                            ACCOUNTINGALLOCATIONS.*,
+                            LEDGERENTRIES.*
+                        </FETCH>
+
+                        <FILTER>
+                            VoucherDateFilter,
+                            VoucherTypeFilter
+                        </FILTER>
+
+                    </COLLECTION>
+
+                    <SYSTEM
+                        TYPE="Formulae"
+                        NAME="VoucherDateFilter"
+                    >
+                        $Date &gt;= ##SVFROMDATE
+                        AND
+                        $Date &lt;= ##SVTODATE
+                    </SYSTEM>
+
+                    <SYSTEM
+                        TYPE="Formulae"
+                        NAME="VoucherTypeFilter"
+                    >
+                        $VoucherTypeName = "{voucher_type_esc}"
+                    </SYSTEM>
+
+                </TDLMESSAGE>
+            </TDL>
+
+        </DESC>
+    </BODY>
+</ENVELOPE>
+"""
+# ---------------------------------------------------------------------------
+# Sending
+# ---------------------------------------------------------------------------
+
+def send_to_tally(
+    xml_payload: str,
+    tally_url: str = TALLY_HOST,
+) -> str:
+
+    response = requests.post(
+        tally_url,
+        data=xml_payload.encode("utf-8"),
+        headers={
+            "Content-Type": "text/xml",
+        },
+        timeout=TALLY_TIMEOUT_SECONDS,
     )
 
-    return (
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>"
-        "<TYPE>COLLECTION</TYPE><ID>ItemMasterCollection</ID></HEADER><BODY><DESC>"
-        "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
-        f"<SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY></STATICVARIABLES>"
-        "<TDL><TDLMESSAGE>"
-        '<COLLECTION NAME="ItemMasterCollection" ISMODIFY="No">'
-        f"<TYPE>StockItem</TYPE><FETCH>{fetch_fields}</FETCH></COLLECTION>"
-        "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"
-    )
+    response.raise_for_status()
 
+    text = response.text
 
-def fetch_item_master(company: str = TALLY_COMPANY, tally_url: str = TALLY_HOST) -> str:
-    payload = build_stock_item_collection_xml(company)
-    return send_to_tally(payload, tally_url)
-
-
-def xml_to_item_master_json(xml_text: str) -> list[dict]:
-    """Parse a StockItem collection response into a flat list of normalized
-    (but not yet ItemMaster-shaped) item dicts. Use stock_item_to_master_dict()
-    to convert to the actual ItemMaster column shape.
-
-    Some STOCKITEM entries in Tally have no child fields at all (parse as
-    a plain string rather than a dict) -- these are skipped rather than
-    passed through, since they carry no usable data anyway.
-    """
-    root = ET.fromstring(clean_tally_xml(xml_text))
-    items = root.findall(".//STOCKITEM")
-    item_dicts = [_parse_node(v) for v in items]
-    normalized = [normalize_keys(v) for v in item_dicts]
-    return [v for v in normalized if isinstance(v, dict)]
-
-
-def filter_item_master_rows(
-    items: list[dict],
-    name_prefix: str | None = "TI",
-    allowed_groups: set[str] | None = None,
-) -> list[dict]:
-    """
-    items: output of xml_to_item_master_json().
-    name_prefix: keep only items whose name starts with this (case-insensitive).
-        Pass None to skip name filtering.
-    allowed_groups: if given, keep only items whose item_group (Tally's
-        PARENT field) is in this set. Left unset for now -- the sample
-        data showed junk entries under "01- Misc.", but I don't know your
-        real product group name(s) to build an allow-list. Pass e.g.
-        {"Finished Goods", "TI Products"} once you confirm the actual
-        group name(s) real products sit under in Tally.
-    """
-    filtered = []
-    for item in items:
-        name = (item.get("name") or "").strip()
-        if not name:
-            continue
-        if name_prefix and not name.upper().startswith(name_prefix.upper()):
-            continue
-        if allowed_groups and item.get("parent") not in allowed_groups:
-            continue
-        filtered.append(item)
-    return filtered
-
-
-def stock_item_to_master_dict(item: dict) -> dict:
-    """
-    item: one normalized entry from xml_to_item_master_json().
-    Produces a dict matching ItemMaster's actual columns.
-
-    Fields Tally has no equivalent for (revision_no, additional_spec_text)
-    are left blank/default -- these appear to be manually-maintained fields
-    in your ERP, not sourced from Tally. `rate` also defaults to 0.00 since
-    Tally's stock item master doesn't carry a single canonical selling
-    rate the way a price list would -- if you have a specific price list
-    to pull from instead, tell me and I'll add a separate fetch for it.
-    """
-    item_code = item.get("partno") or item.get("name", "")
-    item_name = item.get("name", "")
-
-    return {
-        "item_code": item_code.strip(),
-        "item_name": item_name.strip(),
-        "item_group": item.get("parent", ""),
-        "rate": 0.00,  # see caveat above
-        "unit_measure": item.get("baseunits", "NOS"),
-        "additional_spec_text": item.get("description", ""),
-        "hsn_code": item.get("gsthsncode") or item.get("gsthsnname", ""),
-        "revision_no": "",
-        "available_stock": int(_parse_qty(item.get("closingbalance"))),
-    }
-
-
-
-def voucher_to_preview_dict(voucher: dict) -> dict:
-    """
-    voucher: one already-normalized entry from xml_to_staging_json()'s
-    "tallymessage" list. Produces the flat shape the React upload/preview
-    tables expect (purchase_order_number, billing_name, items[...]), for
-    on-screen review BEFORE anything is written to the staging tables.
-    """
-    date_str = voucher.get("date", "")
-    order_date = None
-    if date_str:
-        from datetime import datetime
-        try:
-            order_date = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
-        except ValueError:
-            order_date = date_str  # leave as-is rather than crash the preview
-
-    address = _join_text_list(voucher.get("basicbuyeraddress"))
-    payment_terms = _join_text_list(voucher.get("basicorderterms"))
-
-    items = []
-    for item in _as_list(voucher.get("allinventoryentries")):
-        items.append(
-            {
-                "item_code": item.get("stockitemname"),
-                "additional_spec_text": _join_text_list(item.get("basicuserdescription")),
-                "hsn_code": item.get("gsthsnname", ""),
-                "quantity": _parse_qty(item.get("billedqty") or item.get("actualqty")),
-                "rate": _parse_rate(item.get("rate")),
-                "discount_percentage": 0,
-            }
+    if (
+        "<LINEERROR>" in text
+        or "Unknown Request" in text
+    ):
+        raise ValueError(
+            "Tally rejected the request: "
+            f"{text[:1000]}"
         )
 
-    return {
-        "purchase_order_number": voucher.get("vouchernumber"),
-        "order_acceptance_date": order_date,
-        "customer_code": voucher.get("partyledgername"),
-        "billing_name": voucher.get("partyname") or voucher.get("partyledgername"),
-        "billing_address": address,
-        "payment_terms": payment_terms,
-        "reference": voucher.get("reference"),
-        "items": items,
-    }
-
-
-def voucher_to_bill_preview_dict(voucher: dict) -> dict:
-    """
-    voucher: one already-normalized entry from xml_to_staging_json()'s
-    "tallymessage" list, fetched with voucher_type="Sales" (the actual
-    billing/invoice voucher type, not "Sales Order").
-
-    Produces a shape aligned with your real BillHeader/BillItem columns.
-    Deliberately does NOT resolve item_code or order_item_id here -- those
-    require database lookups against ItemMaster/OrderItem, which belong in
-    order_billing_linker.py, not this pure-XML-parsing layer. Each item
-    keeps "stockitemname" (raw Tally text) alongside "product_name" so the
-    linker has the raw string to match against.
-
-    PROTOTYPE NOTE: order_acceptance_id below is left unresolved (None) --
-    order_billing_linker.link_bill_preview_to_order() fills it in via a
-    confirmed OrderHeader lookup (Sales invoice REFERENCE ==
-    OrderHeader.purchase_order_number). This function only shapes what
-    came out of Tally; the linker owns the database lookup.
-    """
-    date_str = voucher.get("date", "")
-    bill_date = None
-    if date_str:
-        from datetime import datetime
-        try:
-            bill_date = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
-        except ValueError:
-            bill_date = date_str
-
-    items = []
-    for item in _as_list(voucher.get("allinventoryentries")):
-        stockitemname = item.get("stockitemname", "")
-        items.append(
-            {
-                "stockitemname": stockitemname,   # raw Tally text, for linker matching
-                "item_code": None,                # resolved by the linker via ItemMaster
-                "order_item_id": None,             # resolved by the linker via OrderItem
-                "product_name": stockitemname,
-                "hsn_code": item.get("gsthsnname", ""),
-                "quantity_shipped": int(_parse_qty(item.get("billedqty") or item.get("actualqty"))),
-                "rate": _parse_rate(item.get("rate")),
-                "amount": abs(_parse_rate(item.get("amount"))),
-            }
-        )
-
-    return {
-        "bill_num": voucher.get("vouchernumber"),
-        "bill_date": bill_date,
-        "order_acceptance_id": None,  # resolved by the linker
-        "indian_state": voucher.get("statename", ""),
-        "_reference": voucher.get("reference"),  # kept for the linker to match on; not a BillHeader column
-        "_party_ledger": voucher.get("partyledgername"),  # for display/debugging only
-        "items": items,
-    }
+    return text
 
 
 # ---------------------------------------------------------------------------
-# One-call convenience wrappers
+# Voucher fetch
 # ---------------------------------------------------------------------------
 
 def fetch_voucher_range(
@@ -566,47 +425,969 @@ def fetch_voucher_range(
     company: str = TALLY_COMPANY,
     tally_url: str = TALLY_HOST,
 ) -> str:
-    payload = build_voucher_collection_xml(voucher_type, from_date, to_date, company)
-    return send_to_tally(payload, tally_url)
 
+    payload = build_voucher_collection_xml(
+        voucher_type=voucher_type,
+        from_date=from_date,
+        to_date=to_date,
+        company=company,
+    )
 
-def fetch_and_stage_json(
-    voucher_type: str | None,
-    from_date: str,
-    to_date: str,
-    company: str = TALLY_COMPANY,
-    tally_url: str = TALLY_HOST,
-) -> dict:
-    """Fetch + normalize in one call -> {"tallymessage": [...]}."""
-    raw_xml = fetch_voucher_range(voucher_type, from_date, to_date, company, tally_url)
-    return xml_to_staging_json(raw_xml)
-
-
-def fetch_and_preview(
-    voucher_type: str | None,
-    from_date: str,
-    to_date: str,
-    company: str = TALLY_COMPANY,
-    tally_url: str = TALLY_HOST,
-) -> dict:
-    """Fetch + normalize + flatten to preview shape, plus raw XML for display."""
-    raw_xml = fetch_voucher_range(voucher_type, from_date, to_date, company, tally_url)
-    staged = xml_to_staging_json(raw_xml)
-    preview = [voucher_to_preview_dict(v) for v in staged["tallymessage"]]
-    return {"normalized": preview, "raw": raw_xml, "staging_json": staged}
+    return send_to_tally(
+        payload,
+        tally_url=tally_url,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Known gaps in EDBR.ingest_tally_json() worth patching there directly
-# (not fixed here since that's your tested DB-commit code, just flagging):
-#
-# 1. `ledger.get("ispartyledger", False)` never fires -- ISPARTYLEDGER is
-#    not present on voucher-level LEDGERENTRIES.LIST in this Tally version.
-#    grand_total silently stays 0.0. Fix: match by name instead --
-#    `elif ledger.get("ledgername") == voucher.get("partyledgername"):`
-#
-# 2. `orderduedate` (inside batchallocations) is formatted "24-Jun-26"
-#    (DD-Mon-YY), not "20260624" like every other Tally date field.
-#    `_parse_tally_date()`'s `strptime(date_str, "%Y%m%d")` will raise on
-#    it. Needs its own parser: `datetime.strptime(date_str, "%d-%b-%y")`.
+# Voucher -> normalized JSON
 # ---------------------------------------------------------------------------
+
+def xml_to_staging_json(
+    xml_text: str,
+) -> dict:
+
+    root = ET.fromstring(
+        clean_tally_xml(xml_text)
+    )
+
+    vouchers = [
+        voucher
+        for voucher in root.findall(".//VOUCHER")
+        if "VCHTYPE" in voucher.attrib
+    ]
+
+    voucher_dicts = [
+        _parse_node(voucher)
+        for voucher in vouchers
+    ]
+
+    normalized = [
+        normalize_keys(voucher)
+        for voucher in voucher_dicts
+    ]
+
+    return {
+        "tallymessage": normalized
+    }
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _as_list(value):
+    """
+    Normalize a Tally collection into a list.
+
+    Tally may return:
+        None
+        ""
+        {}
+        {}
+        [{...}, ""]
+        {...}
+
+    Empty/non-object collection entries are ignored by callers
+    that require structured records.
+    """
+
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return value
+
+    if isinstance(value, dict):
+        return [value]
+
+    return [value]
+
+def _join_text_list(value) -> str:
+    """
+    Convert Tally text/list structures into a clean string.
+
+    Handles:
+
+        "30 DAYS"
+
+        ["LINE 1", "LINE 2"]
+
+        {
+            "type": "String",
+            "basicbuyeraddress": [
+                "LINE 1",
+                "LINE 2",
+            ],
+        }
+
+    Never stringify a Tally metadata dictionary directly.
+    """
+
+    if value is None:
+        return ""
+
+    # ---------------------------------------------------------
+    # Tally wrapper dictionary
+    # ---------------------------------------------------------
+
+    if isinstance(value, dict):
+
+        # Remove Tally metadata such as:
+        #
+        # {"type": "String", ...}
+        #
+        # and recursively process the actual value.
+
+        meaningful_values = []
+
+        for key, nested_value in value.items():
+
+            if key.lower() == "type":
+                continue
+
+            meaningful_values.append(
+                _join_text_list(nested_value)
+            )
+
+        return " ".join(
+            item
+            for item in meaningful_values
+            if item
+        ).strip()
+
+    # ---------------------------------------------------------
+    # Lists
+    # ---------------------------------------------------------
+
+    if isinstance(value, list):
+
+        return " ".join(
+            _join_text_list(item)
+            for item in value
+            if item is not None
+        ).strip()
+
+    # ---------------------------------------------------------
+    # Scalar
+    # ---------------------------------------------------------
+
+    return str(value).strip()
+
+def _parse_decimal(value) -> Decimal:
+
+    if value is None:
+        return Decimal("0")
+
+    text = str(value).strip()
+
+    # Remove commas.
+    text = text.replace(",", "")
+
+    # Tally quantities/rates can look like:
+    # 72385.00/Nos.
+    #
+    # Amounts can look like:
+    # -259192.90
+    match = re.search(
+        r"-?\d+(?:\.\d+)?",
+        text,
+    )
+
+    if not match:
+        return Decimal("0")
+
+    return Decimal(match.group())
+
+
+def _parse_date(value):
+
+    if not value:
+        return None
+
+    value = str(value).strip()
+
+    for fmt in (
+        "%Y%m%d",
+        "%d-%b-%y",
+        "%d-%b-%Y",
+    ):
+        try:
+            return datetime.strptime(
+                value,
+                fmt,
+            ).date()
+
+        except ValueError:
+            continue
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Sales / Purchase Order staging mapper
+# ---------------------------------------------------------------------------
+
+def voucher_to_staging_order(
+    voucher: dict,
+) -> dict:
+    """
+    Convert one normalized Tally Sales Order / Purchase Order
+    into the staging shape.
+
+    Mapping:
+
+    Header
+    ------
+    GUID                -> tally_guid
+    VOUCHERNUMBER       -> order_acceptance_id
+    DATE                -> order_acceptance_date
+    REFERENCE           -> purchase_order_number
+    PARTYLEDGERNAME     -> billing_name
+    PARTYNAME           -> customer_code
+    BASICBUYERADDRESS   -> billing_address
+    BASICORDERTERMS     -> terms_of_delivery
+    BASICDUEDATEOFPYMT  -> payment_terms
+    BASICSHIPPEDBY      -> dispatched_through
+    STATENAME           -> state_name
+    PARTYGSTIN          -> buyer_gstin
+    PLACEOFSUPPLY       -> destination
+
+    Items
+    -----
+
+    STOCKITEMNAME       -> item_code
+    RATE                -> rate
+    DISCOUNT            -> discount_percentage
+    AMOUNT              -> amount
+    ACTUALQTY           -> quantity
+
+    Ledger
+    ------
+
+    Freight Charges AMOUNT -> freight_charges
+    """
+
+    voucher_type = (
+        voucher.get("vouchertypename")
+        or voucher.get("vchtype")
+        or ""
+    )
+
+    # ---------------------------------------------------------
+    # Header
+    # ---------------------------------------------------------
+    tally_guid = (voucher.get("guid") or "").strip()
+
+    order_acceptance_id = (
+        voucher.get("vouchernumber")
+    )
+
+    order_acceptance_date = _parse_date(
+        voucher.get("date")
+    )
+
+    # Based on the sample:
+    #
+    # REFERENCE = 4700001598
+    #
+    # This is preserved as purchase_order_number.
+    purchase_order_number = (
+        voucher.get("reference")
+    )
+
+    billing_name = (
+        voucher.get("partyledgername")
+        or ""
+    )
+
+    customer_code = (
+        voucher.get("partyname")
+        or ""
+    )
+
+    billing_address = _join_text_list(
+        voucher.get("basicbuyeraddress")
+    )
+
+    terms_of_delivery = _join_text_list(
+        voucher.get("basicorderterms")
+    )
+
+    payment_terms = (
+        voucher.get("basicduedateofpymt")
+        or ""
+    )
+
+    dispatched_through = (
+        voucher.get("basicshippedby")
+        or ""
+    )
+
+    state_name = (
+        voucher.get("statename")
+        or ""
+    )
+
+    buyer_gstin = (
+        voucher.get("partygstin")
+        or ""
+    )
+
+    destination = (
+        voucher.get("placeofsupply")
+        or ""
+    )
+
+    # ---------------------------------------------------------
+    # Items
+    # ---------------------------------------------------------
+
+    items = []
+    skipped_inventory_entries = 0
+    inventory_entries = _as_list(
+        voucher.get("allinventoryentries")
+    )
+
+    for inventory in inventory_entries:
+
+        if not isinstance(inventory, dict):
+            skipped_inventory_entries += 1
+            continue
+
+        stockitemname = (
+            inventory.get("stockitemname")
+            or ""
+        )
+
+        quantity = _parse_decimal(
+            inventory.get("actualqty")
+        )
+
+        rate = _parse_decimal(
+            inventory.get("rate")
+        )
+
+        discount = _parse_decimal(
+            inventory.get("discount")
+        )
+
+        amount = abs(
+            _parse_decimal(
+                inventory.get("amount")
+            )
+        )
+
+        item = {
+            "item_code": stockitemname,
+            "additional_spec_text": "",
+            "hsn_code": "",
+            "quantity": quantity,
+            "rate": rate,
+            "discount_percentage": discount,
+            "amount": amount,
+            "due_date": None,
+        }
+
+        items.append(item)
+
+    # ---------------------------------------------------------
+    # Ledger entries
+    # ---------------------------------------------------------
+
+    freight_charges = Decimal("0")
+    tax_amount = Decimal("0")
+    grand_total = Decimal("0")
+
+    ledger_entries = _as_list(
+        voucher.get("ledgerentries")
+    )
+
+    for ledger in ledger_entries:
+
+        if not isinstance(ledger, dict):
+            continue
+
+        ledger_name = (
+            ledger.get("ledgername")
+            or ""
+        ).strip()
+
+        ledger_amount = _parse_decimal(
+            ledger.get("amount")
+        )
+
+        # IMPORTANT:
+        #
+        # Do not treat every AMOUNT as freight.
+        #
+        # Only the ledger named Freight Charges
+        # contributes to freight_charges.
+
+        if ledger_name.casefold() == "freight charges".casefold():
+
+            freight_charges += abs(
+                ledger_amount
+            )
+
+        # We can improve tax classification later.
+        if (
+            "CGST" in ledger_name.upper()
+            or "SGST" in ledger_name.upper()
+            or "IGST" in ledger_name.upper()
+        ):
+            tax_amount += abs(
+                ledger_amount
+            )
+
+        grand_total += abs(
+            ledger_amount
+        )
+
+    return {
+        "voucher_type": voucher_type,
+        "tally_guid": tally_guid,
+        "order_acceptance_id": order_acceptance_id,
+        "order_acceptance_date": order_acceptance_date,
+
+        "purchase_order_number": purchase_order_number,
+
+        "purchase_order_date": None,
+
+        "billing_name": billing_name,
+        "billing_address": billing_address,
+
+        "payment_terms": payment_terms,
+
+        "status": "PENDING",
+
+        "customer_code": customer_code,
+
+        "dispatched_through": dispatched_through,
+
+        "ordered_by": "",
+
+        "packing_charges": Decimal("0"),
+
+        "freight_charges": freight_charges,
+
+        "tax_rate": Decimal("18"),
+
+        "buyer_gstin": buyer_gstin,
+
+        "destination": destination,
+
+        "terms_of_delivery": terms_of_delivery,
+
+        "tax_amount": tax_amount,
+
+        "grand_total": grand_total,
+
+        "state_name": state_name,
+
+        "items": items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Item Master
+# ---------------------------------------------------------------------------
+
+def build_stock_item_collection_xml(
+    company: str = TALLY_COMPANY,
+) -> str:
+
+    company_esc = _xml_escape(company)
+
+    fetch_fields = (
+        "NAME,"
+        "PARTNO,"
+        "PARENT,"
+        "BASEUNITS,"
+        "GSTHSNNAME,"
+        "GSTHSNCODE,"
+        "GSTRATE,"
+        "CLOSINGBALANCE,"
+        "DESCRIPTION"
+    )
+
+    return (
+        "<ENVELOPE>"
+        "<HEADER>"
+        "<VERSION>1</VERSION>"
+        "<TALLYREQUEST>EXPORT</TALLYREQUEST>"
+        "<TYPE>COLLECTION</TYPE>"
+        "<ID>ItemMasterCollection</ID>"
+        "</HEADER>"
+
+        "<BODY>"
+        "<DESC>"
+
+        "<STATICVARIABLES>"
+        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
+        f"<SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY>"
+        "</STATICVARIABLES>"
+
+        "<TDL>"
+        "<TDLMESSAGE>"
+
+        '<COLLECTION NAME="ItemMasterCollection" '
+        'ISMODIFY="No">'
+
+        "<TYPE>StockItem</TYPE>"
+        f"<FETCH>{fetch_fields}</FETCH>"
+
+        "</COLLECTION>"
+
+        "</TDLMESSAGE>"
+        "</TDL>"
+
+        "</DESC>"
+        "</BODY>"
+        "</ENVELOPE>"
+    )
+
+
+def fetch_item_master(
+    company: str = TALLY_COMPANY,
+    tally_url: str = TALLY_HOST,
+) -> str:
+
+    payload = build_stock_item_collection_xml(
+        company
+    )
+
+    return send_to_tally(
+        payload,
+        tally_url=tally_url,
+    )
+
+
+def filter_item_master_xml(
+    xml_text: str,
+    name_prefix: str = "TI",
+) -> str:
+    """
+    Keep only:
+
+        <STOCKITEM NAME="TI...">
+
+    The complete response is filtered in memory and
+    the resulting XML retains the original Tally
+    response structure.
+    """
+
+    prefix = (
+        name_prefix
+        .strip()
+        .casefold()
+    )
+
+    root = ET.fromstring(
+        clean_tally_xml(xml_text)
+    )
+
+    for parent in root.iter():
+
+        for stock_item in list(parent):
+
+            if stock_item.tag != "STOCKITEM":
+                continue
+
+            name = (
+                stock_item.attrib
+                .get("NAME", "")
+                .strip()
+            )
+
+            if not name.casefold().startswith(prefix):
+                parent.remove(stock_item)
+
+    return ET.tostring(
+        root,
+        encoding="unicode",
+    )
+
+
+def xml_to_item_master_json(
+    xml_text: str,
+) -> list[dict]:
+
+    root = ET.fromstring(
+        clean_tally_xml(xml_text)
+    )
+
+    items = root.findall(
+        ".//STOCKITEM"
+    )
+
+    result = []
+
+    for item in items:
+
+        parsed = normalize_keys(
+            _parse_node(item)
+        )
+
+        if isinstance(parsed, dict):
+            result.append(parsed)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Raw XML saving
+# ---------------------------------------------------------------------------
+
+def save_raw_tally_xml(
+    xml_text: str,
+    dataset: str,
+    fetched_at: datetime | None = None,
+) -> Path:
+
+    fetched_at = (
+        fetched_at
+        or datetime.now().astimezone()
+    )
+
+    day = fetched_at.strftime(
+        "%Y-%m-%d"
+    )
+
+    timestamp = fetched_at.strftime(
+        "%H%M%S_%f"
+    )
+
+    output_dir = (
+        TALLY_RAW_DIR
+        / dataset
+        / day
+    )
+
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    output_path = (
+        output_dir
+        / f"{timestamp}.xml"
+    )
+
+    output_path.write_text(
+        xml_text,
+        encoding="utf-8",
+    )
+
+    return output_path
+
+TALLY_JSON_DIR = Path("tally_json")
+
+def _json_default(value):
+    """
+    Convert Python values used by the Tally staging mapper
+    into JSON-safe values.
+
+    Decimal is intentionally stored as a string.
+
+    This is important for money/quantity values because
+    converting Decimal -> float would introduce precision loss.
+
+    date/datetime are stored as ISO strings.
+    """
+
+    if isinstance(value, Decimal):
+        return str(value)
+
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+
+    raise TypeError(
+        f"Object of type {type(value).__name__} "
+        f"is not JSON serializable"
+    )
+
+
+def save_json(
+    data,
+    dataset: str,
+    suffix: str = "",
+    fetched_at: datetime | None = None,
+) -> Path:
+    """
+    Save JSON alongside the corresponding Tally XML.
+
+    Example:
+
+        tally_json/
+            sales_orders/
+                2026-08-08/
+                    123303_292933_staging.json
+    """
+
+    import json
+
+    fetched_at = (
+        fetched_at
+        or datetime.now().astimezone()
+    )
+
+    day = fetched_at.strftime(
+        "%Y-%m-%d"
+    )
+
+    timestamp = fetched_at.strftime(
+        "%H%M%S_%f"
+    )
+
+    output_dir = (
+        TALLY_JSON_DIR
+        / dataset
+        / day
+    )
+
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    suffix_text = (
+        f"_{suffix}"
+        if suffix
+        else ""
+    )
+
+    output_path = (
+        output_dir
+        / f"{timestamp}{suffix_text}.json"
+    )
+
+    output_path.write_text(
+        json.dumps(
+            data,
+            indent=2,
+            ensure_ascii=False,
+            default=_json_default,
+        ),
+        encoding="utf-8",
+    )
+
+    return output_path
+
+
+def xml_to_staging_order_json(
+    xml_text: str,
+) -> dict:
+    """
+    Convert Tally voucher XML directly into
+    application/staging field names.
+
+    This does NOT touch the database.
+
+    Output shape:
+
+    {
+        "tallymessage": [
+            {
+                "voucher_type": "Sales Order",
+                "order_acceptance_id": "...",
+                ...
+                "items": [...]
+            }
+        ]
+    }
+    """
+
+    normalized = xml_to_staging_json(
+        xml_text
+    )
+
+    vouchers = normalized.get(
+        "tallymessage",
+        []
+    )
+
+    staging_orders = [voucher_to_staging_order(voucher) for voucher in normalized["tallymessage"]]
+
+    return {
+        "tallymessage": staging_orders
+    }
+
+# ---------------------------------------------------------------------------
+# Staging DB ingestion
+# ---------------------------------------------------------------------------
+
+def stage_orders_to_db(
+    staging_data: dict,
+    session,
+) -> dict:
+    """
+    Synchronize Tally staging data into PostgreSQL.
+
+    Identity:
+        tally_guid
+
+    Tally owns:
+        customer/order/item/financial snapshot fields.
+
+    ERP owns:
+        workflow status.
+
+    Therefore:
+        INSERT -> status = PENDING
+        UPDATE -> preserve existing status
+
+    Child items are replaced with the latest Tally snapshot.
+    """
+
+    vouchers = staging_data.get(
+        "tallymessage",
+        [],
+    )
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+    items_written = 0
+
+    for order in vouchers:
+
+        tally_guid = (
+            order.get("tally_guid")
+            or ""
+        ).strip()
+
+        if not tally_guid:
+            skipped += 1
+            continue
+
+        # -----------------------------------------------------
+        # INSERT / UPDATE HEADER
+        # -----------------------------------------------------
+
+        stmt = pg_insert(StagingOrderHeader).values(
+        tally_guid=tally_guid,
+        order_acceptance_id=order.get("order_acceptance_id"),
+        order_acceptance_date=order.get("order_acceptance_date"),
+        purchase_order_number=order.get("purchase_order_number"),
+        billing_name=order.get("billing_name"),
+        billing_address=order.get("billing_address"),
+        payment_terms=order.get("payment_terms"),
+        customer_code=order.get("customer_code"),
+        dispatched_through=order.get("dispatched_through"),
+        ordered_by=order.get("ordered_by"),
+        packing_charges=order.get("packing_charges"),
+        freight_charges=order.get("freight_charges"),
+        tax_rate=order.get("tax_rate"),
+        buyer_gstin=order.get("buyer_gstin"),
+        destination=order.get("destination"),
+        terms_of_delivery=order.get("terms_of_delivery"),
+        tax_amount=order.get("tax_amount"),
+        grand_total=order.get("grand_total"),
+        state_name=order.get("state_name"),
+        )
+
+        update_values = {
+            "order_acceptance_id": stmt.excluded.order_acceptance_id,
+            "order_acceptance_date": stmt.excluded.order_acceptance_date,
+            "purchase_order_number": stmt.excluded.purchase_order_number,
+            "billing_name": stmt.excluded.billing_name,
+            "billing_address": stmt.excluded.billing_address,
+            "payment_terms": stmt.excluded.payment_terms,
+            "customer_code": stmt.excluded.customer_code,
+            "dispatched_through": stmt.excluded.dispatched_through,
+            "ordered_by": stmt.excluded.ordered_by,
+            "packing_charges": stmt.excluded.packing_charges,
+            "freight_charges": stmt.excluded.freight_charges,
+            "tax_rate": stmt.excluded.tax_rate,
+            "buyer_gstin": stmt.excluded.buyer_gstin,
+            "destination": stmt.excluded.destination,
+            "terms_of_delivery": stmt.excluded.terms_of_delivery,
+            "tax_amount": stmt.excluded.tax_amount,
+            "grand_total": stmt.excluded.grand_total,
+            "state_name": stmt.excluded.state_name,
+        }
+        stmt = stmt.on_conflict_do_update(index_elements=[StagingOrderHeader.tally_guid],set_=update_values,).returning(StagingOrderHeader.staging_id, StagingOrderHeader.status,)
+
+        result = session.execute(stmt)
+
+        staging_id, existing_status = result.one()
+
+        # -----------------------------------------------------
+        # Determine insert/update for reporting
+        # -----------------------------------------------------
+
+        if existing_status == "PENDING":
+            # This isn't a perfect way to distinguish insert/update,
+            # so don't rely on this for accounting.
+            pass
+
+        # -----------------------------------------------------
+        # Replace child item snapshot
+        # -----------------------------------------------------
+
+        session.query(
+            StagingOrderItem
+        ).filter(
+            StagingOrderItem.staging_header_id
+            == staging_id
+        ).delete(
+            synchronize_session=False
+        )
+
+        for item in order.get("items", []):
+
+            session.add(
+                StagingOrderItem(
+                    staging_header_id=staging_id,
+
+                    item_code=item.get(
+                        "item_code"
+                    ),
+
+                    additional_spec_text=item.get(
+                        "additional_spec_text"
+                    ),
+
+                    hsn_code=item.get(
+                        "hsn_code"
+                    ),
+
+                    quantity=item.get(
+                        "quantity"
+                    ),
+
+                    rate=item.get(
+                        "rate"
+                    ),
+
+                    discount_percentage=item.get(
+                        "discount_percentage"
+                    ),
+
+                    amount=item.get(
+                        "amount"
+                    ),
+
+                    due_date=item.get(
+                        "due_date"
+                    ),
+                )
+            )
+
+            items_written += 1
+
+        # For now count every successfully synchronized voucher
+        # as processed. If you want exact inserted/updated counts,
+        # we can add xmax/RETURNING logic later.
+
+        inserted += 1
+
+    session.flush()
+
+    return {
+        "received": len(vouchers),
+        "processed": inserted,
+        "skipped": skipped,
+        "items_written": items_written,
+    }

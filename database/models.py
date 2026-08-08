@@ -217,32 +217,32 @@ class ItemMaster(Base):
 
 class StagingOrderHeader(Base):
     __tablename__ = "stg_order_headers"
-    #Done
-    staging_id: Mapped[int] = mapped_column(Integer,primary_key=True, autoincrement=True)
 
-    order_acceptance_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    staging_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True,)
+    tally_guid: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True,)
+    order_acceptance_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True,)
 
-    order_acceptance_date: Mapped[date | None] = mapped_column(Date, server_default=func.current_timestamp(), nullable=True)
+    order_acceptance_date: Mapped[date | None] = mapped_column(Date, nullable=True,)
 
-    purchase_order_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    purchase_order_number: Mapped[str | None] = mapped_column(String(100), nullable=True,)
 
-    purchase_order_date: Mapped [date | None] = mapped_column(Date, server_default=func.current_timestamp(), nullable=True)
-    
-    billing_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    purchase_order_date: Mapped[date | None] = mapped_column(Date, nullable=True,)
 
-    billing_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_name: Mapped[str | None] = mapped_column(String(255), nullable=True,)
 
-    payment_terms: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    billing_address: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
-    status: Mapped[str] = mapped_column(String(50),server_default="PENDING", nullable=True)
+    payment_terms: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime,server_default=func.now(), nullable=True)
-    
-    due_date: Mapped[date | None] = mapped_column(Date, server_default=func.current_timestamp(), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), server_default="PENDING", nullable=True,)
 
-    customer_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True,)
 
-    dispatched_through: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True,)
+
+    customer_code: Mapped[str | None] = mapped_column(String(100), nullable=True,)
+
+    dispatched_through: Mapped[str | None] = mapped_column(String(100), nullable=True,)
 
     ordered_by: Mapped[str | None] = mapped_column(String(255), nullable=True,)
 
@@ -250,40 +250,49 @@ class StagingOrderHeader(Base):
 
     freight_charges: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), server_default="0.00", nullable=True,)
 
-    tax_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), server_default="18.00",nullable=True,)
+    tax_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), server_default="18.00", nullable=True,)
 
-    buyer_gstin: Mapped[str | None] = mapped_column(String(15), nullable=True, )
+    buyer_gstin: Mapped[str | None] = mapped_column(String(15), nullable=True,)
 
     destination: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
-    terms_of_delivery: Mapped[str | None] = mapped_column(String(255), nullable=True,)
+    terms_of_delivery: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
     tax_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), server_default="0.00", nullable=True,)
 
     grand_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), server_default="0.00", nullable=True,)
 
-    items: Mapped[list["StagingOrderItem"]] = relationship(primaryjoin="foreign(StagingOrderItem.order_acceptance_id) == StagingOrderHeader.order_acceptance_id", cascade="all, delete-orphan",)
-    
+    # NEW
+    state_name: Mapped[str | None] = mapped_column(String(100), nullable=True,)
+
+    items: Mapped[list["StagingOrderItem"]] = relationship(back_populates="header", cascade="all, delete-orphan",)
+
+
 class StagingOrderItem(Base):
     __tablename__ = "stg_order_items"
-    #Done
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    order_acceptance_id: Mapped[str | None] = mapped_column(String(100), ForeignKey("stg_order_headers.order_acceptance_id", ondelete="CASCADE"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True,)
 
-    item_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    staging_header_id: Mapped[int] = mapped_column(ForeignKey("stg_order_headers.staging_id",ondelete="CASCADE",),nullable=False, index=True,)
 
-    additional_spec_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    item_code: Mapped[str | None] = mapped_column(String(100), nullable=True,)
 
-    hsn_code: Mapped[str | None] = mapped_column(String(50))
+    additional_spec_text: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
-    quantity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    hsn_code: Mapped[str | None] = mapped_column(String(50), nullable=True,)
 
-    rate: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True,)
 
-    amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
-    due_date: Mapped[date | None] = mapped_column(Date, server_default=func.current_timestamp(), nullable=True,)
+    rate: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True,)
 
+    discount_percentage: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), server_default="0.00", nullable=True,)
+
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True,)
+
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True,)
+
+    header: Mapped["StagingOrderHeader"] = relationship(back_populates="items",)
+    
 class LogisticsPartner(Base):
     __tablename__ = "logistics_partners"
     #Done

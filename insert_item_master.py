@@ -1,19 +1,18 @@
 """
-insert_item_master.py
+inspect_item_master.py
 
-Fetches Item Master from Tally and inserts into ItemMaster via your
-existing EDBR.create_item() -- unchanged, exactly as it already exists in
-repository.py. Standalone, independent of tally_router.py.
+Fetches Item Master data from Tally and saves the TI* items to JSON.
 
-Since the table is currently empty, this is a straight insert loop with
-per-row error handling (so one bad item doesn't abort the whole batch).
-Re-running this after the table has data WILL fail on duplicate item_code
-(create_item doesn't upsert) -- that's fine for a first populate run, but
-if you re-run this later, tell me and I'll add a skip-existing check.
-
-Run directly:
-    python insert_item_master.py
+IMPORTANT:
+- Does NOT write anything to PostgreSQL.
+- Does NOT call EDBR.create_item().
+- Does NOT modify ItemMaster.
+- This is purely for inspecting the Tally Item Master structure.
 """
+
+import json
+from collections import Counter
+from datetime import datetime
 
 from services.tally_client import (
     fetch_item_master,
@@ -21,95 +20,197 @@ from services.tally_client import (
     filter_item_master_rows,
     stock_item_to_master_dict,
 )
-from database.repository import EDBR
+
+
+OUTPUT_FILE = "tally_ti_item_master.json"
 
 
 def main():
     print("Fetching Item Master from Tally...")
+
     raw_xml = fetch_item_master()
+
     raw_items = xml_to_item_master_json(raw_xml)
+
     print(f"Got {len(raw_items)} raw items from Tally.\n")
 
     if not raw_items:
-        print("Nothing returned -- check Tally connection / company name before debugging further.")
+        print(
+            "Nothing returned -- check Tally connection / "
+            "company name before debugging further."
+        )
         return
 
-    filtered_items = filter_item_master_rows(raw_items, name_prefix="TI")
-    print(f"After filtering to names starting with 'TI': {len(filtered_items)} items.\n")
+    # ---------------------------------------------------------
+    # Filter to TI products
+    # ---------------------------------------------------------
 
-    # Show the item_group breakdown of what's LEFT after name filtering,
-    # so you can tell me if any of these groups are still junk to exclude
-    # via allowed_groups, or if this list is already clean.
-    from collections import Counter
-    group_counts = Counter(item.get("parent", "") for item in filtered_items)
-    print("=== item_group breakdown (post name-filter) ===")
-    for group, count in group_counts.most_common(20):
-        print(f"  {count:5d}  {group!r}")
+    filtered_items = filter_item_master_rows(
+        raw_items,
+        name_prefix="TI",
+    )
+
+    print(
+        f"After filtering to names starting with 'TI': "
+        f"{len(filtered_items)} items.\n"
+    )
+
+    # ---------------------------------------------------------
+    # Item group breakdown
+    # ---------------------------------------------------------
+
+    group_counts = Counter(
+        item.get("parent", "")
+        for item in filtered_items
+    )
+
+    print("=== item_group breakdown ===")
+
+    for group, count in group_counts.most_common():
+        print(f"{count:5d}  {group!r}")
+
     print()
 
-    mapped_items = [stock_item_to_master_dict(i) for i in filtered_items]
+    # ---------------------------------------------------------
+    # Current application mapping
+    # ---------------------------------------------------------
 
-    # De-duplicate by item_code: Tally genuinely has ~2,600+ stock item
-    # records that share identical NAME text (multiple godown entries,
-    # historical duplicates, etc.) -- since item_code == item_name here
-    # (no PARTNO populated) and create_item() doesn't upsert, every repeat
-    # after the first would hit a primary-key collision. Keep the first
-    # occurrence of each item_code; report how many were dropped.
+    mapped_items = [
+        stock_item_to_master_dict(item)
+        for item in filtered_items
+    ]
+
+    # ---------------------------------------------------------
+    # De-duplicate only for the mapped representation.
+    #
+    # We are NOT deleting anything from the raw Tally data.
+    # This is only to show what would happen if item_code were
+    # used as the primary key.
+    # ---------------------------------------------------------
+
     seen = {}
     duplicates = 0
+
     for item in mapped_items:
-        code = item["item_code"]
+        code = item.get("item_code")
+
+        if not code:
+            continue
+
         if code in seen:
             duplicates += 1
             continue
-        seen[code] = item
-    deduped_items = list(seen.values())
-    print(f"De-duplicated: {len(mapped_items)} -> {len(deduped_items)} unique item_code "
-          f"({duplicates} duplicate names skipped)\n")
 
-    # item_code is String(100) in the ItemMaster model -- some of these
-    # long descriptive names may exceed that. Flag rather than silently
-    # truncate (truncating could create NEW collisions between two
-    # different long names that happen to share the first 100 chars).
-    too_long = [item for item in deduped_items if len(item["item_code"]) > 100]
+        seen[code] = item
+
+    deduped_items = list(seen.values())
+
+    print(
+        f"Mapped items: {len(mapped_items)}"
+    )
+
+    print(
+        f"Unique mapped item_codes: {len(deduped_items)}"
+    )
+
+    print(
+        f"Duplicate item_codes detected: {duplicates}\n"
+    )
+
+    # ---------------------------------------------------------
+    # Length check
+    # ---------------------------------------------------------
+
+    too_long = [
+        item
+        for item in deduped_items
+        if len(item.get("item_code", "")) > 100
+    ]
+
     if too_long:
-        print(f"WARNING: {len(too_long)} items have item_code longer than 100 chars "
-              f"(the column limit) -- these will fail on insert. Example:")
-        print(f"  {too_long[0]['item_code']!r} ({len(too_long[0]['item_code'])} chars)")
+        print(
+            f"WARNING: {len(too_long)} items have item_code "
+            f"longer than 100 characters."
+        )
+
+        print(
+            f"Example: {too_long[0]['item_code']!r} "
+            f"({len(too_long[0]['item_code'])} chars)"
+        )
+
         print()
 
-    print("=== Sample mapped rows (first 3) ===")
-    for item in deduped_items[:3]:
-        print(item)
-    print()
+    # ---------------------------------------------------------
+    # Save everything to JSON
+    # ---------------------------------------------------------
 
-    confirm = input(f"About to insert {len(deduped_items)} items into ItemMaster. Proceed? [y/N] ")
-    if confirm.strip().lower() != "y":
-        print("Aborted -- nothing inserted.")
-        return
+    output = {
+        "metadata": {
+            "fetched_at": datetime.now().isoformat(),
+            "source": "Tally ItemMaster",
+            "company_filter": "TI",
+            "total_items_from_tally": len(raw_items),
+            "filtered_items": len(filtered_items),
+            "mapped_items": len(mapped_items),
+            "unique_item_codes": len(deduped_items),
+            "duplicate_item_codes": duplicates,
+            "item_codes_over_100_chars": len(too_long),
+        },
 
-    inserted = 0
-    skipped = 0
-    failed = []
+        "item_group_breakdown": dict(group_counts),
 
-    for item in deduped_items:
-        if not item.get("item_code"):
-            skipped += 1
-            continue
-        try:
-            EDBR.create_item(item)
-            inserted += 1
-        except Exception as e:
-            failed.append((item.get("item_code"), str(e)))
+        # This is the important section.
+        # This preserves the normalized Tally structure.
+        "raw_ti_items": filtered_items,
 
-    print(f"\nInserted: {inserted}")
-    print(f"Skipped (no item_code): {skipped}")
-    print(f"Failed: {len(failed)}")
+        # This shows how our current application code maps
+        # Tally -> ItemMaster.
+        "mapped_items": mapped_items,
 
-    if failed:
-        print("\n=== First 10 failures ===")
-        for item_code, error in failed[:10]:
-            print(f"  {item_code}: {error}")
+        # This is what would currently be safe to insert
+        # if item_code is the PK, but DO NOT insert yet.
+        "deduplicated_mapped_items": deduped_items,
+    }
+
+    with open(
+        OUTPUT_FILE,
+        "w",
+        encoding="utf-8",
+    ) as f:
+        json.dump(
+            output,
+            f,
+            indent=2,
+            ensure_ascii=False,
+            default=str,
+        )
+
+    print(f"Saved Tally Item Master inspection data to:")
+    print(f"  {OUTPUT_FILE}")
+
+    print("\n=== First raw Tally item ===")
+
+    if filtered_items:
+        print(
+            json.dumps(
+                filtered_items[0],
+                indent=2,
+                ensure_ascii=False,
+                default=str,
+            )
+        )
+
+    print("\n=== First mapped ItemMaster item ===")
+
+    if mapped_items:
+        print(
+            json.dumps(
+                mapped_items[0],
+                indent=2,
+                ensure_ascii=False,
+                default=str,
+            )
+        )
 
 
 if __name__ == "__main__":

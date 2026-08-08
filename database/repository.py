@@ -29,7 +29,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASEa_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -248,44 +248,86 @@ class PostgresRepository:
             h_dict['items'] = [to_dict(i) for i in header.items]
             return h_dict
             
-    def search_oa_autocomplete(self, query: str):
+    def search_pending_staged_orders(self, query: str = "", limit: int = 20,):
         with SessionLocal() as session:
-            stmt = select(StagingOrderHeader.order_acceptance_id).where(
-                StagingOrderHeader.order_acceptance_id.ilike(f"%{query}%"),
-                StagingOrderHeader.status == 'PENDING'
-            ).limit(20)
+
+            stmt = (
+                select(StagingOrderHeader.order_acceptance_id)
+                .where(
+                    StagingOrderHeader.status == "PENDING"
+                )
+                .order_by(
+                    StagingOrderHeader.order_acceptance_date.desc()
+                )
+                .limit(limit)
+            )
+
+            if query:
+                stmt = stmt.where(
+                    StagingOrderHeader.order_acceptance_id.ilike(
+                        f"%{query}%"
+                    )
+                )
+
             return session.scalars(stmt).all()
 
-    def get_staged_order_by_oa(self, order_acceptance_id: str):
+    def get_pending_staged_order(self, order_acceptance_id: str,):
         with SessionLocal() as session:
-            stmt = select(StagingOrderHeader).options(joinedload(StagingOrderHeader.items)).where(
-                StagingOrderHeader.order_acceptance_id == order_acceptance_id, StagingOrderHeader.status=="PENDING"
-            ).limit(1)
-            
-            header = session.scalars(stmt).first()
-            
-            if not header: return None
-            
-            h_dict = to_dict(header)
-            
-            # Format and enforce defaults matching old logic
-            for field in ['freight_charges', 'packing_charges', 'tax_amount', 'grand_total', 'tax_rate']:
-                if field in h_dict and h_dict.get(field) is not None:
-                    h_dict[field] = float(h_dict[field])
-                else:
-                    h_dict[field] = 0.0 if field != 'tax_rate' else 18.0
-                    
-            h_dict['items'] = [to_dict(i) for i in header.items]
-            return h_dict
-                        
-    def mark_staged_order_processed(self, order_acceptance_id: str):
+
+            stmt = (
+                select(StagingOrderHeader)
+                .options(
+                    selectinload(
+                        StagingOrderHeader.items
+                    )
+                )
+                .where(
+                    StagingOrderHeader.order_acceptance_id
+                    == order_acceptance_id,
+
+                    StagingOrderHeader.status
+                    == "PENDING",
+                )
+            )
+
+            header = session.scalars(
+                stmt
+            ).first()
+
+            if not header:
+                return None
+
+            data = to_dict(header)
+
+            data["items"] = [
+                to_dict(item)
+                for item in header.items
+            ]
+
+            return data
+
+    def mark_staged_order_picked_up(self, order_acceptance_id: str,):
         with SessionLocal() as session:
-            stmt = update(StagingOrderHeader).where(
-                StagingOrderHeader.order_acceptance_id == order_acceptance_id
-            ).values(status='PROCESSED')
-            session.execute(stmt)
+
+            stmt = (
+                update(StagingOrderHeader)
+                .where(
+                    StagingOrderHeader.order_acceptance_id
+                    == order_acceptance_id,
+
+                    StagingOrderHeader.status
+                    == "PENDING",
+                )
+                .values(
+                    status="PICKED_UP"
+                )
+            )
+
+            result = session.execute(stmt)
+
             session.commit()
 
+            return result.rowcount == 1
     def _parse_tally_date(self, date_str):
         if not date_str: return None
         return datetime.strptime(date_str, '%Y%m%d').date()
@@ -930,7 +972,56 @@ class PostgresRepository:
             session.commit()
             session.refresh(new_item)
             return to_dict(new_item)
-    
+
+    def upsert_item_from_tally(self, item_data: dict):
+        with SessionLocal() as session:
+            item_code = item_data["item_code"].strip()
+
+            item = session.get(ItemMaster, item_code)
+
+            if item:
+                item.item_name = item_data["item_name"].strip()
+                item.item_group = item_data["item_group"].strip()
+                item.unit_measure = item_data["unit_measure"].strip()
+                item.hsn_code = item_data["hsn_code"].strip()
+                item.additional_spec_text = item_data["additional_spec_text"].strip()
+                item.available_stock = int(item_data["available_stock"])
+
+                # IMPORTANT:
+                # Don't overwrite these blindly from Tally yet.
+                #
+                # item.rate
+                # item.revision_no
+
+                session.commit()
+                session.refresh(item)
+
+                return {
+                    "action": "updated",
+                    "item": to_dict(item),
+                }
+
+            new_item = ItemMaster(
+                item_code=item_code,
+                item_name=item_data["item_name"].strip(),
+                item_group=item_data["item_group"].strip(),
+                rate=item_data.get("rate", 0),
+                unit_measure=item_data["unit_measure"].strip(),
+                additional_spec_text=item_data["additional_spec_text"].strip(),
+                hsn_code=item_data["hsn_code"].strip(),
+                revision_no=item_data["revision_no"].strip(),
+                available_stock=int(item_data["available_stock"]),
+            )
+
+            session.add(new_item)
+            session.commit()
+            session.refresh(new_item)
+
+            return {
+                "action": "created",
+                "item": to_dict(new_item),
+            }
+        
     def update_item(self, item_code, data):
         used = self.item_has_transactions(item_code)
         with SessionLocal() as session:
