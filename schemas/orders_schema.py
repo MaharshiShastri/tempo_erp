@@ -30,7 +30,7 @@ class OrderHeaderCreate(BaseModel):
     order_acceptance_date: date
     purchase_order_number: str = Field(..., min_length=1)
     purchase_order_date: date
-    customer_code: str = Field(..., min_length=1)
+    customer_id: str = Field(..., min_length=1)
     payment_terms: Optional[str] = ""
     billing_name: str = Field(..., min_length=1)
     billing_address: str = Field(..., min_length=1)
@@ -38,4 +38,4 @@ class OrderHeaderCreate(BaseModel):
     delivery_terms: Optional[str] = ""
     due_date: date
     items: List[OrderItemCreate]
-    ordered_by: str = Field(..., min_length=1)
+    ordered_by: Optional[str] = None

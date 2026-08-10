@@ -30,7 +30,7 @@ export default function GlobalProductionPulseView({ state }) {
                         return items.map((item, index) => ({
                             ...item,
                             _parentOrder: order, 
-                            _uniqueKey: `${order.order_acceptance_id}-${index}`
+                            _uniqueKey: `${order.order_id}-${index}`
                         }));
                     });
                     
@@ -57,7 +57,7 @@ export default function GlobalProductionPulseView({ state }) {
                                         
                                         {/* OA ID (Secondary Focus) */}
                                         <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-muted)", marginBottom: "12px", display: "flex", justifyContent: "space-between" }}>
-                                            <span>OA: {item._parentOrder.order_acceptance_id}</span>
+                                            <span>OA: {item._parentOrder.order_id}</span>
                                             <span style={{ color: "var(--brand-danger)" }}>Due: {item._parentOrder.due_date}</span>
                                         </div>
 
@@ -66,7 +66,7 @@ export default function GlobalProductionPulseView({ state }) {
                                             <button 
                                                 className="btn btn-secondary" 
                                                 style={{ width: "100%", fontSize: "11px", padding: "6px", display: "flex", justifyContent: "center", alignItems: "center", gap: "4px" }}
-                                                onClick={() => handleMoveStage(item._parentOrder.order_acceptance_id, stage.key)}
+                                                onClick={() => handleMoveStage(item._parentOrder.order_id, stage.key)}
                                             >
                                                 Advance Stage <FiArrowRight />
                                             </button>

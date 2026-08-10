@@ -23,25 +23,31 @@ def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify
         order_data['ordered_by'] = user_profile['email']
 
         return EDBR.create_order(order_data)
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)}",)
 
 @router.get("/pulse")
 def get_production_pulse(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_global_production_pulse(user)
 
 @router.patch("/{order_id:path}/stage",)
-def update_stage(order_id: str, payload: StageUpdatePayload, user: dict = Depends(check_department(["Shop Floor Administrator", "Dispatch Engineer",]))):
+def update_stage(order_id: int, payload: StageUpdatePayload, user: dict = Depends(check_department(["Shop Floor Administrator", "Dispatch Engineer",]))):
 
     try:
         return EDBR.update_order_stage(order_id, payload.stage)
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update stage: {str(e)}")
     
 @router.get("/search/oa/{oa_id:path}", dependencies=[Depends(check_department("Sales Representative"))])
 def search_order_by_po(oa_id: str, user_profile: dict = Depends(verify_bearer_token)):
     
-    order = EDBR.get_staged_order_by_oa(oa_id)
+    order = EDBR.get_pending_staged_order(oa_id)
     if not order:
         raise HTTPException(status_code=404, detail="Purchase Order not found in database.")
     return order
@@ -49,7 +55,7 @@ def search_order_by_po(oa_id: str, user_profile: dict = Depends(verify_bearer_to
 def po_autocomplete(q: str, user_profile: dict = Depends(verify_bearer_token)):
     if not q or len(q) < 2:
         return []
-    return EDBR.search_oa_autocomplete(q)
+    return EDBR.search_pending_staged_orders(q)
 
 @router.post("/ocr", dependencies=[Depends(check_department("Sales Representative"))])
 async def extract_order_from_document(file: UploadFile = File(...), user: dict = Depends(verify_bearer_token)):

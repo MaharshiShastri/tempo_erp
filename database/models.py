@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, Numeric, String, Text, 
-                        JSON, func, Computed, Float, Index, CheckConstraint)
+                        JSON, func, Computed, Float, Index, CheckConstraint, text)
 
 from sqlalchemy.dialects.postgresql import ARRAY
 
@@ -71,120 +71,136 @@ class ActivityLog(Base):
 
 class OrderHeader(Base):
     __tablename__ = "order_headers"
-    #Done
-    order_acceptance_id: Mapped[str] = mapped_column(String(50), primary_key=True)
 
-    order_acceptance_date: Mapped[date] = mapped_column(Date, nullable=False)
+    order_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True,)
 
-    purchase_order_number: Mapped[str] = mapped_column(String(100), nullable=False)
+    order_acceptance_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True,)
 
-    purchase_order_date: Mapped[date] = mapped_column(Date, nullable=False)
+    order_acceptance_date: Mapped[date] = mapped_column(Date, nullable=False,)
 
-    customer_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    purchase_order_number: Mapped[str] = mapped_column(String(100), nullable=False,)
 
-    payment_terms: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    purchase_order_date: Mapped[date] = mapped_column(Date, nullable=False,)
 
-    billing_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    customer_id: Mapped[str] = mapped_column(String(20), ForeignKey("client_companies.id"), nullable=False, index=True,)
 
-    billing_address: Mapped[str] = mapped_column(Text, nullable=False)
+    payment_terms: Mapped[str | None] = mapped_column(String(100), nullable=True,)
 
-    dispatched_through: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    billing_name: Mapped[str] = mapped_column(String(255), nullable=False,)
 
-    delivery_terms: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    billing_address: Mapped[str] = mapped_column(Text, nullable=False,)
+
+    dispatched_through: Mapped[str | None] = mapped_column(String(100), nullable=True,)
+
+    delivery_terms: Mapped[str | None] = mapped_column(String(100), nullable=True,)
 
     due_date: Mapped[date] = mapped_column(Date, nullable=False,)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
 
-    production_stage: Mapped[str] = mapped_column(String(50), server_default="PO_SUBMITTED", nullable=True)
+    current_stage_code: Mapped[str] = mapped_column(String(50), ForeignKey("production_stages.code"), nullable=False, server_default="PO_SUBMITTED", index=True,)
 
-    ordered_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ordered_by: Mapped[str | None] = mapped_column(String(255), nullable=True,)
 
-    packing_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0.00", nullable=True)
+    packing_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0.00", nullable=False,)
 
-    freight_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0.00", nullable=True)
+    freight_charges: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default="0.00", nullable=False,)
 
-    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="18.00", nullable=True)
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="18.00", nullable=False,)
 
-    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    customer: Mapped["ClientCompany"] = relationship(back_populates="orders", )
 
-    bills: Mapped[list["BillHeader"]] = relationship(back_populates="order")
+    current_stage: Mapped["ProductionStage"] = relationship(foreign_keys=[current_stage_code],)
+
+    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan",)
+
+    bills: Mapped[list["BillHeader"]] = relationship(back_populates="order",)
+
+    production_stage_history: Mapped[list["ProductionStageHistory"]] = relationship(back_populates="order", cascade="all, delete-orphan", order_by="ProductionStageHistory.entered_at",)
+
+    schedules: Mapped[list["ProductionSchedule"]] = relationship(back_populates="order", cascade="all, delete-orphan",)
 
 class OrderItem(Base):
     __tablename__ = "order_items"
-    __table_args__ = (CheckConstraint("discount_percentage >= 0 AND discount_percentage <= 100", name="order_items_discount_percentage_check",),
-                      CheckConstraint("quantity > 0", name="order_items_quantity_check"),
-                      CheckConstraint("rate >= 0", name="order_items_rate_check"),)
-    #Done
-    order_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
-    order_acceptance_id: Mapped[str] = mapped_column(String(50), ForeignKey("order_headers.order_acceptance_id",ondelete="CASCADE"), nullable=False)
+    __table_args__ = (
+        CheckConstraint(
+            "discount_percentage >= 0 AND discount_percentage <= 100",
+            name="order_items_discount_percentage_check",
+        ),
+        CheckConstraint(
+            "quantity > 0",
+            name="order_items_quantity_check",
+        ),
+        CheckConstraint(
+            "rate >= 0",
+            name="order_items_rate_check",
+        ),
+    )
 
-    item_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    order_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True,)
 
-    um: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    order_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order_headers.order_id", ondelete="CASCADE"), nullable=False, index=True,)
 
-    additional_spec_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    item_code: Mapped[str] = mapped_column(String(100), ForeignKey("items_master.item_code"), nullable=False, index=True,)
 
-    hsn_code: Mapped[str] = mapped_column(String(8), nullable=False)
+    um: Mapped[str | None] = mapped_column(String(10), nullable=True,)
 
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    additional_spec_text: Mapped[str | None] = mapped_column(Text, nullable=True,)
 
-    rate: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    hsn_code: Mapped[str] = mapped_column(String(8), nullable=False,)
 
-    discount_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="0.00", nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False,)
 
-    amount: Mapped[Decimal]  = mapped_column(Numeric(15, 2), Computed("quantity * rate * (1 - discount_percentage / 100)", persisted=True), nullable=True)
+    rate: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False,)
 
-    order: Mapped["OrderHeader"] = relationship(back_populates="items")
+    discount_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="0.00", nullable=False,)
 
-    item: Mapped["ItemMaster"] = relationship("ItemMaster",  primaryjoin="foreign(OrderItem.item_code)==ItemMaster.item_code", back_populates="order_items")
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), Computed("quantity * rate * (1 - discount_percentage / 100)",persisted=True,),nullable=False,)
 
-    bill_items: Mapped[list["BillItem"]] = relationship(back_populates="order_item")
+    order: Mapped["OrderHeader"] = relationship(back_populates="items",)
+
+    item: Mapped["ItemMaster"] = relationship(back_populates="order_items",)
+
+    bill_items: Mapped[list["BillItem"]] = relationship(back_populates="order_item",)
 
 class BillHeader(Base):
-    #Done
     __tablename__ = "bill_headers"
 
     bill_num: Mapped[str] = mapped_column(String(50), primary_key=True,)
 
-    bill_date: Mapped[date] = mapped_column(Date, nullable=False)
+    bill_date: Mapped[date] = mapped_column(Date, nullable=False,)
 
-    order_acceptance_id: Mapped[str | None] = mapped_column(String(50), ForeignKey("order_headers.order_acceptance_id"), nullable=True)
+    order_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("order_headers.order_id"), nullable=True,index=True,)
 
-    indian_state: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    indian_state: Mapped[str | None] = mapped_column(String(100), nullable=True,)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
 
-    order: Mapped["OrderHeader | None"] = relationship(back_populates="bills")
+    order: Mapped["OrderHeader | None"] = relationship(back_populates="bills",)
 
     items: Mapped[list["BillItem"]] = relationship(back_populates="bill", cascade="all, delete-orphan",)
 
 class BillItem(Base):
     __tablename__ = "bill_items"
-    __table_args__ = (CheckConstraint("quantity_shipped > 0", name="bill_items_quantity_shipped_check",),)
-    #Done
-    bill_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
-    bill_num: Mapped[str] = mapped_column(String(50), ForeignKey("bill_headers.bill_num",ondelete="CASCADE",), nullable=True)
+    bill_item_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True,)
 
-    order_item_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order_items.order_item_id"), nullable=True)
+    bill_num: Mapped[str] = mapped_column(String(50), ForeignKey("bill_headers.bill_num", ondelete="CASCADE"), nullable=False,)
 
-    quantity_shipped: Mapped[int] = mapped_column(nullable=False)
+    order_item_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("order_items.order_item_id"), nullable=True, index=True,)
 
-    item_code: Mapped[str | None] = mapped_column(String(100), ForeignKey("items_master.item_code"), nullable=True)
+    item_code: Mapped[str | None] = mapped_column(String(100), ForeignKey("items_master.item_code"), nullable=True,)
 
-    product_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    quantity_shipped: Mapped[int] = mapped_column(Integer, nullable=False,)
 
-    hsn_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    rate: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True,)
 
-    rate: Mapped[Decimal | None] = mapped_column(Numeric(9, 2), nullable=True)
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True,)
 
-    amount: Mapped[Decimal | None] = mapped_column(Numeric(9, 2), nullable=True)
-    
-    bill: Mapped["BillHeader"] = relationship(back_populates="items")
+    bill: Mapped["BillHeader"] = relationship(back_populates="items", )
 
-    order_item: Mapped["OrderItem"] = relationship(back_populates="bill_items")
+    order_item: Mapped["OrderItem | None"] = relationship(back_populates="bill_items",)
 
     item: Mapped["ItemMaster | None"] = relationship()
 
@@ -493,28 +509,30 @@ class CRMLead(Base):
 
 class ClientCompany(Base):
     __tablename__ = "client_companies"
-    #Done
-    id: Mapped[str] = mapped_column(String(20), primary_key=True)
+
+    id: Mapped[str] = mapped_column(String(20), primary_key=True,)
 
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False,)
 
     address_line_1: Mapped[str] = mapped_column(String(255), nullable=False,)
 
-    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=False,)
 
-    state: Mapped[str] = mapped_column(String(100), nullable=False)
+    state: Mapped[str] = mapped_column(String(100), nullable=False,)
 
-    pincode: Mapped[str] = mapped_column(String(10), nullable=False)
+    pincode: Mapped[str] = mapped_column(String(10), nullable=False,)
 
-    contact_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    contact_name: Mapped[str] = mapped_column(String(255), nullable=False,)
 
-    contact_role: Mapped[str] = mapped_column(String(100), nullable=False)
+    contact_role: Mapped[str] = mapped_column(String(100), nullable=False,)
 
-    contact_phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    contact_phone: Mapped[str] = mapped_column(String(20), nullable=False, )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
 
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
+
+    orders: Mapped[list["OrderHeader"]] = relationship(back_populates="customer",)
 
 class GRNHeader(Base):
     __tablename__ = "grn_headers"
@@ -761,3 +779,82 @@ class Quotation(Base):
     document_path: Mapped[str | None] = mapped_column(String(1000), nullable=True,)
 
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False,)
+
+class ProductionStage(Base):
+    __tablename__ = "production_stages"
+
+    code: Mapped[str] = mapped_column(String(50), primary_key=True,)
+
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True,)
+
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False, unique=True,)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False,)
+
+    expected_duration_hours: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True,)
+
+    history: Mapped[list["ProductionStageHistory"]] = relationship(back_populates="stage",)
+
+    schedules: Mapped[list["ProductionSchedule"]] = relationship(back_populates="stage",)
+
+class ProductionStageHistory(Base):
+    __tablename__ = "production_stage_history"
+
+    __table_args__ = (Index("idx_production_stage_history_current", "order_id", postgresql_where=text("exited_at IS NULL"),),
+                      Index("idx_production_stage_history_order", "order_id", "entered_at",),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True,)
+
+    order_id: Mapped[str] = mapped_column(String(50), ForeignKey("order_headers.order_acceptance_id", ondelete="CASCADE",),nullable=False, )
+
+    stage_code: Mapped[str] = mapped_column(String(50), ForeignKey("production_stages.code", ondelete="RESTRICT",), nullable=False,)
+
+    entered_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
+
+    exited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True,)
+
+    changed_by: Mapped[str | None] = mapped_column(String(255), ForeignKey( "users.email", ondelete="SET NULL",),nullable=True,)
+
+    order: Mapped["OrderHeader"] = relationship(back_populates="production_stage_history",)
+
+    stage: Mapped["ProductionStage"] = relationship(back_populates="history", foreign_keys=[stage_code], )
+
+    changed_by_user: Mapped["User | None"] = relationship(foreign_keys=[changed_by],)
+    
+class ProductionSchedule(Base):
+    __tablename__ = "production_schedules"
+
+    __table_args__ = (
+        CheckConstraint("planned_end >= planned_start", name="production_schedule_planned_dates_check",),
+        CheckConstraint("actual_end IS NULL OR actual_start IS NULL OR actual_end >= actual_start", name="production_schedule_actual_dates_check",),
+        Index("ix_production_schedule_stage_planned_start", "stage_code", "planned_start",),
+        Index("ix_production_schedule_order", "order_id",),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True,)
+
+    order_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order_headers.order_id", ondelete="CASCADE"), nullable=False,)
+
+    stage_code: Mapped[str] = mapped_column(String(50), ForeignKey("production_stages.code"), nullable=False,)
+
+    planned_start: Mapped[datetime] = mapped_column(DateTime, nullable=False,)
+
+    planned_end: Mapped[datetime] = mapped_column(DateTime, nullable=False,)
+
+    actual_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True,)
+
+    actual_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True,)
+
+    priority: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False,)
+
+    assigned_team: Mapped[str | None] = mapped_column(String(100), nullable=True,)
+
+    status: Mapped[str] = mapped_column(String(30), server_default="PLANNED", nullable=False,)
+
+    created_by: Mapped[str | None] = mapped_column(String(255), ForeignKey("users.email", ondelete="SET NULL"), nullable=True,)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
+
+    order: Mapped["OrderHeader"] = relationship(back_populates="schedules", )
+
+    stage: Mapped["ProductionStage"] = relationship(back_populates="schedules", )

@@ -194,32 +194,40 @@ class PostgresRepository:
         
             return result
         
-    def create_order(self, order_data: dict) -> dict:
+    def create_order(self, order_data: dict, user_email: str) -> dict:
         with SessionLocal() as session:
             header = OrderHeader(
-                order_acceptance_id=str(order_data['order_acceptance_id']),
-                order_acceptance_date=order_data['order_acceptance_date'],
-                purchase_order_number=order_data['purchase_order_number'],
-                purchase_order_date=order_data['purchase_order_date'],
-                customer_code=order_data['customer_code'],
-                payment_terms=order_data.get('payment_terms', ''),
-                billing_name=order_data['billing_name'],
-                billing_address=order_data['billing_address'],
-                dispatched_through=order_data.get('dispatched_through', ''),
-                delivery_terms=order_data.get('delivery_terms', ''),
-                due_date=order_data['due_date'],
-                ordered_by=order_data['ordered_by'],
-                packing_charges=order_data.get('packing_charges', 0.0),
-                freight_charges=order_data.get('freight_charges', 0.0),
-                tax_rate=order_data.get('tax_rate', 18.0)
+                order_acceptance_id=order_data["order_acceptance_id"],
+                order_acceptance_date=order_data["order_acceptance_date"],
+                purchase_order_number=order_data["purchase_order_number"],
+                purchase_order_date=order_data["purchase_order_date"],
+
+                customer_id=order_data["customer_id"],
+
+                payment_terms=order_data.get("payment_terms"),
+                billing_name=order_data["billing_name"],
+                billing_address=order_data["billing_address"],
+                dispatched_through=order_data.get("dispatched_through"),
+                delivery_terms=order_data.get("delivery_terms"),
+                due_date=order_data["due_date"],
+
+                current_stage_code=order_data.get("current_stage_code", "PO_SUBMITTED",),
+                
+                ordered_by=order_data.get("ordered_by"),
+
+                packing_charges=order_data.get("packing_charges", 0),
+                freight_charges=order_data.get("freight_charges", 0),
+                tax_rate=order_data.get("tax_rate", 18),
             )
+            
             session.add(header)
             
             log = ActivityLog(
                 entity_id=header.order_acceptance_id,
                 entity_type="ORDER_CREATED",
                 message=f"New order {header.order_acceptance_id} added to pipeline.",
-                log_type="INFO"
+                log_type="INFO",
+                operator_email = user_email
             )
             session.add(log)
             
@@ -228,7 +236,7 @@ class PostgresRepository:
                     raise ValueError("Specification text details cannot be left blank.")
                 
                 oi = OrderItem(
-                    order_acceptance_id=header.order_acceptance_id,
+                    order_id = header.id,
                     item_code=item['item_code'],
                     additional_spec_text=item['additional_spec_text'].strip(),
                     hsn_code=item.get('hsn_code', ''),
@@ -237,7 +245,6 @@ class PostgresRepository:
                     rate=item['rate'],
                     discount_percentage=item.get('discount_percentage', 0.0)
                 )
-                session.add(oi)
                 header.items.append(oi)
 
             session.commit()
@@ -253,21 +260,13 @@ class PostgresRepository:
 
             stmt = (
                 select(StagingOrderHeader.order_acceptance_id)
-                .where(
-                    StagingOrderHeader.status == "PENDING"
-                )
-                .order_by(
-                    StagingOrderHeader.order_acceptance_date.desc()
-                )
+                .where(StagingOrderHeader.status == "PENDING")
+                .order_by(StagingOrderHeader.order_acceptance_date.desc())
                 .limit(limit)
             )
 
             if query:
-                stmt = stmt.where(
-                    StagingOrderHeader.order_acceptance_id.ilike(
-                        f"%{query}%"
-                    )
-                )
+                stmt = stmt.where(StagingOrderHeader.order_acceptance_id.ilike(f"%{query}%"),)
 
             return session.scalars(stmt).all()
 
@@ -282,12 +281,11 @@ class PostgresRepository:
                     )
                 )
                 .where(
-                    StagingOrderHeader.order_acceptance_id
-                    == order_acceptance_id,
+                    StagingOrderHeader.order_acceptance_id == order_acceptance_id,
 
-                    StagingOrderHeader.status
-                    == "PENDING",
+                    StagingOrderHeader.status == "PENDING",
                 )
+                .order_by(StagingOrderHeader.created_at.desc())
             )
 
             header = session.scalars(
@@ -311,16 +309,10 @@ class PostgresRepository:
 
             stmt = (
                 update(StagingOrderHeader)
-                .where(
-                    StagingOrderHeader.order_acceptance_id
-                    == order_acceptance_id,
-
-                    StagingOrderHeader.status
-                    == "PENDING",
+                .where(StagingOrderHeader.order_acceptance_id == order_acceptance_id,
+                    StagingOrderHeader.status == "PENDING",
                 )
-                .values(
-                    status="PICKED_UP"
-                )
+                .values(status="PICKED_UP")
             )
 
             result = session.execute(stmt)
@@ -328,329 +320,79 @@ class PostgresRepository:
             session.commit()
 
             return result.rowcount == 1
-    def _parse_tally_date(self, date_str):
-        if not date_str: return None
-        return datetime.strptime(date_str, '%Y%m%d').date()
-
-    def _parse_tally_number(self, val_str):
-        if not val_str: return 0.0
-        match = re.search(r"[-+]?\d*\.\d+|\d+", str(val_str))
-        return float(match.group()) if match else 0.0
-
-    def _extract_tally_text_list(self, field_list):
-        if not field_list or not isinstance(field_list, list):
-            return ""
-        return "\n".join([str(item) for item in field_list if isinstance(item, str)]).strip()
-
-    def ingest_tally_json(self, tally_data: dict) -> int:
-        
-        inserted_count = 0
-        vouchers = tally_data.get("tallymessage", [])
-        
-        with SessionLocal() as session:
-            for voucher in vouchers:
-                order_acceptance_id = voucher.get("vouchernumber")
-                if not order_acceptance_id:
-                    continue 
-                    
-                order_date = self._parse_tally_date(voucher.get("date"))
-                po_number = voucher.get("reference", "")
-                billing_name = voucher.get("partyname", "")
-                billing_address = self._extract_tally_text_list(voucher.get("basicbuyeraddress"))
-                payment_terms = voucher.get("basicduedateofpymt", "")
-                
-                gstin = voucher.get("partygstin", "")
-                dispatched_through = voucher.get("basicshippedby", "")
-                terms_of_delivery = self._extract_tally_text_list(voucher.get("basicorderterms"))
-                
-                freight_charges = 0.0
-                tax_amount = 0.0
-                grand_total = 0.0
-                
-                for ledger in voucher.get("ledgerentries", []):
-                    lname = ledger.get("ledgername", "").upper()
-                    amt = self._parse_tally_number(ledger.get("amount"))
-                    
-                    if "FREIGHT" in lname:
-                        freight_charges += amt
-                    elif any(tax in lname for tax in ["CGST", "SGST", "IGST"]):
-                        tax_amount += amt
-                    elif ledger.get("ispartyledger", False):
-                        grand_total = abs(amt)
-                
-                # Upsert Staging Header using postgres dialect
-                stmt = pg_insert(StagingOrderHeader).values(
-                    order_acceptance_id=order_acceptance_id, 
-                    order_acceptance_date=order_date, 
-                    purchase_order_number=po_number, 
-                    billing_name=billing_name, 
-                    billing_address=billing_address, 
-                    payment_terms=payment_terms, 
-                    # Assuming these missing model fields from old logic are dynamic or mapped.
-                    # Since StagingOrderHeader in ORM doesn't have buyer_gstin, freight_charges etc.,
-                    # they are skipped or map to existing fields. I will map strictly to model.
-                ).on_conflict_do_update(
-                    index_elements=['order_acceptance_id'],
-                    set_={
-                        'status': 'PENDING',
-                        'purchase_order_number': po_number,
-                        'billing_name': billing_name,
-                        'billing_address': billing_address,
-                        'payment_terms': payment_terms
-                    }
-                )
-                session.execute(stmt)
-
-                # Delete old and insert new Staging Items
-                session.execute(delete(StagingOrderItem).where(StagingOrderItem.order_acceptance_id == order_acceptance_id))
-                
-                items = voucher.get("allinventoryentries", [])
-                for item in items:
-                    item_code = resolve_item_code(item.get("stockitemname", "").strip().upper())
-
-                    if not item_code:
-                        print(f"Unknown item: {item.get('stockitemname')}")
-                        continue
-
-                    spec_text = self._extract_tally_text_list(item.get("basicuserdescription"))
-                    hsn_code = item.get("gsthsnname", "")
-                    qty = self._parse_tally_number(item.get("actualqty"))
-                    rate = self._parse_tally_number(item.get("rate"))
-                    amount = self._parse_tally_number(item.get("amount"))
-
-                    due_date_str = None
-                    allocations = item.get("batchallocations", [])
-                    if allocations and isinstance(allocations, list):
-                        due_date_str = allocations[0].get("orderduedate")
-                    
-                    session.add(StagingOrderItem(
-                        order_acceptance_id=order_acceptance_id,
-                        item_code=item_code,
-                        additional_spec_text=spec_text,
-                        hsn_code=hsn_code,
-                        quantity=qty,
-                        rate=rate,
-                        amount=amount,
-                        due_date=self._parse_tally_date(due_date_str) if due_date_str else None
-                    ))
-                
-                inserted_count += 1
-            session.commit()
-        return inserted_count
-    
-    def extract_daybook_json(self, bill_data: dict):
-
-        bills = []
-
-        invoices = (bill_data.get("dbcolumnar", {}).get("dspcolvchdetail", []))
-
-        with SessionLocal() as session:
-
-            for invoice in invoices:
-
-                items = []
-
-                qty_details = (invoice.get("dbcqtydetails", {}).get("dspcolvchdetail", []))
-
-                # Sometimes a single inventory line is exported as an object
-                if isinstance(qty_details, dict):
-                    qty_details = [qty_details]
-
-                for item in qty_details:
-
-                    product = (item.get("dbcfixed", {}).get("dbcparty", "").strip())
-
-                    matched = self.resolve_item(session, product)
-
-                    items.append({
-
-                        "product_name": product,
-
-                        "item_code": matched.item_code if matched else "",
-
-                        "quantity_shipped": int(self._parse_tally_number(item.get("dbcqty"))),
-
-                        "rate": self._parse_tally_number(item.get("dbcrate")),
-
-                        "amount": abs(self._parse_tally_number(item.get("dbcamount")))
-
-                    })
-
-                bills.append({
-
-                    "bill_num": invoice.get("dbcvchno"),
-
-                    "bill_date": self._parse_daybook_date(invoice.get("dbcfixed", {}).get("dbcdate")),
-
-                    "party_name": invoice.get("dbcpartyname", ""),
-
-                    "order_acceptance_id": None,
-
-                    "items": items
-
-                })
-
-        return bills
 
     # --- GLOBAL ORDERS ENGINE end---
 
     # --- GLOBAL BILLS ENGINE start---
-    def resolve_item(self, session, tally_name):
-    
-        items = session.scalars(select(ItemMaster)).all()
-    
-        name = tally_name.upper()
-    
-        # Rule 1
-        for item in items:
-            if item.item_code.upper() == name:
-                return item
-    
-        # Rule 2
-        for item in items:
-            if item.item_code.upper() in name:
-                return item
-    
-        return None
-    
-    def resolve_product(self, session, item):
-
-        candidates = []
-
-        primary = item.get("dbcfixed", {}).get("dbcparty")
-
-        if primary:
-            candidates.append(primary)
-
-        descriptions = (
-            item.get("dspcolvchitemdescription", {})
-                .get("dspcolvchdetail", [])
-        )
-
-        for desc in descriptions:
-
-            name = desc.get("dbcfixed", {}).get("dbcparty")
-
-            if name:
-                candidates.append(name)
-
-        for candidate in candidates:
-
-            matched = self.resolve_item(session, candidate)
-
-            if matched:
-                return matched
-
-        return None
             
     def get_all_bills(self):
         with SessionLocal() as session:
-            stmt = select(BillHeader).options(joinedload(BillHeader.items).joinedload(BillItem.order_item)).order_by(BillHeader.created_at.desc())
-            headers = session.scalars(stmt).unique().all()
-            
+
+            stmt = (select(BillHeader)
+                .options(joinedload(BillHeader.items))
+                .order_by(BillHeader.created_at.desc())
+            )
+
+            headers = (session.scalars(stmt)
+                .unique()
+                .all()
+            )
+
             result = []
-            for h in headers:
-                h_dict = to_dict(h)
-                items_data = []
-                for i in h.items:
-                    i_dict = to_dict(i)
-                    if i.order_item:
-                        i_dict['item_code'] = i.order_item.item_code
-                    items_data.append(i_dict)
-                h_dict['items'] = items_data
-                result.append(h_dict)
-                
+
+            for header in headers:
+
+                data = to_dict(header)
+
+                data["items"] = [to_dict(item) for item in header.items]
+
+                result.append(data)
+
             return result
 
     def create_bill(self, bill_data: dict) -> dict:
         with SessionLocal() as session:
 
+            order_id = bill_data.get("order_id")
+
             header = BillHeader(
                 bill_num=bill_data["bill_num"],
                 bill_date=bill_data["bill_date"],
-                order_acceptance_id=bill_data["order_acceptance_id"],
-                indian_state=bill_data["indian_state"]
+                order_id=order_id,
+                indian_state=bill_data.get("indian_state"),
             )
 
             session.add(header)
+            session.flush()
 
             for item in bill_data["items"]:
-
-                session.add(BillItem(
-
+                bill_item = BillItem(
                     bill_num=header.bill_num,
-
                     order_item_id=item.get("order_item_id"),
-
                     item_code=item.get("item_code"),
-
-                    product_name=item.get("product_name"),
-
-                    hsn_code=item.get("hsn_code"),
-
+                    product_name = item.get("product_name"),
+                    hsn_code = item.get("hsn_code"),
                     quantity_shipped=item["quantity_shipped"],
-
-                    rate=item["rate"],
-
-                    amount=item["amount"]
-
+                    rate=item.get("rate"),
+                    amount=item.get("amount"),
                 )
 
-            )
+                session.add(bill_item)
 
-            order = session.get(
-                OrderHeader,
-                bill_data["order_acceptance_id"]
-            )
-
-            if bill_data.get("order_acceptance_id"):
-                order = session.get(OrderHeader,bill_data["order_acceptance_id"])
+            if order_id is not None:
+                order = session.get(OrderHeader, order_id)
 
                 if order:
-                    order.production_stage = "DISPATCHED"
+                    order.current_stage_code = "DISPATCHED"
 
             session.commit()
             session.refresh(header)
 
             h_dict = to_dict(header)
-            h_dict["items"] = [to_dict(i) for i in header.items]
+            h_dict["items"] = [to_dict(item) for item in header.items]
+
             return h_dict
     
-    def _parse_daybook_date(self, date_str):
-        if not date_str:
-            return None
-        return datetime.strptime(date_str, "%d-%b-%y").date()
-    
-    def ingest_daybook_json(self, bill_data: dict)->int:
-        inserted = 0
-        invoices = (bill_data.get("dbcolumnar", {}).get("dspcolvchdetail", []))
-        with SessionLocal() as session:
-            for invoice in invoices:
-                bill_num=invoice.get("dbcvchno")
-                if not bill_num:
-                    continue
-                
-                bill_date = self._parse_daybook_date(invoice["dbcfixed"]["dbcdate"])
-                buyer_address = invoice.get("dbcbuyeraddress", "")
-
-                state = resolve_state(buyer_address)
-
-                stmt = (pg_insert(BillHeader).values(bill_num=bill_num, bill_date=bill_date, order_acceptance_id=None, indian_state=state).on_conflict_do_update(index_elements=["bill_num"], set_={"bill_date": bill_date}))
-                session.execute(stmt)
-                items = (invoice.get("dbcqtydetails", {}).get("dspcolvchdetail", []))
-                
-                for item in items:
-                    product_name = (item.get("dbcfixed", {}).get("dbcparty", ""))
-                    quantity = int(self._parse_tally_number(item.get("dbcqty")))
-                    rate = self._parse_tally_number(item.get("dbcrate"))
-                    amount = abs(self._parse_tally_number(item.get("dbcamount")))
-                    matched = self.resolve_product(session, item)
-                    session.add(BillItem(bill_num=bill_num, quantity_shipped=quantity, product_name=product_name, rate=rate, amount=amount, order_item_id = matched.item_code if matched else None))
-                    inserted += 1
-                
-                session.commit()
-        
-        return inserted
     # --- GLOBAL BILLS ENGINE end---
 
     # --- TASK MANAGER SUBSYSTEM start---
@@ -1194,7 +936,7 @@ class PostgresRepository:
                 operator_email=operator_email,
                 log_type=log_type,
                 message=message,
-                metadata=metadata
+                meta_data=metadata
             )
             session.add(log)
             session.commit()
@@ -1589,11 +1331,15 @@ class PostgresRepository:
     def update_order_stage(self, order_id: str, new_stage: str):
         
         with SessionLocal() as session:
-            stmt = (update(OrderHeader).where(OrderHeader.order_acceptance_id == str(order_id)).values(production_stage=new_stage))
+            order = session.get(OrderHeader, order_id)
 
-            order = session.execute(stmt).scalar_one_or_none()
+            if not order:
+                raise ValueError("Order not found.")
+
+            order.current_stage = new_stage
 
             session.commit()
+            session.refresh(order)
 
             return to_dict(order)
     # --- GLOBAL PRODUCTION PULSE end ---
@@ -1676,7 +1422,7 @@ class PostgresRepository:
 
                 targets_queued = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email,LeadTarget.status != "Inactive", LeadTarget.added_date.between(from_date, to_date)))
 
-                order_value = session.scalar(select(func.coalesce(func.sum(OrderItem.amount),0)).select_from(OrderHeader).join(OrderItem,OrderItem.order_acceptance_id ==OrderHeader.order_acceptance_id).where(OrderHeader.ordered_by == user.email, OrderHeader.created_at.between(from_date, to_date)))
+                order_value = session.scalar(select(func.coalesce(func.sum(OrderItem.amount),0)).select_from(OrderHeader).join(OrderItem,OrderItem.order_id ==OrderHeader.order_id).where(OrderHeader.ordered_by == user.email, OrderHeader.created_at.between(from_date, to_date)))
 
                 rejected = session.scalar(select(func.count()).select_from(LeadTarget).where(LeadTarget.requested_by == user.email, LeadTarget.status == "Rejected", LeadTarget.added_date.between(from_date, to_date)))
 
@@ -1822,12 +1568,13 @@ class PostgresRepository:
     
     def get_production_analytics(self, from_date, to_date):
         with SessionLocal() as session:
-            stages = session.execute(select(
-                    func.coalesce(OrderHeader.production_stage, "PO_SUBMITTED").label("stage"),
-                    func.count(OrderHeader.order_acceptance_id).label("order_count")
-                )
-                .where(OrderHeader.created_at.between(from_date, to_date))
-                .group_by(OrderHeader.production_stage)
+            stages = session.execute(
+                select(
+                    func.coalesce(OrderHeader.current_stage_code, "PO_SUBMITTED").label("stage"),
+                    func.count(OrderHeader.order_id).label("order_count"),
+                    )
+                .where(OrderHeader.created_at.between(from_date, to_date,))
+                .group_by(OrderHeader.current_stage_code)
                 .order_by(desc("order_count"))
             ).all()
 
