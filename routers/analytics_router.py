@@ -6,6 +6,8 @@ from .dependencies import check_department
 from database.models import User
 from sqlalchemy import update
 from datetime import date
+from fastapi.responses import FileResponse
+from services.production_excel import generate_production_excel
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics & KPIs"])
 
@@ -57,6 +59,7 @@ def get_production_kpis(from_date: date = Query(...), to_date: date = Query(...)
     try:
         return EDBR.get_production_analytics(from_date, to_date)
     except Exception as e:
+        print(str(e), " error occured")
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.patch("/admin/users/{email}/target", dependencies=[Depends(check_department("Admin"))])
@@ -79,3 +82,57 @@ def quotation_analytics_today(user: dict = Depends(verify_bearer_token)):
         raise HTTPException(status_code=403, detail="Not authorized.")
 
     return EDBR.get_today_quotation_analytics()
+
+@router.get("/production/pending-orders/excel")
+def download_pending_orders_excel(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    user: dict = Depends(verify_bearer_token),
+):
+    if user.get("role") not in [
+        "Admin",
+        "Chief Full Stack Developer",
+        "Shop Floor Administrator",
+    ]:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized access to production reports.",
+        )
+
+    if from_date > to_date:
+        raise HTTPException(
+            status_code=400,
+            detail="from_date cannot be later than to_date.",
+        )
+
+    try:
+        analytics = EDBR.get_production_analytics(
+            from_date,
+            to_date,
+        )
+        output_path = generate_production_excel(
+            analytics_data=analytics,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+        return FileResponse(
+            path=output_path,
+            media_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            filename=output_path.name,
+        )
+
+    except Exception as exc:
+
+        print(
+            "Pending orders Excel export error:",
+            str(exc),
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate pending orders Excel report.",
+        )

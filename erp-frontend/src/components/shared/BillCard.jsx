@@ -9,7 +9,7 @@ export default function BillCard({ bill, onPrint }) {
 
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: '10px' }}>
-                        Source OA: <strong>{bill.order_acceptance_id}</strong>
+                        Source OA: <strong>{bill.order_acceptance_id || "—"}</strong>
                     </span>
 
                     <button className="btn btn-secondary" onClick={() => onPrint?.(bill, 'invoice')}>🖨️ Print Invoice</button>
@@ -24,6 +24,7 @@ export default function BillCard({ bill, onPrint }) {
                             <th>Target Order Item Reference</th>
                             <th>Resolved Item Code</th>
                             <th style={{ textAlign: 'right' }}>Dispatched Quantity</th>
+                            <th style={{ textAlign: 'right' }}>Remaining to Bill</th>
                         </tr>
                     </thead>
 
@@ -34,6 +35,7 @@ export default function BillCard({ bill, onPrint }) {
                                 <td style={{ color: 'var(--text-muted)' }}>Row ID: {it.order_item_id}</td>
                                 <td><strong>{it.item_code}</strong></td>
                                 <td style={{textAlign: 'right', fontWeight: 'bold', color: 'var(--brand-success)'}}>{it.quantity_shipped} Units</td>
+                                <td style={{ textAlign: 'right', fontWeight: 'bold', color: Number(it.remaining_quantity || 0) > 0 ? 'var(--brand-danger)' : 'var(--brand-success)' }}>{it.remaining_quantity ?? "—"} Units</td>
                             </tr>
                         ))}
                     </tbody>

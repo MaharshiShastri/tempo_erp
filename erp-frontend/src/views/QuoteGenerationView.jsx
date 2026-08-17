@@ -4,7 +4,7 @@ export default function QuoteGenerationView({state}){
     const productGroups = useMemo(() => [
             ...new Set(
                 (state?.itemsMaster ?? [])
-                    .map(item => item.item_name)
+                    .map(item => item.item_group)
                     .filter(Boolean)
             )
         ].sort(),
@@ -17,7 +17,7 @@ export default function QuoteGenerationView({state}){
         if(!selectedProduct) {return [];}
 
         return (state?.itemsMaster ?? [])
-        .filter(item => item.item_name === selectedProduct)
+        .filter(item => item.item_group === selectedProduct)
         .filter(item => item.item_code)
         .map(item=> item.item_code)
         .sort();

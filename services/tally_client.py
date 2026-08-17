@@ -284,75 +284,77 @@ def normalize_keys(obj,):
 # ===========================================================================
 
 def build_voucher_collection_xml(
-    voucher_type: str,
+    voucher_type: str | None,
     from_date: str,
     to_date: str,
     company: str = TALLY_COMPANY,
 ) -> str:
     """
     Build a Tally voucher collection request.
-
+ 
+    from_date / to_date: 'YYYY-MM-DD' or 'YYYYMMDD'.
+    voucher_type=None -> no type filter, returns every voucher in range
+    (Day Book).
+ 
     Explicitly fetches cancellation/deletion flags because the
     service needs to distinguish:
-
+ 
         valid order
         cancelled order
         deleted voucher
+ 
+    Date bounds are enforced INSIDE the filter formula via
+    $$Date:##SVFROMDATE / ##SVTODATE -- plain SVFROMDATE/SVTODATE alone,
+    or $Date >= ##SVFROMDATE without the $$Date: type-coercion wrapper,
+    do not reliably bound an ad-hoc Voucher collection in this Tally
+    version (the comparison silently matches everything instead of
+    raising an error, which makes this bug easy to miss).
     """
-
-    from_dt = from_date.replace(
-        "-",
-        "",
-    )
-
-    to_dt = to_date.replace(
-        "-",
-        "",
-    )
-
-    voucher_type_esc = _xml_escape(
-        voucher_type
-    )
-
-    company_esc = _xml_escape(
-        company
-    )
-
+    from_dt = from_date.replace("-", "")
+    to_dt = to_date.replace("-", "")
+    company_esc = _xml_escape(company)
+ 
+    date_clause = "($Date &gt;= $$Date:##SVFROMDATE) AND ($Date &lt;= $$Date:##SVTODATE)"
+    if voucher_type:
+        voucher_type_esc = _xml_escape(voucher_type)
+        filter_formula = f'($VoucherTypeName = "{voucher_type_esc}") AND {date_clause}'
+    else:
+        filter_formula = date_clause
+ 
+    print("Date range from: ", from_dt, " to: ", to_dt)
     return f"""
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>COLLECTION</TYPE>
-        <ID>VoucherRangeCollection</ID>
-    </HEADER>
-
-    <BODY>
-        <DESC>
-
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVFROMDATE>{from_dt}</SVFROMDATE>
-                <SVTODATE>{to_dt}</SVTODATE>
-                <SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
-
-            <TDL>
-                <TDLMESSAGE>
-
-                    <COLLECTION
-                        NAME="VoucherRangeCollection"
-                        ISMODIFY="No"
-                        ISFIXED="No"
-                        ISINITIALIZE="Yes"
-                        ISOPTION="No"
-                        ISINTERNAL="No"
-                    >
-
-                        <TYPE>Voucher</TYPE>
-
-                        <FETCH>
-                            DATE,
+    <ENVELOPE>
+        <HEADER>
+            <VERSION>1</VERSION>
+            <TALLYREQUEST>EXPORT</TALLYREQUEST>
+            <TYPE>COLLECTION</TYPE>
+            <ID>VoucherRangeCollection</ID>
+        </HEADER>
+    
+        <BODY>
+            <DESC>
+    
+                <STATICVARIABLES>
+                    <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+                    <SVFROMDATE>{from_dt}</SVFROMDATE>
+                    <SVTODATE>{to_dt}</SVTODATE>
+                    <SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY>
+                </STATICVARIABLES>
+    
+                <TDL>
+                    <TDLMESSAGE>
+    
+                        <COLLECTION
+                            NAME="VoucherRangeCollection"
+                            ISMODIFY="No"
+                            ISFIXED="No"
+                            ISINITIALIZE="Yes"
+                            ISOPTION="No"
+                            ISINTERNAL="No"
+                        >
+    
+                            <TYPE>Voucher</TYPE>
+                            <FETCH>DATE,
                             REFERENCEDATE,
                             GUID,
                             VCHTYPE,
@@ -369,10 +371,10 @@ def build_voucher_collection_xml(
                             BASICORDERTERMS.*,
                             BASICDUEDATEOFPYMT,
                             BASICSHIPPEDBY,
-
+ 
                             ISCANCELLED,
                             ISDELETED,
-
+ 
                             ASORIGINAL,
                             ISDEEMEDPOSITIVE,
                             EFFECTIVEDATE,
@@ -381,43 +383,29 @@ def build_voucher_collection_xml(
                             VOUCHERKEY,
                             VOUCHERRETAINKEY,
                             VOUCHERNUMBERSERIES,
-
+ 
                             ALLINVENTORYENTRIES.*,
                             BATCHALLOCATIONS.*,
                             ACCOUNTINGALLOCATIONS.*,
                             LEDGERENTRIES.*
-                        </FETCH>
+                            </FETCH>
+                            <FILTER>VoucherRangeFilter</FILTER>
+    
+                        </COLLECTION>
+    
+                        <SYSTEM
+                            TYPE="Formulae"
+                            NAME="VoucherRangeFilter"
+                        >{filter_formula}</SYSTEM>
+    
+                    </TDLMESSAGE>
+                </TDL>
+    
+            </DESC>
+        </BODY>
+    </ENVELOPE>
+    """.strip()
 
-                        <FILTER>
-                            VoucherDateFilter,
-                            VoucherTypeFilter
-                        </FILTER>
-
-                    </COLLECTION>
-
-                    <SYSTEM
-                        TYPE="Formulae"
-                        NAME="VoucherDateFilter"
-                    >
-                        $Date &gt;= ##SVFROMDATE
-                        AND
-                        $Date &lt;= ##SVTODATE
-                    </SYSTEM>
-
-                    <SYSTEM
-                        TYPE="Formulae"
-                        NAME="VoucherTypeFilter"
-                    >
-                        $VoucherTypeName = "{voucher_type_esc}"
-                    </SYSTEM>
-
-                </TDLMESSAGE>
-            </TDL>
-
-        </DESC>
-    </BODY>
-</ENVELOPE>
-""".strip()
 
 
 # ===========================================================================
@@ -500,7 +488,7 @@ def xml_to_staging_json(
     This is still Tally representation.
 
     Application field mapping happens in:
-        voucher_to_staging_order()
+        voucher_to_order()
     """
 
     root = ET.fromstring(
@@ -652,360 +640,45 @@ def _parse_decimal(
     )
 
 
-def _parse_date(
-    value,
-):
-    """
-    Parse common Tally date formats.
-    """
+def _parse_date(value): 
+    """ Parse dates coming from different Tally fields. Tally / user-entered dates may appear as: 20260406 
+    2026-04-06 
+    06-Apr-26 
+    06-Apr-2026 
+    30.04.2026 
+    30/04/2026 
+    30-04-2026 """ 
+    if value is None: 
+        return None # Tally wrappers / lists 
 
-    if not value:
-        return None
+    if isinstance(value, dict): # Prefer the actual field value over metadata. 
+        values = [ nested for key, nested in value.items() if key.lower() != "type" ] 
+        for nested in values: 
+            parsed = _parse_date(nested) 
+            if parsed: 
+                return parsed 
 
-    value = str(value).strip()
+            return None 
 
-    for fmt in (
-        "%Y%m%d",
-        "%d-%b-%y",
-        "%d-%b-%Y",
-    ):
+    if isinstance(value, list): 
+        for item in value: 
+            parsed = _parse_date(item) 
+            if parsed: 
+                return parsed 
+        return None 
 
-        try:
+    text = str(value).strip() 
+    if not text: 
+        return None # Tally commonly returns YYYYMMDD. 
+    formats = ( "%Y%m%d", "%Y-%m-%d", "%d-%b-%y", "%d-%b-%Y", "%d.%m.%Y", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%y", "%d/%m/%y", "%d-%m-%y", ) 
+    for fmt in formats: 
+        try: 
+            return datetime.strptime( text, fmt, ).date() 
 
-            return datetime.strptime(
-                value,
-                fmt,
-            ).date()
-
-        except ValueError:
-            continue
+        except ValueError: 
+            pass 
 
     return None
-
-
-# ===========================================================================
-# Voucher -> staging
-# ===========================================================================
-
-def voucher_to_staging_order(
-    voucher: dict,
-) -> dict:
-    """
-    Convert normalized Tally voucher -> application staging shape.
-
-    This function does NOT touch PostgreSQL.
-    """
-
-    voucher_type = (
-        voucher.get("vouchertypename")
-        or voucher.get("vchtype")
-        or ""
-    )
-
-    tally_guid = str(
-        voucher.get("guid")
-        or ""
-    ).strip()
-
-    order_acceptance_id = (
-        voucher.get("vouchernumber")
-    )
-
-    order_acceptance_date = _parse_date(
-        voucher.get("date")
-    )
-
-    purchase_order_number = (
-        voucher.get("reference")
-    )
-
-    billing_name = (
-        voucher.get("partyledgername")
-        or ""
-    )
-
-    customer_code = (
-        voucher.get("partyname")
-        or ""
-    )
-
-    billing_address = _join_text_list(
-        voucher.get(
-            "basicbuyeraddress"
-        )
-    )
-
-    terms_of_delivery = _join_text_list(
-        voucher.get(
-            "basicorderterms"
-        )
-    )
-
-    payment_terms = (
-        voucher.get(
-            "basicduedateofpymt"
-        )
-        or ""
-    )
-
-    dispatched_through = (
-        voucher.get(
-            "basicshippedby"
-        )
-        or ""
-    )
-
-    state_name = (
-        voucher.get(
-            "statename"
-        )
-        or ""
-    )
-
-    buyer_gstin = (
-        voucher.get(
-            "partygstin"
-        )
-        or ""
-    )
-
-    destination = (
-        voucher.get(
-            "placeofsupply"
-        )
-        or ""
-    )
-
-    # -------------------------------------------------------------------
-    # Items
-    # -------------------------------------------------------------------
-
-    items = []
-
-    inventory_entries = _as_list(
-        voucher.get(
-            "allinventoryentries"
-        )
-    )
-
-    for inventory in inventory_entries:
-
-        if not isinstance(
-            inventory,
-            dict,
-        ):
-            continue
-
-        stockitemname = (
-            inventory.get(
-                "stockitemname"
-            )
-            or ""
-        )
-
-        quantity = _parse_decimal(
-            inventory.get(
-                "actualqty"
-            )
-        )
-
-        rate = _parse_decimal(
-            inventory.get(
-                "rate"
-            )
-        )
-
-        discount = _parse_decimal(
-            inventory.get(
-                "discount"
-            )
-        )
-
-        amount = abs(
-            _parse_decimal(
-                inventory.get(
-                    "amount"
-                )
-            )
-        )
-
-        # Tally may contain item-specific description/user
-        # description structures.
-        additional_spec_text = _join_text_list(
-            inventory.get(
-                "basicuserdescription"
-            )
-            or inventory.get(
-                "description"
-            )
-        )
-
-        hsn_code = (
-            inventory.get(
-                "gsthsncode"
-            )
-            or inventory.get(
-                "gsthsnname"
-            )
-            or ""
-        )
-
-        due_date = None
-
-        # Some Tally configurations expose due dates through
-        # inventory allocations. Keep this conservative until
-        # the exact allocation shape is confirmed.
-        #
-        # We therefore leave due_date as None rather than
-        # inventing a date.
-
-        items.append(
-            {
-                "item_code": stockitemname,
-                "additional_spec_text": (
-                    additional_spec_text
-                ),
-                "hsn_code": hsn_code,
-                "quantity": quantity,
-                "rate": rate,
-                "discount_percentage": discount,
-                "amount": amount,
-                "due_date": due_date,
-            }
-        )
-
-    # -------------------------------------------------------------------
-    # Ledger entries
-    # -------------------------------------------------------------------
-
-    freight_charges = Decimal("0")
-    tax_amount = Decimal("0")
-    grand_total = Decimal("0")
-
-    ledger_entries = _as_list(
-        voucher.get(
-            "ledgerentries"
-        )
-    )
-
-    for ledger in ledger_entries:
-
-        if not isinstance(
-            ledger,
-            dict,
-        ):
-            continue
-
-        ledger_name = (
-            ledger.get(
-                "ledgername"
-            )
-            or ""
-        ).strip()
-
-        ledger_name_upper = (
-            ledger_name.upper()
-        )
-
-        ledger_amount = _parse_decimal(
-            ledger.get(
-                "amount"
-            )
-        )
-
-        absolute_amount = abs(
-            ledger_amount
-        )
-
-        if (
-            ledger_name.casefold()
-            == "freight charges".casefold()
-        ):
-            freight_charges += (
-                absolute_amount
-            )
-
-        if any(
-            tax_name in ledger_name_upper
-            for tax_name in (
-                "CGST",
-                "SGST",
-                "IGST",
-            )
-        ):
-            tax_amount += (
-                absolute_amount
-            )
-
-        # Existing application behavior treats ledger totals
-        # as contributing to the staging financial snapshot.
-        grand_total += (
-            absolute_amount
-        )
-
-    return {
-        "voucher_type": voucher_type,
-
-        "tally_guid": tally_guid,
-
-        "order_acceptance_id": (
-            order_acceptance_id
-        ),
-
-        "order_acceptance_date": (
-            order_acceptance_date
-        ),
-
-        "purchase_order_number": (
-            purchase_order_number
-        ),
-
-        "purchase_order_date": None,
-
-        "billing_name": billing_name,
-
-        "billing_address": billing_address,
-
-        "payment_terms": payment_terms,
-
-        # Insert default only. Service preserves existing ERP status
-        # during an update.
-        "status": "PENDING",
-
-        "customer_code": customer_code,
-
-        "dispatched_through": (
-            dispatched_through
-        ),
-
-        "ordered_by": "",
-
-        "packing_charges": Decimal("0"),
-
-        "freight_charges": (
-            freight_charges
-        ),
-
-        "tax_rate": Decimal("18"),
-
-        "buyer_gstin": buyer_gstin,
-
-        "destination": destination,
-
-        "terms_of_delivery": (
-            terms_of_delivery
-        ),
-
-        "tax_amount": tax_amount,
-
-        "grand_total": grand_total,
-
-        "state_name": state_name,
-
-        "items": items,
-    }
-
-
 # ===========================================================================
 # Item Master
 # ===========================================================================

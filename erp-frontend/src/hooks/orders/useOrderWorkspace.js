@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 
 export default function useOrderWorkspace({sessionToken, companiesMaster, itemsMaster, setAlertMessage, setIsAlertOpen, setActiveTab}){
     const defaultOrderItem = { item_code: '', additional_spec_text: '', hsn_code: '', quantity: 1, unit_measure: 'NOS', rate: 0.00, discount_percentage: 0.00 };
-    const defaultOrderHeader = { order_acceptance_id: '', order_acceptance_date: '', purchase_order_number: '', purchase_order_date: '', customer_code: '', company_name: "", payment_terms: '', billing_name: '', billing_address: '', due_date: '' };
+    const defaultOrderHeader = { order_acceptance_id: '', order_acceptance_date: '', purchase_order_number: '', purchase_order_date: '', customer_code: '', company_name: "", payment_terms: '', billing_name: '', billing_address: '', due_date: '', dispathced_through: '', delivery_terms: '', packing_charges: 0, freight_charges: 0, tax_rate: 18 };
     
     const [orders, setOrders] = useState([]);
     const [orderHeader, setOrderHeader] = useState({...defaultOrderHeader});
     const [orderItems, setOrderItems] = useState([{ ...defaultOrderItem }]);
     const [billItems, setBillItems] = useState([]);
     const [isBillingSameAsCustomer, setIsBillingSameAsCustomer] = useState(true);
-
+    const [isPendingTallyOrder, setIsPendingTallyOrder] = useState(false);
     const appendOrderItemRow = () => setOrderItems([...orderItems, { ...defaultOrderItem }]);
     const popOrderItemRow = (idx) => setOrderItems(orderItems.filter((_, i) => i !== idx));
     const updateOrderItemField = (idx, field, val) => {const items = [...orderItems]; items[idx][field] = val; setOrderItems(items);};
@@ -57,6 +57,8 @@ export default function useOrderWorkspace({sessionToken, companiesMaster, itemsM
         }
     }, [isBillingSameAsCustomer, orderHeader.customer_code, companiesMaster]);
 
-    return{defaultOrderHeader, defaultOrderItem, orders, setOrders, orderHeader, setOrderHeader, orderItems, setOrderItems, billItems, setBillItems, isBillingSameAsCustomer, setIsBillingSameAsCustomer, appendOrderItemRow, popOrderItemRow, updateOrderItemField, handleCustomerMasterSelection, handleItemMasterSelection};
+    return{defaultOrderHeader, defaultOrderItem, orders, setOrders, orderHeader, setOrderHeader, orderItems, setOrderItems, billItems, setBillItems, isBillingSameAsCustomer, setIsBillingSameAsCustomer, appendOrderItemRow, popOrderItemRow, updateOrderItemField, handleCustomerMasterSelection, handleItemMasterSelection,
+        isPendingTallyOrder, setIsPendingTallyOrder,
+    };
     
 }

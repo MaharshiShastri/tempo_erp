@@ -31,6 +31,7 @@ from routers.faq_router import router as faq_router
 from routers.stream_router import router as stream_router
 from routers.geo_router import router as geo_router
 from routers.quotations import router as quotations_router
+from routers.exercise_router import router as exercise_router
 
 app = FastAPI(title="Tempo Instruments ERP - Decoupled Enterprise Solution")
 
@@ -108,6 +109,7 @@ app.include_router(faq_router)
 app.include_router(stream_router)
 app.include_router(geo_router)
 app.include_router(quotations_router)
+app.include_router(exercise_router)
 
 BASE_DIR = Path(__file__).resolve().parent
 

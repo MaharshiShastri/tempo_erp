@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe } from "react-icons/fi";
+import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe, FiUsers } from "react-icons/fi";
 import { FaFileWord } from "react-icons/fa";
 import useERPState from "./hooks/useERPState";
 import packageJson from "../package.json";
@@ -41,6 +41,8 @@ import InventoryAuditLogsView from "./views/InventoryAuditLogsView";
 import LogisticsPartnerReadOnlyView from "./views/LogisticsPartnerReadOnlyView";
 import DispatchPlannerView from "./views/DispatchPlannerView";
 import QuoteGenerationView from "./views/QuoteGenerationView";
+import QuotationListView from "./views/QuotationListView";
+import ExerciseGenerator from './views/ExerciseGeneratorView';
 
 function App() {
     const state = useERPState();
@@ -223,9 +225,9 @@ function App() {
                                     )}
                                     
                                     {isSales && (
-                                        <a href="#QouteGenerator" className={`menu-item ${state.activeTab === 'qoute-generator' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('qoute-generator')}}>
+                                        <a href="#QouteGenerator" className={`menu-item ${state.activeTab === 'qoute-list' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('qoute-list')}}>
                                             <span><FaFileWord /></span>
-                                            {!sidebarCollapsed && <span>Quote Generator</span>}
+                                            {!sidebarCollapsed && <span>Quotes List</span>}
                                             <span style={{fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '1px 4px', borderRadius: '4px', marginLeft: 'auto'}}></span>
                                         </a>
                                     )
@@ -370,11 +372,12 @@ function App() {
                                         {!sidebarCollapsed && <span>Sales Analytics</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+S</span>
                                     </a>
-                                    <a href="#tally" className={`menu-item ${state.activeTab === 'tally-xml' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('tally-xml')}}>
-                                        <span style={{ fontWeight: '900', color: '#ffb300', fontFamily: 'Georgia, serif', fontStyle: 'italic', paddingRight: '2px' }}>T</span> 
-                                        {!sidebarCollapsed && <span>Fetch Tally Order data</span>}
+                                    <a href="#exercise" className={`menu-item ${state.activeTab === 'exercise' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('exercise')}}>
+                                        <span><FiUsers></FiUsers></span>
+                                        {!sidebarCollapsed && <span>Exercise Generator</span>}
                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                     </a>
+                                    
                                     <a href="#map" className={`menu-item ${state.activeTab === 'map' ? 'active' : ''}`} onClick={(e)=>{e.preventDefault(); state.setActiveTab('map')}}>
                                         <span><FiGlobe/></span>
                                         {!sidebarCollapsed && <span>Geo Analytics</span>}
@@ -474,14 +477,15 @@ function App() {
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
                     {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
                     {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
-                    {isSuperUser && state.activeTab === 'tally-xml' && <TallyImportWorkspaceView state={state}/>}
+                    {isSuperUser && state.activeTab === 'exercise' && <ExerciseGenerator state={state}/>}
                     {isSuperUser && state.activeTab === 'map' && <GeoAnalyticsView state={state}/>}
                     {isTransporter && state.activeTab === "transport-analytics" && <TransportAnalyticsView state={state}/>}
                     {isFactory && state.activeTab==='prod-stats' && <ProductionAnalyticsView state={state}/>}
                     {isFactory && state.activeTab==='audit' && <InventoryAuditLogsView state={state}/>}
                     {(isSales || isTransporter) && state.activeTab==='logistics-read' && <LogisticsPartnerReadOnlyView state={state}/>}
                     {isTransporter && state.activeTab==='dispatch-planner' && <DispatchPlannerView state={state}/>}
-                    {isSales && state.activeTab==='qoute-generator' && <QuoteGenerationView state={state}/>}
+                    {isSales && state.activeTab==='qoute-list' && <QuotationListView state={state}/>}
+                    {isSales && state.activeTab=="quote-generation" && <QuoteGenerationView state={state}/>}
                 </div>
             </div>
 

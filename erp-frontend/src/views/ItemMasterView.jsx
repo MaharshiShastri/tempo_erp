@@ -5,9 +5,9 @@ export default function ItemMasterView({ state }) {
         <div className="frappe-card">
             <div className="system-header">
                 <h3>📦 Enterprise Inventory & Item Master</h3>
-                <button className="btn btn-primary" onClick={() => state.setActiveTab("item-create")}>
+                {["Admin", "Shop Floor Administrator", "Chief Full Stack Developer"].includes(state.user?.role) && <button className="btn btn-primary" onClick={() => state.setActiveTab("item-create")}>
                     + New SKU
-                </button>
+                </button>}
             </div>
 
             {/* Existing Items Ledger */}
@@ -35,7 +35,7 @@ export default function ItemMasterView({ state }) {
                                     <td style={{textAlign:"center",fontWeight:"bold"}}>
                                         <div className='stock-cell'>
                                             <span className='stock-value'>{item.available_stock}</span>
-                                            {['Admin','Chief Full Stack Developer','Shop Floor Administrator'].includes(state.user.role) && (
+                                            {["Admin", "Shop Floor Administrator", "Chief Full Stack Developer"].includes(state.user?.role) && (
                                                 <button className='stock-adjust-btn' onClick={()=>state.openStockModal(item)}>+Adjust</button>)}
                                         </div>
                                     </td>

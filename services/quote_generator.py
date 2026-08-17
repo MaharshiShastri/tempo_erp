@@ -531,7 +531,8 @@ def add_dealer_row(target_doc, dealer):
 
 def generate_qoute_document(
     request,
-    authenticated_user,
+    authenticated_user=None,
+    sales_user=None
 ):
     """
     Generate quotation Word document.
@@ -548,23 +549,14 @@ def generate_qoute_document(
     # Authorization
     # -----------------------------------------
 
-    if authenticated_user.get("role") not in [
-        "Sales Representative",
-        "Admin",
-        "Chief Full Stack Developer",
-    ]:
-        raise PermissionError(
-            "Only sales team can generate qoutations."
-        )
+    if authenticated_user.get("role") not in ["Sales Representative", "Admin", "Chief Full Stack Developer",]:
+        raise PermissionError("Only sales team can generate qoutations.")
 
     # -----------------------------------------
     # Sales user
     # -----------------------------------------
 
-    sales_user = EDBR.get_user_business_contact(
-        email=authenticated_user["email"],
-        role=authenticated_user["role"],
-    )
+    sales_user = EDBR.get_user_business_contact(email=authenticated_user["email"], role=authenticated_user["role"],)
 
     # -----------------------------------------
     # Documents
@@ -582,7 +574,7 @@ def generate_qoute_document(
     # Product group
     # -----------------------------------------
 
-    available_products = EDBR.get_item_names()
+    available_products = EDBR.get_item_groups()
 
     product_blocks = extract_product_group(
         source_doc=source_doc,

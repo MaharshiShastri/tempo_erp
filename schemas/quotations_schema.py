@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import date
+from typing import Optional
 
 class SpecialModelRow(BaseModel):
     values: list[str] = Field(default_factory=list)
@@ -33,3 +34,46 @@ class QuoteGenerationRequest(BaseModel):
 
     special_columns: list[str] = Field(default_factory=list)
     special_rows: list[SpecialModelRow] = Field(default_factory=list)
+
+class QuotationUpdateRequest(BaseModel):
+    product_name: Optional[str] = None
+
+    client_company: Optional[str] = None
+    client_address_line1: Optional[str] = None
+    client_city: Optional[str] = None
+    client_postal_code: Optional[str] = None
+
+    client_email: Optional[str] = None
+
+    buyer_name: Optional[str] = None
+    buyer_phone_number: Optional[str] = None
+
+    enquiry_date: Optional[date] = None
+
+    supply: Optional[str] = None
+    installation: Optional[str] = None
+    freight: Optional[str] = None
+
+    is_dealer: Optional[bool] = None
+    is_special_model: Optional[bool] = None
+
+class QuotationChangeSnapshotRequest(BaseModel):
+
+    quoted_product_name: str
+    quoted_item_code: Optional[str] = None
+    quoted_quantity: Optional[float] = None
+    quoted_rate: Optional[float] = None
+
+    ordered_product_name: Optional[str] = None
+    ordered_item_code: Optional[str] = None
+    ordered_quantity: Optional[float] = None
+    ordered_rate: Optional[float] = None
+
+
+class QuotationStatusUpdateRequest(BaseModel):
+
+    status: str = Field(..., pattern="^(ORDERED|REJECTED|CHANGED)$",)
+
+    converted_order_id: Optional[int] = None
+
+    snapshot: Optional[QuotationChangeSnapshotRequest] = None

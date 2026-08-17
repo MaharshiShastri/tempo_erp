@@ -12,11 +12,12 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 # Import your models (adjust the import path as necessary)
 from database.models import (
     User, ActivityLog, OrderHeader, OrderItem, BillHeader, BillItem, 
-    ItemMaster, StagingOrderHeader, StagingOrderItem, LogisticsPartner, 
+    ItemMaster, ProductionStage, ProductionSchedule, LogisticsPartner, 
     LogisticsZone, LogisticsZoneRate, LogisticsFuelMatrix, LogisticsODAMatrix, 
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
-    SystemNotification, TestItemMaster, StockLedger, Quotation
+    SystemNotification, TestItemMaster, StockLedger, Quotation, ProductionStageHistory,
+    QuotationChangeSnapshot,
 )
 from schemas.logistics_schema import FullPartnerProfile
 from services.item_matcher import resolve_item_code
@@ -29,7 +30,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASEa_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URaL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -157,6 +158,68 @@ class PostgresRepository:
                 "role": row["role"],
                 "business_phone": row["phone_business"],
             }
+
+    def get_users_for_exercise(self, role: str | None = None,):
+        with SessionLocal() as session:
+
+            stmt = (
+                select(User)
+                .where(User.email.is_not(None))
+                .order_by(User.email.asc())
+            )
+
+            if role:
+                stmt = stmt.where(User.role == role)
+
+            users = session.scalars(stmt).all()
+
+            return [
+                {
+                    "email": user.email,
+                    "name": user.name,
+                    "role": user.role,
+                }
+                for user in users
+            ]
+
+    def get_exercise_roles(self):
+        with SessionLocal() as session:
+
+            stmt = (
+                select(User.role)
+                .where(
+                    User.role.is_not(None),
+                    User.role != "",
+                )
+                .distinct()
+                .order_by(User.role.asc())
+            )
+
+            roles = session.scalars(stmt).all()
+
+            return roles
+
+    def get_user_for_exercise(self, person_email: str, role: str | None = None,):
+        with SessionLocal() as session:
+
+            stmt = (
+                select(User)
+                .where(User.email == person_email)
+            )
+
+            if role:
+                stmt = stmt.where(User.role == role)
+
+            user = session.scalar(stmt)
+
+            if not user:
+                return None
+
+            return {
+                "email": user.email,
+                "name": user.name,
+                "role": user.role,
+            }
     # --- AUTH & RBAC end---
 
     # --- GLOBAL ORDERS ENGINE start---
@@ -173,167 +236,294 @@ class PostgresRepository:
                 
             return result
 
-    def get_orders_for_user(self, user_profile: dict):
-        email = user_profile.get('email')
+    def get_orders_for_user(self, user_profile: dict,):
+        email = user_profile.get("email")
 
-        with SessionLocal() as session:
-            if user_profile['role'] in ["Admin", "Chief Full Stack Developer", "Shop Floor Administrator", "Dispatch Engineer",]:
-                stmt = select(OrderHeader).options(joinedload(OrderHeader.items)).order_by(OrderHeader.created_at.desc())
-            else:
-                # Adapted to model fields: filtering by ordered_by (email)
+        role = user_profile.get("role")
 
-                stmt = select(OrderHeader).options(joinedload(OrderHeader.items)).order_by(OrderHeader.created_at.desc()).where(OrderHeader.ordered_by == email)
-            
-            orders = session.scalars(stmt).unique().all()
-            result = []
-        
-            for order in orders:
-                order_dict = to_dict(order)
-                order_dict["items"] = [to_dict(item) for item in order.items]
-                result.append(order_dict)
-        
-            return result
-        
-    def create_order(self, order_data: dict, user_email: str) -> dict:
-        with SessionLocal() as session:
-            header = OrderHeader(
-                order_acceptance_id=order_data["order_acceptance_id"],
-                order_acceptance_date=order_data["order_acceptance_date"],
-                purchase_order_number=order_data["purchase_order_number"],
-                purchase_order_date=order_data["purchase_order_date"],
-
-                customer_id=order_data["customer_id"],
-
-                payment_terms=order_data.get("payment_terms"),
-                billing_name=order_data["billing_name"],
-                billing_address=order_data["billing_address"],
-                dispatched_through=order_data.get("dispatched_through"),
-                delivery_terms=order_data.get("delivery_terms"),
-                due_date=order_data["due_date"],
-
-                current_stage_code=order_data.get("current_stage_code", "PO_SUBMITTED",),
-                
-                ordered_by=order_data.get("ordered_by"),
-
-                packing_charges=order_data.get("packing_charges", 0),
-                freight_charges=order_data.get("freight_charges", 0),
-                tax_rate=order_data.get("tax_rate", 18),
-            )
-            
-            session.add(header)
-            
-            log = ActivityLog(
-                entity_id=header.order_acceptance_id,
-                entity_type="ORDER_CREATED",
-                message=f"New order {header.order_acceptance_id} added to pipeline.",
-                log_type="INFO",
-                operator_email = user_email
-            )
-            session.add(log)
-            
-            for item in order_data["items"]:
-                if not item.get("additional_spec_text") or not item["additional_spec_text"].strip():
-                    raise ValueError("Specification text details cannot be left blank.")
-                
-                oi = OrderItem(
-                    order_id = header.id,
-                    item_code=item['item_code'],
-                    additional_spec_text=item['additional_spec_text'].strip(),
-                    hsn_code=item.get('hsn_code', ''),
-                    quantity=item['quantity'],
-                    um=item['unit_measure'],
-                    rate=item['rate'],
-                    discount_percentage=item.get('discount_percentage', 0.0)
-                )
-                header.items.append(oi)
-
-            session.commit()
-            session.refresh(header)
-            for item in header.items:
-                session.refresh(item)
-            h_dict = to_dict(header)
-            h_dict['items'] = [to_dict(i) for i in header.items]
-            return h_dict
-            
-    def search_pending_staged_orders(self, query: str = "", limit: int = 20,):
         with SessionLocal() as session:
 
             stmt = (
-                select(StagingOrderHeader.order_acceptance_id)
-                .where(StagingOrderHeader.status == "PENDING")
-                .order_by(StagingOrderHeader.order_acceptance_date.desc())
+                select(OrderHeader)
+                .options(joinedload(OrderHeader.items))
+                .order_by(
+                    OrderHeader.order_acceptance_date.desc(),
+                    OrderHeader.order_id.desc(),
+                )
+            )
+
+            if role not in {"Admin", "Chief Full Stack Developer", "Shop Floor Administrator", "Dispatch Engineer",}:
+
+                stmt = stmt.where(OrderHeader.ordered_by == email)
+
+            orders = (session.scalars(stmt).unique().all())
+
+            result = []
+
+            for order in orders:
+
+                order_dict = to_dict(order)
+
+                order_dict["items"] = [to_dict(item) for item in order.items]
+
+                result.append(order_dict)
+
+            return result
+        
+    def create_order(self, order_data: dict, user_email: str,) -> dict:
+
+        with SessionLocal() as session:
+
+            tally_guid = order_data.get("tally_guid")
+
+            if not tally_guid:
+                raise ValueError("tally_guid is required for an order.")
+
+            header = OrderHeader(
+                tally_guid=tally_guid,
+
+                order_acceptance_id=(order_data["order_acceptance_id"]),
+
+                order_acceptance_date=(order_data["order_acceptance_date"]),
+
+                purchase_order_number=(order_data["purchase_order_number"]),
+
+                purchase_order_date=(order_data["purchase_order_date"]),
+
+                customer_id=(order_data.get("customer_id")),
+
+                tally_customer_code=(order_data.get("tally_customer_code")),
+
+                payment_terms=(order_data.get("payment_terms")),
+
+                billing_name=(order_data["billing_name"]),
+
+                billing_address=(order_data["billing_address"]),
+
+                dispatched_through=(order_data.get("dispatched_through")),
+
+                delivery_terms=(order_data.get("delivery_terms")),
+
+                due_date=(order_data.get("due_date")),
+
+                # New manual orders start pending.
+                current_stage_code="PENDING",
+
+                # Do not claim automatically.
+                ordered_by=None,
+
+                packing_charges=(order_data.get("packing_charges",0,)),
+
+                freight_charges=(order_data.get("freight_charges",0,)),
+
+                tax_rate=(order_data.get("tax_rate", 18,)),
+
+                buyer_gstin=(order_data.get("buyer_gstin")),
+
+                destination=(order_data.get("destination")),
+
+                state_name=(order_data.get("state_name")),
+
+                tax_amount=(order_data.get("tax_amount",0,)),
+
+                grand_total=(order_data.get("grand_total",0,)),
+            )
+
+            session.add(header)
+
+            session.flush()
+
+            log = ActivityLog(
+                entity_id=header.order_acceptance_id,
+                entity_type="ORDER_CREATED",
+                message=(
+                    f"New order "
+                    f"{header.order_acceptance_id} "
+                    f"added to pending pipeline."
+                ),
+                log_type="INFO",
+                operator_email=user_email,
+            )
+
+            session.add(log)
+
+            for item in order_data.get("items",[],):
+
+                if (
+                    not item.get(
+                        "additional_spec_text"
+                    )
+                    or not item[
+                        "additional_spec_text"
+                    ].strip()
+                ):
+                    raise ValueError("Specification text details " "cannot be left blank.")
+
+                oi = OrderItem(
+                    order_id=header.order_id,
+
+                    item_code=item["item_code"],
+
+                    additional_spec_text=(item["additional_spec_text"].strip()),
+
+                    hsn_code=item.get("hsn_code","",),
+
+                    quantity=item["quantity"],
+
+                    um=item.get("unit_measure"),
+
+                    rate=item["rate"],
+
+                    discount_percentage=item.get("discount_percentage", 0.0,),
+
+                    due_date=item.get("due_date"),
+                )
+
+                session.add(oi)
+
+            session.commit()
+
+            session.expire_all()
+
+            stmt = (
+                select(OrderHeader)
+                .options(joinedload(OrderHeader.items))
+                .where(OrderHeader.order_id == header.order_id)
+            )
+
+            header = (session.scalars(stmt).unique().one())
+
+            h_dict = to_dict(header)
+
+            h_dict["items"] = [to_dict(item) for item in header.items]
+
+            return h_dict
+            
+    def search_pending_staged_orders(self, query: str = "", limit: int = 20,):
+         with SessionLocal() as session:
+
+            stmt = (
+                select(OrderHeader)
+                .where(OrderHeader.current_stage_code == "PENDING",)
+                .order_by(OrderHeader.order_acceptance_date.desc(), OrderHeader.order_id.desc(),)
                 .limit(limit)
             )
 
             if query:
-                stmt = stmt.where(StagingOrderHeader.order_acceptance_id.ilike(f"%{query}%"),)
+                search = f"%{query.strip()}%"
 
-            return session.scalars(stmt).all()
+                stmt = stmt.where(OrderHeader.order_acceptance_id.ilike(search))
+
+            orders = session.scalars(stmt).all()
+
+            result = []
+
+            for order in orders:
+
+                result.append({
+                    "order_id": order.order_id,
+                    "tally_guid": order.tally_guid,
+                    "order_acceptance_id": (order.order_acceptance_id),
+                    "order_acceptance_date": (order.order_acceptance_date),
+                    "billing_name": (order.billing_name),
+                    "tally_customer_code": (order.tally_customer_code),
+                    "current_stage_code": (order.current_stage_code),
+                    "ordered_by": order.ordered_by,
+                })
+
+            return result
 
     def get_pending_staged_order(self, order_acceptance_id: str,):
         with SessionLocal() as session:
 
             stmt = (
-                select(StagingOrderHeader)
-                .options(
-                    selectinload(
-                        StagingOrderHeader.items
-                    )
-                )
-                .where(
-                    StagingOrderHeader.order_acceptance_id == order_acceptance_id,
-
-                    StagingOrderHeader.status == "PENDING",
-                )
-                .order_by(StagingOrderHeader.created_at.desc())
+            select(OrderHeader)
+            .options(selectinload(OrderHeader.items))
+            .where(OrderHeader.order_acceptance_id == order_acceptance_id,
+                OrderHeader.current_stage_code == "PENDING",
             )
+        )
 
-            header = session.scalars(
-                stmt
-            ).first()
+            header = session.scalars(stmt).first()
 
             if not header:
                 return None
 
             data = to_dict(header)
 
-            data["items"] = [
-                to_dict(item)
-                for item in header.items
-            ]
+            data["items"] = [to_dict(item) for item in header.items]
 
             return data
 
-    def mark_staged_order_picked_up(self, order_acceptance_id: str,):
+    def claim_pending_order(self, order_acceptance_id: str, sales_user_email: str,):
         with SessionLocal() as session:
 
             stmt = (
-                update(StagingOrderHeader)
-                .where(StagingOrderHeader.order_acceptance_id == order_acceptance_id,
-                    StagingOrderHeader.status == "PENDING",
+                update(OrderHeader)
+                .where(OrderHeader.order_acceptance_id == order_acceptance_id,
+
+                    OrderHeader.current_stage_code == "PENDING",
+
+                    OrderHeader.ordered_by.is_(None),
                 )
-                .values(status="PICKED_UP")
+                .values(ordered_by=sales_user_email, current_stage_code="PO_SUBMITTED",)
+                .returning(
+                    OrderHeader.order_id,
+                    OrderHeader.order_acceptance_id,
+                    OrderHeader.current_stage_code,
+                    OrderHeader.ordered_by,
+                )
             )
 
             result = session.execute(stmt)
 
+            claimed = result.first()
+
+            if not claimed:
+
+                session.rollback()
+
+                return None
+
+            # ---------------------------------------------------------
+            # Record workflow history
+            # ---------------------------------------------------------
+
+            history = ProductionStageHistory(order_id=claimed.order_id, stage="PO_SUBMITTED", changed_by=sales_user_email,)
+
+            session.add(history)
+
             session.commit()
 
-            return result.rowcount == 1
+            return {
+                "order_id": claimed.order_id,
+                "order_acceptance_id": claimed.order_acceptance_id,
+                "current_stage_code": claimed.current_stage_code,
+                "ordered_by": claimed.ordered_by,
+            }
 
     # --- GLOBAL ORDERS ENGINE end---
 
-    # --- GLOBAL BILLS ENGINE start---
-            
+    # --- GLOBAL BILLS ENGINE start ---
+
     def get_all_bills(self):
         with SessionLocal() as session:
 
-            stmt = (select(BillHeader)
-                .options(joinedload(BillHeader.items))
-                .order_by(BillHeader.created_at.desc())
+            stmt = (
+                select(BillHeader)
+                .options(
+                    joinedload(BillHeader.items),
+                    joinedload(BillHeader.order)
+                        .joinedload(OrderHeader.items),
+                )
+                .order_by(
+                    BillHeader.bill_date.desc(),
+                    BillHeader.bill_num.desc(),
+                )
             )
 
-            headers = (session.scalars(stmt)
+            headers = (
+                session.scalars(stmt)
                 .unique()
                 .all()
             )
@@ -344,56 +534,412 @@ class PostgresRepository:
 
                 data = to_dict(header)
 
-                data["items"] = [to_dict(item) for item in header.items]
+                data["order_id"] = header.order_id
+
+                data["order_acceptance_id"] = (
+                    header.order.order_acceptance_id
+                    if header.order
+                    else None
+                )
+
+                # -----------------------------------------------------
+                # Remaining quantities
+                # -----------------------------------------------------
+
+                items = []
+
+                for bill_item in header.items:
+
+                    item_data = to_dict(bill_item)
+
+                    if bill_item.order_item_id is None:
+
+                        item_data["ordered_quantity"] = None
+                        item_data["total_shipped_quantity"] = None
+                        item_data["remaining_quantity"] = None
+
+                        items.append(item_data)
+                        continue
+
+                    order_item = session.get(
+                        OrderItem,
+                        bill_item.order_item_id,
+                    )
+
+                    if not order_item:
+
+                        item_data["ordered_quantity"] = None
+                        item_data["total_shipped_quantity"] = None
+                        item_data["remaining_quantity"] = None
+
+                        items.append(item_data)
+                        continue
+
+                    shipped_quantity = session.scalar(
+                        select(
+                            func.coalesce(
+                                func.sum(
+                                    BillItem.quantity_shipped
+                                ),
+                                0,
+                            )
+                        )
+                        .where(
+                            BillItem.order_item_id
+                            == bill_item.order_item_id
+                        )
+                    ) or 0
+
+                    ordered_quantity = (
+                        order_item.quantity
+                    )
+
+                    remaining_quantity = max(
+                        ordered_quantity
+                        - shipped_quantity,
+                        0,
+                    )
+
+                    item_data["ordered_quantity"] = (
+                        ordered_quantity
+                    )
+
+                    item_data["total_shipped_quantity"] = (
+                        shipped_quantity
+                    )
+
+                    item_data["remaining_quantity"] = (
+                        remaining_quantity
+                    )
+
+                    items.append(item_data)
+
+                data["items"] = items
 
                 result.append(data)
 
             return result
 
-    def create_bill(self, bill_data: dict) -> dict:
+
+    def get_bill(self, bill_num: str):
         with SessionLocal() as session:
+
+            stmt = (
+                select(BillHeader)
+                .options(
+                    joinedload(BillHeader.items),
+                    joinedload(BillHeader.order),
+                )
+                .where(BillHeader.bill_num == bill_num)
+            )
+
+            bill = (
+                session.scalars(stmt)
+                .unique()
+                .first()
+            )
+
+            if not bill:
+                return None
+
+            data = to_dict(bill)
+
+            data["order_id"] = bill.order_id
+
+            data["order_acceptance_id"] = (
+                bill.order.order_acceptance_id
+                if bill.order
+                else None
+            )
+
+            items = []
+
+            for bill_item in bill.items:
+
+                item_data = to_dict(bill_item)
+
+                if bill_item.order_item_id is not None:
+
+                    order_item = session.get(
+                        OrderItem,
+                        bill_item.order_item_id,
+                    )
+
+                    if order_item:
+
+                        shipped_quantity = session.scalar(
+                            select(
+                                func.coalesce(
+                                    func.sum(BillItem.quantity_shipped),
+                                    0,
+                                )
+                            )
+                            .where(BillItem.order_item_id == bill_item.order_item_id
+                            )
+                        ) or 0
+
+                        item_data["ordered_quantity"] = (
+                            order_item.quantity
+                        )
+
+                        item_data["total_shipped_quantity"] = (
+                            shipped_quantity
+                        )
+
+                        item_data["remaining_quantity"] = max(order_item.quantity - shipped_quantity, 0,)
+
+                items.append(item_data)
+
+            data["items"] = items
+
+            return data
+
+
+    def create_bill(self, bill_data: dict) -> dict:
+
+        with SessionLocal() as session:
+
+            bill_num = str(bill_data["bill_num"]).strip()
+
+            if not bill_num:
+                raise ValueError("bill_num is required.")
+
+            existing = session.get(BillHeader, bill_num,)
+
+            if existing:
+                raise ValueError(f"Bill '{bill_num}' already exists.")
 
             order_id = bill_data.get("order_id")
 
+            # ---------------------------------------------------------
+            # Validate order linkage when supplied.
+            # ---------------------------------------------------------
+
+            order = None
+
+            if order_id is not None:
+
+                order = session.get(OrderHeader, order_id,)
+
+                if not order:
+                    raise ValueError(f"Order {order_id} does not exist.")
+
+            # ---------------------------------------------------------
+            # Bill header
+            # ---------------------------------------------------------
+
             header = BillHeader(
-                bill_num=bill_data["bill_num"],
+                bill_num=bill_num,
                 bill_date=bill_data["bill_date"],
                 order_id=order_id,
-                indian_state=bill_data.get("indian_state"),
+                indian_state=(bill_data.get("indian_state") or None),
             )
 
             session.add(header)
+
             session.flush()
 
-            for item in bill_data["items"]:
+            # ---------------------------------------------------------
+            # Bill items
+            # ---------------------------------------------------------
+
+            for item_data in bill_data.get("items", [],):
+
+                item_code = item_data.get("item_code")
+
+                order_item_id = item_data.get("order_item_id")
+
+                # -----------------------------------------------------
+                # Resolve ItemMaster when an item_code is supplied.
+                # BillItem.item_code is nullable, so an unknown item
+                # can still be recorded without violating the FK.
+                # -----------------------------------------------------
+
+                item = None
+
+                if item_code:
+
+                    item = session.get(ItemMaster, item_code,)
+
+                    if item is None:
+                        # Preserve the bill line but do not violate
+                        # the FK to items_master.
+                        item_code = None
+
+                # -----------------------------------------------------
+                # Resolve OrderItem when supplied.
+                # -----------------------------------------------------
+
+                order_item = None
+
+                if order_item_id is not None:
+
+                    order_item = session.get(OrderItem, order_item_id,)
+
+                    if order_item is None:
+                        order_item_id = None
+
                 bill_item = BillItem(
                     bill_num=header.bill_num,
-                    order_item_id=item.get("order_item_id"),
-                    item_code=item.get("item_code"),
-                    product_name = item.get("product_name"),
-                    hsn_code = item.get("hsn_code"),
-                    quantity_shipped=item["quantity_shipped"],
-                    rate=item.get("rate"),
-                    amount=item.get("amount"),
+
+                    order_item_id=order_item_id,
+
+                    item_code=item_code,
+
+                    quantity_shipped=item_data["quantity_shipped"],
+
+                    rate=item_data.get("rate"),
+
+                    amount=item_data.get("amount"),
                 )
 
                 session.add(bill_item)
 
-            if order_id is not None:
-                order = session.get(OrderHeader, order_id)
+            # ---------------------------------------------------------
+            # A bill means this order has been dispatched/invoiced.
+            #
+            # Only update workflow state when an actual order exists.
+            # ---------------------------------------------------------
 
-                if order:
-                    order.current_stage_code = "DISPATCHED"
+            if order:
+
+                order.current_stage_code = ("DISPATCHED")
 
             session.commit()
-            session.refresh(header)
 
-            h_dict = to_dict(header)
-            h_dict["items"] = [to_dict(item) for item in header.items]
+            # ---------------------------------------------------------
+            # Reload completely from DB.
+            # This keeps the returned object consistent with the
+            # committed state rather than relying on stale ORM state.
+            # ---------------------------------------------------------
 
-            return h_dict
-    
-    # --- GLOBAL BILLS ENGINE end---
+            stmt = (
+                select(BillHeader)
+                .options(joinedload(BillHeader.items),)
+                .where(BillHeader.bill_num == bill_num,)
+            )
+
+            header = (session.scalars(stmt).unique().one())
+
+            result = to_dict(header)
+
+            result["items"] = [to_dict(item) for item in header.items]
+
+            return result
+
+
+    def update_bill(self, bill_num: str, bill_data: dict,) -> dict:
+
+        with SessionLocal() as session:
+
+            header = session.get(BillHeader, bill_num,)
+
+            if not header:
+                return None
+
+            # ---------------------------------------------------------
+            # Update header fields
+            # ---------------------------------------------------------
+
+            if "bill_date" in bill_data:
+                header.bill_date = (bill_data["bill_date"])
+
+            if "indian_state" in bill_data:
+                header.indian_state = (bill_data["indian_state"] or None)
+
+            if "order_id" in bill_data:
+
+                order_id = bill_data["order_id"]
+
+                if order_id is not None:
+
+                    order = session.get(OrderHeader, order_id,)
+
+                    if not order:
+                        raise ValueError(f"Order {order_id} does not exist.")
+
+                header.order_id = order_id
+
+            # ---------------------------------------------------------
+            # Replace item snapshot if items were supplied.
+            # ---------------------------------------------------------
+
+            if "items" in bill_data:
+
+                session.execute(delete(BillItem).where(BillItem.bill_num == header.bill_num))
+
+                for item_data in bill_data["items"]:
+
+                    item_code = item_data.get("item_code")
+
+                    order_item_id = item_data.get("order_item_id")
+
+                    # Ignore invalid ItemMaster links
+                    # rather than breaking the entire bill.
+                    if item_code:
+
+                        item = session.get(ItemMaster, item_code,)
+
+                        if not item:
+                            item_code = None
+
+                    # Ignore invalid OrderItem links.
+                    if order_item_id is not None:
+
+                        order_item = session.get(OrderItem, order_item_id,)
+
+                        if not order_item:
+                            order_item_id = None
+
+                    session.add(
+                        BillItem(
+                            bill_num=header.bill_num,
+                            order_item_id=order_item_id,
+                            item_code=item_code,
+                            quantity_shipped=item_data["quantity_shipped"],
+                            rate=item_data.get("rate"),
+                            amount=item_data.get("amount"),
+                        )
+                    )
+
+            session.commit()
+
+            # ---------------------------------------------------------
+            # Reload
+            # ---------------------------------------------------------
+
+            stmt = (
+                select(BillHeader)
+                .options(joinedload(BillHeader.items),)
+                .where(BillHeader.bill_num == bill_num)
+            )
+
+            header = (session.scalars(stmt).unique().one())
+
+            result = to_dict(header)
+
+            result["items"] = [to_dict(item) for item in header.items]
+
+            return result
+
+
+    def delete_bill(self, bill_num: str,) -> bool:
+
+        with SessionLocal() as session:
+
+            header = session.get(BillHeader, bill_num,)
+
+            if not header:
+                return False
+
+            session.delete(header)
+
+            session.commit()
+
+            return True
+
+
+    # --- GLOBAL BILLS ENGINE end ---
 
     # --- TASK MANAGER SUBSYSTEM start---
     def get_tasks(self, user_email: str):
@@ -677,12 +1223,12 @@ class PostgresRepository:
     # --- LOGISTICS PARTNER end---
 
     # --- ITEM MASTERY start---
-    def get_item_names(self):
+    def get_item_groups(self):
         with SessionLocal() as session:
             stmt = (
-                select(ItemMaster.item_name).where(ItemMaster.item_name.is_not(None), ItemMaster.item_name != "")
+                select(ItemMaster.item_group).where(ItemMaster.item_group.is_not(None), ItemMaster.item_group != "")
                 .distinct()
-                .order_by(ItemMaster.item_name)
+                .order_by(ItemMaster.item_group)
             )   
 
             return list(session.execute(stmt).scalars().all())
@@ -1568,29 +2114,61 @@ class PostgresRepository:
     
     def get_production_analytics(self, from_date, to_date):
         with SessionLocal() as session:
+
+            # =========================================================
+            # PRODUCTION STAGES
+            # =========================================================
+
             stages = session.execute(
                 select(
-                    func.coalesce(OrderHeader.current_stage_code, "PO_SUBMITTED").label("stage"),
+                    func.coalesce(
+                        OrderHeader.current_stage_code,
+                        "PO_SUBMITTED",
+                    ).label("stage"),
+
                     func.count(OrderHeader.order_id).label("order_count"),
-                    )
-                .where(OrderHeader.created_at.between(from_date, to_date,))
+                )
+                .where(
+                    OrderHeader.order_acceptance_date >= from_date,
+                    OrderHeader.order_acceptance_date <= to_date,
+                )
                 .group_by(OrderHeader.current_stage_code)
                 .order_by(desc("order_count"))
             ).all()
 
-            task_summary = session.execute(select(User.name.label("operator"), 
+            # =========================================================
+            # TASK SUMMARY
+            # =========================================================
 
-                func.count(Task.id).filter(Task.assigned_by == User.email).label("assigned"),
+            task_summary = session.execute(
+                select(
+                    User.name.label("operator"),
 
-                func.count(Task.id).filter(User.email == func.any(Task.assigned_to)).label("received")
+                    func.count(Task.id)
+                    .filter(Task.assigned_by == User.email)
+                    .label("assigned"),
 
-            )
-            .where(or_(User.role == "Shop Floor Administrator", User.role == "Admin", User.role == "Chief Full Stack Developer"))
-            .group_by(User.email, User.name)
-            .order_by(User.name)
-
+                    func.count(Task.id)
+                    .filter(
+                        User.email == func.any(Task.assigned_to)
+                    )
+                    .label("received"),
+                )
+                .where(
+                    or_(
+                        User.role == "Shop Floor Administrator",
+                        User.role == "Admin",
+                        User.role == "Chief Full Stack Developer",
+                    )
+                )
+                .group_by(User.email, User.name)
+                .order_by(User.name)
             ).all()
-            
+
+            # =========================================================
+            # DAILY COMPLETED TASKS
+            # =========================================================
+
             completed_daily = session.execute(
                 select(
                     func.date(Task.completed_at).label("day"),
@@ -1598,38 +2176,414 @@ class PostgresRepository:
                 )
                 .where(
                     Task.completed_at.is_not(None),
-                    Task.completed_at.between(from_date, to_date)
+                    Task.completed_at >= from_date,
+                    Task.completed_at <= to_date,
                 )
                 .group_by(func.date(Task.completed_at))
                 .order_by(func.date(Task.completed_at))
             ).all()
 
+            # =========================================================
+            # BILLS INSIDE SELECTED PERIOD
+            # =========================================================
+
+            billed_subquery = (
+                select(
+                    BillItem.order_item_id.label("order_item_id"),
+
+                    func.sum(
+                        BillItem.quantity_shipped
+                    ).label("billed_quantity"),
+
+                    func.min(
+                        BillHeader.bill_date
+                    ).label("first_bill_date"),
+
+                    func.max(
+                        BillHeader.bill_date
+                    ).label("last_bill_date"),
+                )
+                .join(
+                    BillHeader,
+                    BillHeader.bill_num == BillItem.bill_num,
+                )
+                .where(
+                    BillHeader.bill_date >= from_date,
+                    BillHeader.bill_date <= to_date,
+                )
+                .group_by(
+                    BillItem.order_item_id,
+                )
+                .subquery()
+            )
+
+            billed_quantity = func.coalesce(
+                billed_subquery.c.billed_quantity,
+                0,
+            )
+
+            pending_quantity = func.greatest(
+                OrderItem.quantity - billed_quantity,
+                0,
+            )
+
+            # =========================================================
+            # ORDERS BOOKED DURING PERIOD
+            # =========================================================
+
+            order_item_rows = session.execute(
+                select(
+                    OrderHeader.order_id,
+
+                    OrderHeader.order_acceptance_id,
+
+                    OrderHeader.order_acceptance_date,
+
+                    OrderHeader.payment_terms,
+
+                    OrderHeader.purchase_order_date,
+
+                    OrderHeader.purchase_order_number,
+
+                    OrderHeader.billing_name.label(
+                        "client_name"
+                    ),
+
+                    OrderItem.order_item_id,
+                    OrderItem.item_code,
+
+                    OrderItem.quantity.label(
+                        "ordered_quantity"
+                    ),
+
+                    OrderItem.rate,
+
+                    OrderItem.discount_percentage,
+
+                    OrderItem.amount,
+
+                    billed_quantity.label(
+                        "billed_quantity"
+                    ),
+
+                    pending_quantity.label(
+                        "pending_quantity"
+                    ),
+                )
+                .join(
+                    OrderItem,
+                    OrderItem.order_id == OrderHeader.order_id,
+                )
+                .outerjoin(
+                    billed_subquery,
+                    billed_subquery.c.order_item_id
+                    == OrderItem.order_item_id,
+                )
+                .where(
+                    OrderHeader.order_acceptance_date >= from_date,
+                    OrderHeader.order_acceptance_date <= to_date,
+                )
+                .order_by(
+                    OrderHeader.order_acceptance_date,
+                    OrderHeader.order_id,
+                    OrderItem.item_code,
+                )
+            ).all()
             
+            # =========================================================
+            # BUILD ORDERED / PENDING DATA
+            # =========================================================
+
+            total_ordered = 0
+            total_shipped = 0
+            total_pending = 0
+
+            orders_booked = []
+            pending_order_items = []
+
+            for row in order_item_rows:
+
+                ordered = int(row.ordered_quantity or 0)
+                billed = int(row.billed_quantity or 0)
+
+                pending = max(
+                    ordered - billed,
+                    0,
+                )
+
+                total_ordered += ordered
+                total_shipped += billed
+                total_pending += pending
+
+                item_data = {
+                    "_order_item_id": row.order_item_id,
+                    "oa_id": row.order_acceptance_id,
+                    "oa_date": (
+                        str(row.order_acceptance_date)
+                        if row.order_acceptance_date
+                        else None
+                    ),
+
+                    "payment_terms": row.payment_terms,
+
+                    "purchase_order_date": (
+                        str(row.purchase_order_date)
+                        if row.purchase_order_date
+                        else None
+                    ),
+
+                    "po_number": row.purchase_order_number,
+
+                    "client_name": row.client_name,
+
+                    "item_code": row.item_code,
+
+                    "quantity": ordered,
+
+                    "rate": float(row.rate or 0),
+
+                    "discount_percentage": float(
+                        row.discount_percentage or 0
+                    ),
+
+                    "amount": float(
+                        row.amount or 0
+                    ),
+
+                    "billed_quantity": billed,
+
+                    "pending_quantity": pending,
+                }
+
+                orders_booked.append(item_data)
+
+                if pending > 0:
+                    pending_order_items.append(item_data)
+
+            # =========================================================
+            # BILLED DATASET
+            #
+            # This is deliberately queried independently because:
+            #
+            # - the order may have been accepted BEFORE from_date
+            # - but billed INSIDE the selected period.
+            #
+            # Therefore it cannot be derived from orders_booked.
+            # =========================================================
+
+            billed_rows = session.execute(
+                select(
+                    OrderHeader.order_id,
+
+                    OrderHeader.order_acceptance_id,
+
+                    OrderHeader.order_acceptance_date,
+
+                    OrderHeader.payment_terms,
+
+                    OrderHeader.purchase_order_date,
+
+                    OrderHeader.purchase_order_number,
+
+                    OrderHeader.billing_name.label(
+                        "client_name"
+                    ),
+
+                    OrderItem.order_item_id,
+
+                    OrderItem.item_code,
+
+                    OrderItem.quantity.label(
+                        "ordered_quantity"
+                    ),
+
+                    OrderItem.rate,
+
+                    OrderItem.discount_percentage,
+
+                    OrderItem.amount,
+
+                    BillHeader.bill_num,
+
+                    BillHeader.bill_date,
+
+                    BillItem.quantity_shipped.label(
+                        "billed_quantity"
+                    ),
+                )
+                .join(
+                    OrderItem,
+                    OrderItem.order_id == OrderHeader.order_id,
+                )
+                .join(
+                    BillItem,
+                    BillItem.order_item_id
+                    == OrderItem.order_item_id,
+                )
+                .join(
+                    BillHeader,
+                    BillHeader.bill_num
+                    == BillItem.bill_num,
+                )
+                .where(
+                    BillHeader.bill_date >= from_date,
+                    BillHeader.bill_date <= to_date,
+                )
+                .order_by(
+                    BillHeader.bill_date,
+                    BillHeader.bill_num,
+                    OrderHeader.order_id,
+                    OrderItem.item_code,
+                )
+            ).all()
+
+            billed_items = []
+
+            for row in billed_rows:
+
+                billed_items.append(
+                            {
+                    "_order_item_id": row.order_item_id,
+                    "oa_id": row.order_acceptance_id,
+
+                    "oa_date": (
+                        str(row.order_acceptance_date)
+                        if row.order_acceptance_date
+                        else None
+                    ),
+
+                    "payment_terms": row.payment_terms,
+
+                    "purchase_order_date": (
+                        str(row.purchase_order_date)
+                        if row.purchase_order_date
+                        else None
+                    ),
+
+                    "po_number": row.purchase_order_number,
+
+                    "client_name": row.client_name,
+
+                    "item_code": row.item_code,
+
+                    "quantity": int(
+                        row.ordered_quantity or 0
+                    ),
+
+                    "rate": float(
+                        row.rate or 0
+                    ),
+
+                    "discount_percentage": float(
+                        row.discount_percentage or 0
+                    ),
+
+                    "amount": float(
+                        row.amount or 0
+                    ),
+
+                    "bill_num": row.bill_num,
+
+                    "bill_date": str(
+                        row.bill_date
+                    ),
+
+                    "billed_quantity": int(
+                        row.billed_quantity or 0
+                    ),
+                }
+                )
+
+            # =========================================================
+            # ORDERED + BILLED IN SAME PERIOD
+            #
+            # Since orders_booked is restricted to the selected
+            # order acceptance period AND billed_rows is restricted
+            # to the selected bill period, matching by order_item_id
+            # gives us the intersection.
+            # =========================================================
+
+            billed_by_order_item = {}
+
+            for item in billed_items:
+
+                order_item_id = item["_order_item_id"]
+
+                if order_item_id not in billed_by_order_item:
+                    billed_by_order_item[order_item_id] = []
+
+                billed_by_order_item[
+                    order_item_id
+                ].append(item)
+
+            ordered_and_billed = []
+
+            for item in orders_booked:
+
+                bill_entries = billed_by_order_item.get(
+                    item["_order_item_id"],
+                    [],
+                )
+
+                for bill in bill_entries:
+
+                    ordered_and_billed.append(
+                        {
+                            **item,
+
+                            "bill_num": bill["bill_num"],
+                            "bill_date": bill["bill_date"],
+                            "billed_quantity":
+                                bill["billed_quantity"],
+                        }
+                    )
+
+            # =========================================================
+            # RETURN
+            # =========================================================
+
             return {
                 "production_stage": [
                     {
-                        "stage": r.stage,
-                        "count": r.order_count
+                        "stage": row.stage,
+                        "count": row.order_count,
                     }
-                    for r in stages
+                    for row in stages
                 ],
 
-                "task_summary":[
+                "task_summary": [
                     {
-                        "operator": r.operator,
-                        "assigned": r.assigned,
-                        "received": r.received
+                        "operator": row.operator,
+                        "assigned": row.assigned,
+                        "received": row.received,
                     }
-                    for r in task_summary
+                    for row in task_summary
                 ],
 
                 "daily_completed": [
                     {
-                        "day": str(r.day),
-                        "completed": r.completed
+                        "day": str(row.day),
+                        "completed": row.completed,
                     }
-                    for r in completed_daily
-                ]
+                    for row in completed_daily
+                ],
+
+                "order_quantity_summary": {
+                    "ordered": total_ordered,
+                    "shipped": total_shipped,
+                    "pending": total_pending,
+                },
+
+                "orders_booked": orders_booked,
+
+                "pending_order_items":
+                    pending_order_items,
+
+                "billed_items":
+                    billed_items,
+
+                "ordered_and_billed":
+                    ordered_and_billed,
             }
     
     def get_gtm_analytics(self, from_date, to_date):
@@ -1664,7 +2618,7 @@ class PostgresRepository:
                 }
                 for row in rows
             ]
-
+        
     def get_today_quotation_analytics(self):
         today = date.today()
 
@@ -1812,9 +2766,9 @@ class PostgresRepository:
             raise PermissionError(f"Role'{role}' is not permitted to access")
     # --- Geo repository end ---
     # --- Quotations start ---
-
-    def create_quotation(self, request, sales_user, document_path=None):
+    def create_quotation(self, request, sales_user, document_path=None,):
         with SessionLocal() as session:
+
             quotation = Quotation(
                 quote_number=request.qoute_number,
                 product_name=request.product_name,
@@ -1840,11 +2794,9 @@ class PostgresRepository:
                 sales_user_name=sales_user["name"],
                 sales_user_email=sales_user["email"],
 
-                document_path=(
-                    str(document_path)
-                    if document_path
-                    else None
-                ),
+                document_path=(str(document_path) if document_path else None),
+
+                status="GENERATED",
             )
 
             session.add(quotation)
@@ -1856,12 +2808,8 @@ class PostgresRepository:
 
     def get_quotation(self, quotation_id: int):
         with SessionLocal() as session:
-            stmt = (
-                select(Quotation)
-                .where(
-                    Quotation.id == quotation_id,
-                    Quotation.is_active.is_(True),
-                )
+            stmt = (select(Quotation)
+                .where(Quotation.id == quotation_id, Quotation.is_active.is_(True),)
             )
 
             return session.scalars(stmt).first()
@@ -1871,10 +2819,7 @@ class PostgresRepository:
         with SessionLocal() as session:
             stmt = (
                 select(Quotation)
-                .where(
-                    Quotation.quote_number == quotation_num,
-                    Quotation.is_active.is_(True),
-                )
+                .where(Quotation.quote_number == quotation_num, Quotation.is_active.is_(True),)
             )
 
             return session.scalars(stmt).first()
@@ -1884,12 +2829,8 @@ class PostgresRepository:
         with SessionLocal() as session:
             stmt = (
                 select(Quotation)
-                .where(
-                    Quotation.is_active.is_(True)
-                )
-                .order_by(
-                    Quotation.generated_at.desc()
-                )
+                .where(Quotation.is_active.is_(True))
+                .order_by(Quotation.generated_at.desc())
                 .offset(skip)
                 .limit(limit)
             )
@@ -1933,13 +2874,10 @@ class PostgresRepository:
 
             return quotation
 
-
+    
     def deactivate_quotation(self, quotation_id: int):
         with SessionLocal() as session:
-            quotation = session.get(
-                Quotation,
-                quotation_id,
-            )
+            quotation = session.get(Quotation, quotation_id,)
 
             if not quotation or not quotation.is_active:
                 return None
@@ -1952,24 +2890,208 @@ class PostgresRepository:
             return quotation
 
 
+    def update_quotation_status(self, quotation_id: int, status: str, *, converted_order_id: int | None = None, snapshot: dict | None = None,):
+        allowed = {
+            "GENERATED",
+            "ORDERED",
+            "REJECTED",
+            "CHANGED",
+        }
+
+        if status not in allowed:
+            raise ValueError(f"Invalid quotation status: {status}")
+
+        with SessionLocal() as session:
+
+            quotation = session.get(
+                Quotation,
+                quotation_id,
+            )
+
+            if not quotation or not quotation.is_active:
+                return None
+
+            now = datetime.now()
+
+            quotation.status = status
+            quotation.resolved_at = now
+
+            if status == "COMPLETED":
+                quotation.completed_at = now
+
+            elif status == "REJECTED":
+                quotation.rejected_at = now
+
+            elif status == "CHANGED":
+                quotation.changed_at = now
+
+            if converted_order_id is not None:
+                quotation.converted_order_id = (
+                    converted_order_id
+                )
+
+            # -----------------------------------------------------
+            # Changed quotation snapshot
+            # -----------------------------------------------------
+
+            if status == "CHANGED":
+
+                if not snapshot:
+                    raise ValueError(
+                        "Quotation change snapshot is required."
+                    )
+
+                change = QuotationChangeSnapshot(
+                    quotation_id=quotation.id,
+
+                    quoted_product_name=(
+                        snapshot.get(
+                            "quoted_product_name"
+                        )
+                        or quotation.product_name
+                    ),
+
+                    quoted_item_code=(
+                        snapshot.get(
+                            "quoted_item_code"
+                        )
+                    ),
+
+                    quoted_quantity=(
+                        snapshot.get(
+                            "quoted_quantity"
+                        )
+                    ),
+
+                    quoted_rate=(
+                        snapshot.get(
+                            "quoted_rate"
+                        )
+                    ),
+
+                    ordered_product_name=(
+                        snapshot.get(
+                            "ordered_product_name"
+                        )
+                    ),
+
+                    ordered_item_code=(
+                        snapshot.get(
+                            "ordered_item_code"
+                        )
+                    ),
+
+                    ordered_quantity=(
+                        snapshot.get(
+                            "ordered_quantity"
+                        )
+                    ),
+
+                    ordered_rate=(
+                        snapshot.get(
+                            "ordered_rate"
+                        )
+                    ),
+
+                    order_id=converted_order_id,
+                )
+
+                session.add(change)
+
+            session.commit()
+
+            session.refresh(quotation)
+
+            return quotation
+
+    def complete_quotation_from_order(self, quotation_id: int, order_id: int, changed_snapshot: dict | None = None,):
+        with SessionLocal() as session:
+
+            quotation = session.get(
+                Quotation,
+                quotation_id,
+            )
+
+            if not quotation:
+                raise ValueError(
+                    "Quotation not found."
+                )
+
+            now = datetime.now()
+
+            quotation.status = ("CHANGED" if changed_snapshot else "ORDERED")
+
+            quotation.resolved_at = now
+            quotation.completed_at = now
+            quotation.converted_order_id = order_id
+
+            if changed_snapshot:
+
+                quotation.changed_at = now
+
+                session.add(
+                    QuotationChangeSnapshot(
+                        quotation_id=quotation.id,
+
+                        quoted_product_name=(
+                            quotation.product_name
+                        ),
+
+                        quoted_item_code=(
+                            changed_snapshot.get(
+                                "quoted_item_code"
+                            )
+                        ),
+
+                        quoted_quantity=(
+                            changed_snapshot.get(
+                                "quoted_quantity"
+                            )
+                        ),
+
+                        quoted_rate=(
+                            changed_snapshot.get(
+                                "quoted_rate"
+                            )
+                        ),
+
+                        ordered_product_name=(
+                            changed_snapshot.get(
+                                "ordered_product_name"
+                            )
+                        ),
+
+                        ordered_item_code=(
+                            changed_snapshot.get(
+                                "ordered_item_code"
+                            )
+                        ),
+
+                        ordered_quantity=(
+                            changed_snapshot.get(
+                                "ordered_quantity"
+                            )
+                        ),
+
+                        ordered_rate=(
+                            changed_snapshot.get(
+                                "ordered_rate"
+                            )
+                        ),
+
+                        order_id=order_id,
+                    )
+                )
+
+            session.commit()
+            
     def get_quotation_count_by_product(self):
         with SessionLocal() as session:
             stmt = (
-                select(
-                    Quotation.product_name,
-                    func.count(Quotation.id).label(
-                        "quotation_count"
-                    ),
-                )
-                .where(
-                    Quotation.is_active.is_(True)
-                )
-                .group_by(
-                    Quotation.product_name
-                )
-                .order_by(
-                    func.count(Quotation.id).desc()
-                )
+                select(Quotation.product_name, func.count(Quotation.id).label("quotation_count"),)
+                .where(Quotation.is_active.is_(True))
+                .group_by(Quotation.product_name)
+                .order_by(func.count(Quotation.id).desc())
             )
 
             rows = session.execute(stmt).all()

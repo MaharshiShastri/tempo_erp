@@ -3,7 +3,8 @@ import API from "../../api/api";
 
 export default function useOrderLookup({sessionToken, companiesMaster, itemsMaster, setAlertMessage, setIsAlertOpen, setActiveTab,
     orders, setOrders, orderHeader, setOrderHeader, orderItems, setOrderItems, billItems, setBillItems, isBillingSameAsCustomer, setIsBillingSameAsCustomer,
-    appendOrderItemRow, popOrderItemRow, updateOrderItemField, handleCustomerMasterSelection, handleItemMasterSelection, showErrorModal
+    appendOrderItemRow, popOrderItemRow, updateOrderItemField, handleCustomerMasterSelection, handleItemMasterSelection, showErrorModal,
+    isPendingTallyOrder, setIsPendingTallyOrder,
 }){
     const [isOcrLoading, setIsOcrLoading] = useState(false);
     
@@ -62,7 +63,7 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
         if (!exactOaId) return;
         setShowOaSuggestions(false); 
         try {
-            setAlertMessage("Searching staging records for OA...");
+            setAlertMessage("Searching pending Tally orders...");
             setIsAlertOpen(true);
             const safeId = encodeURIComponent(exactOaId);
 
@@ -79,27 +80,42 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
                 return rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.substring(0, 10);
             };
             
+            setIsPendingTallyOrder(true);
+
             // Map the API data parameters safely to your frontend input states
-            setOrderHeader({
-                ...orderHeader,
-                order_acceptance_id: exactOaId,
-                order_acceptance_date: cleanDateString(data.order_acceptance_date),
-                purchase_order_number: data.purchase_order_number || "",
-                purchase_order_date: cleanDateString(data.purchase_order_date),
-                due_date: cleanDateString(data.due_date),
-                payment_terms: data.payment_terms || "",
-                billing_name: data.billing_name || "",
-                billing_address: data.billing_address || "",
-                
-                // Logistics and Tracking additions
-                dispatched_through: data.dispatched_through || "",
-                delivery_terms: data.terms_of_delivery || "", 
-                
-                // Financial fallback values handled smoothly
-                packing_charges: data.packing_charges ?? 0,
-                freight_charges: data.freight_charges ?? 0,
-                tax_rate: data.tax_rate ?? 18,
-            });
+            setOrderHeader((prev) => ({
+            ...prev,
+
+            order_acceptance_id:data.order_acceptance_id || exactOaId,
+
+            order_acceptance_date: cleanDateString(data.order_acceptance_date),
+
+            purchase_order_number: data.purchase_order_number || "",
+
+            purchase_order_date: cleanDateString(data.purchase_order_date),
+
+            due_date: cleanDateString(data.due_date),
+
+            payment_terms: data.payment_terms || "",
+
+            billing_name: data.billing_name || "",
+
+            billing_address: data.billing_address || "",
+
+            dispatched_through: data.dispatched_through || "",
+
+            delivery_terms: data.delivery_terms || "",
+
+            packing_charges: data.packing_charges ?? 0,
+
+            freight_charges: data.freight_charges ?? 0,
+
+            tax_rate: data.tax_rate ?? 18,
+
+            // Tally field
+            customer_code: data.tally_customer_code || "",
+        }));
+
 
             // Auto-check if the company exists
             if (data.billing_name) {
@@ -122,7 +138,7 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
             }
             
             // Auto-populate line items
-            if (data.items && data.items.length > 0) {
+            if (Array.isArray(data.items) && data.items.length > 0) {
                 const formattedItems = data.items.map(item => ({
                     item_code: item.item_code || "",
                     additional_spec_text: item.additional_spec_text || "",

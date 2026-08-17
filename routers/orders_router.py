@@ -21,8 +21,8 @@ def create_order(payload: OrderHeaderCreate, user_profile: dict = Depends(verify
     try:
         order_data = payload.model_dump()
         order_data['ordered_by'] = user_profile['email']
-
-        return EDBR.create_order(order_data)
+        order_data["current_stage_code"] = "PENDING"
+        return EDBR.create_order(order_data, user_email=user_profile["email"],)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -120,3 +120,19 @@ async def extract_order_from_document(file: UploadFile = File(...), user: dict =
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR Extraction Failed: {str(e)}")
+
+@router.post("/claim/{oa_id:path}", dependencies=[Depends(check_department("Sales Representative"))],)
+def claim_order(oa_id: str, user_profile: dict = Depends(verify_bearer_token),):
+    try:
+        result = EDBR.claim_pending_order(order_acceptance_id=oa_id, sales_user_email=user_profile["email"],)
+
+        if not result:
+            raise HTTPException(status_code=409, detail=( "This Order Acceptance is no longer pending or has already been claimed."),)
+
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to claim order: {str(exc)}",)

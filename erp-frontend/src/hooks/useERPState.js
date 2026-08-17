@@ -20,6 +20,7 @@ import useAnalytics from "./analytics/useAnalytics";
 import useGeo from "./geographic/useGeo";
 import useDispatchPlannerHub from "./dispatch/useDispatchPlannerHub";
 import useQuotation from "./useQuotation";
+import useExerciseGenerator from "./useExerciseGenerator";
 
 const API_HOST = window.location.hostname;
 
@@ -53,7 +54,8 @@ export default function useERPState() {
 
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
-
+    const exerciseGenerator = useExerciseGenerator({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    
     //All the shop floor business states
     const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -94,7 +96,7 @@ export default function useERPState() {
             billing.loadBills?.();
             crm.loadLeads?.();
             leadTargets.loadTargets?.();
-
+            qoutation.loadQuotations?.();
         }
 
         if (transportRoles.includes(core.user.role)) { //Transport module refresh
@@ -171,7 +173,7 @@ export default function useERPState() {
         ...companies, ...orders, ...billing, ...crm, ...leadTargets, ...qoutation, //Sales Business states unwinding
         ...truckPlanner,  ...logistics, ...dispatch, //Logistics business states
         ...tasks, ...activity, ...grn, //Shop floor business states
-        ...admin, ...indiaMap,//Admin business states
+        ...admin, ...indiaMap, ...exerciseGenerator,//Admin business states
         ...faq, ...items, ...production, ...login, ...analytics, ...core, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };

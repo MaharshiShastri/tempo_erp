@@ -974,7 +974,280 @@ const API = {
     }
 
     return await response.blob();
-  }
+  },
+  async getQuotations (sessionToken){
+    const response = await fetch(
+        `/api/v1/quotations`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        throw new Error(data.detail || "Unable to fetch quotations.");
+    }
+
+    return response.json();
+  },
+
+  async getQuotation(sessionToken, quotationId){
+    const response = await fetch(
+        `/api/v1/quotations/${quotationId}`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        throw new Error(data.detail || "Unable to fetch quotation.");
+    }
+
+    return response.json();
+  },
+  async updateQuotation  (sessionToken, quotationId, updates){
+    const response = await fetch(
+        `/api/v1/quotations/${quotationId}`,
+        {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(updates),
+        }
+    );
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        throw new Error(data.detail || "Unable to update quotation.");
+    }
+
+    return response.json();
+  },
+
+  async deleteQuotation (sessionToken, quotationId){
+    const response = await fetch(
+        `/api/v1/quotations/${quotationId}`,
+        {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        throw new Error(data.detail || "Unable to deactivate quotation.");
+    }
+
+    return response.json();
+  },
+  
+  downloadQuotation: async (sessionToken, quotationId) => {
+    const response = await fetch(
+        `/api/v1/quotations/${quotationId}/download`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        let message = "Unable to download quotation.";
+
+        try {
+            const error = await response.json();
+            message = error.detail || message;
+        } catch {
+            // Response wasn't JSON.
+        }
+
+        throw new Error(message);
+    }
+
+    return await response.blob();
+  },
+
+  async claimPendingOrder(sessionToken, oaId) {
+    const safeId = encodeURIComponent(oaId);
+
+    const response = await fetch(
+        `/api/v1/orders/claim/${safeId}`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data?.detail || "Unable to claim order."
+        );
+    }
+
+    return data;
+  },
+  
+  async fetchExerciseUsers(sessionToken, role = ""){
+
+    const params = new URLSearchParams();
+
+    if (role?.trim()) {
+        params.set("role", role.trim());
+    }
+
+    const query = params.toString();
+
+    const response = await fetch(
+        `/api/v1/exercises/users${query ? `?${query}` : ""}`,
+        {
+            headers: {
+                Authorization:
+                    `Bearer ${sessionToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        throw new Error(data.detail || "Failed to load ERP users.");
+    }
+
+    return response.json();
+  },
+
+  async generateExerciseDocument(payload, sessionToken){
+
+    const response = await fetch(
+        "/api/v1/exercises/generate",
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type":
+                    "application/json",
+
+                Authorization:
+                    `Bearer ${sessionToken}`,
+            },
+
+            body: JSON.stringify(payload),
+        }
+    );
+
+    if (!response.ok) {
+
+        const data = await response.json().catch(() => ({}));
+
+        throw new Error(data.detail || "Failed to generate exercise document.");
+    }
+
+    return response.blob();
+  },
+
+  async fetchExerciseRoles(sessionToken) {
+
+    const response = await fetch(
+        "/api/v1/exercises/roles",
+        {
+            headers: {
+                Authorization:
+                    `Bearer ${sessionToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+
+        const data =
+            await response.json().catch(() => ({}));
+
+        throw new Error(
+            data.detail ||
+            "Failed to load exercise roles."
+        );
+    }
+
+    return response.json();
+  },
+
+  async updateQuotationStatus(sessionToken, quotationId, payload) {
+    const response = await fetch(
+        `/api/v1/quotations/${quotationId}/status`,
+        {
+            method: "PATCH",
+
+            headers: {
+                "Content-Type": "application/json",
+                Authorization:
+                    `Bearer ${sessionToken}`,
+            },
+
+            body: JSON.stringify(payload),
+        }
+    );
+
+    if (!response.ok) {
+
+        const data =
+            await response.json().catch(() => ({}));
+
+        throw new Error(
+            data.detail ||
+            "Failed to update quotation status."
+        );
+    }
+
+    return response.json();
+  },
+
+  async downloadPendingOrdersExcel(sessionToken, fromDate, toDate){
+    const response = await fetch(
+        `/api/v1/analytics/production/pending-orders/excel?from_date=${fromDate}&to_date=${toDate}`,
+        {
+            method: "GET",
+            headers: {Authorization: `Bearer ${sessionToken}`,},
+        }
+    );
+
+    if (!response.ok) {
+        let message = "Unable to download pending orders report.";
+
+        try {
+            const error = await response.json();
+            message = error?.detail || message;
+        } catch (e){
+          console.log("Error: ", e)
+        }
+
+        throw new Error(message);
+    }
+
+    return await response.blob();
+  },
+  
 };
 
 export default API;

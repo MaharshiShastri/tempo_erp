@@ -297,7 +297,7 @@ export default function OrderEntryFormView({ state }) {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '15px' }}>
                     <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('orders-list')}>Discard Form</button>
-                    <button type="submit" className="btn btn-primary">Commit Order Records<kbd style={{ marginLeft: '6px', fontSize: '10px', opacity: 0.8 }}>Ctrl+S</kbd></button>
+                    <button type="submit" className="btn btn-primary">{state.isPendingTallyOrder ? "✓ Claim Order" : "Create Order"}<kbd style={{ marginLeft: '6px', fontSize: '10px', opacity: 0.8 }}>Ctrl+S</kbd></button>
                 </div>
             </form>
         </div>

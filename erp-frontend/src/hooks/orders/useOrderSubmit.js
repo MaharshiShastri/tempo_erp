@@ -2,10 +2,11 @@ import API from "../../api/api";
 
 export default function useOrderSubmit({user, sessionToken, orderHeader, setIsBillingSameAsCustomer, setOrderHeader, orderItems, setOrderItems, defaultOrderHeader,
     defaultOrderItem, setOrders, isNewClient, temporaryClientName, setCompanyForm, setIsEditingCompany, setAlertMessage,
-    setIsAlertOpen, setActiveTab, showErrorModal}){
+    setIsAlertOpen, setActiveTab, showErrorModal, isPendingTallyOrder, setIsPendingTallyOrder}){
     
     const triggerNewOrderInitialization = () => {
         setIsBillingSameAsCustomer(true);
+        setIsPendingTallyOrder(false);
         setOrderHeader({ ...defaultOrderHeader, order_acceptance_id: '', order_acceptance_date: new Date().toISOString().split('T')[0] });
         setOrderItems([{ ...defaultOrderItem }]);
         setActiveTab('order-new');
@@ -60,6 +61,12 @@ export default function useOrderSubmit({user, sessionToken, orderHeader, setIsBi
         const headerToSubmit = passedHeader || orderHeader;
         const itemsToSubmit = passedItems || orderItems;
 
+        if(!headerToSubmit.order_acceptance_id){
+            setAlertMessage("Order Acceptance ID is required")
+            setIsAlertOpen(true);
+            return;
+        }
+
         if (!headerToSubmit.customer_code || !headerToSubmit.billing_name.trim() || !headerToSubmit.billing_address.trim()) {
             setAlertMessage("Customer Code, Billing Name, and Address are strictly required."); 
             setIsAlertOpen(true); 
@@ -67,6 +74,18 @@ export default function useOrderSubmit({user, sessionToken, orderHeader, setIsBi
         }
 
         try {
+            if(isPendingTallyOrder){
+                const claimed = API.claimPendingOrder(sessionToken, headerToSubmit.order_acceptance_id);
+                setAlertMessage(`✅ ${claimed.order_acceptance_id} claimed successfully.`);
+                setIsAlertOpen(true);
+                setOrderHeader({...defaultOrderHeader});
+                setOrderItems({...defaultOrderItem});
+                setIsPendingTallyOrder(false);
+                await loadOrders();
+                setActiveTab('orders-list');
+                return;
+
+            }
             const payloadItems = itemsToSubmit.map(item => ({ 
                 ...item, 
                 amount: Math.round(((item.quantity || 0) * (item.rate || 0) * (1.0 - ((item.discount_percentage || 0) / 100.0))) * 100) / 100 

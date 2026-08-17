@@ -34,7 +34,7 @@ from services.tally_service import (
 # ---------------------------------------------------------------------------
 
 FROM_DATE = "20260401"
-TO_DATE = "20260808"
+TO_DATE = "20260430"
 
 ITEM_NAME_PREFIX = "TI"
 
@@ -74,8 +74,9 @@ def run() -> None:
 
         print(
             "item_master: "
-            f"{item_result['received']:,} received, "
-            f"{item_result['upserted']:,} upserted, "
+            f"{item_result['received']:,} received | "
+            f"{item_result['inserted']:,} new products inserted | "
+            f"{item_result['stock_updated']:,} existing stock values updated | "
             f"{item_result['skipped']:,} skipped"
         )
 
@@ -90,47 +91,48 @@ def run() -> None:
             print(f"SYNC: {dataset}")
             print("=" * 70)
 
-            result = sync_voucher_dataset(
-                session=session,
-                dataset=dataset,
-                voucher_type=voucher_type,
-                from_date=FROM_DATE,
-                to_date=TO_DATE,
-            )
+            try:
 
-            print(
-                f"{dataset}: "
-                f"{result['received']:,} received | "
-                f"{result['upserted']:,} upserted | "
-                f"{result['cancelled']:,} cancelled | "
-                f"{result['skipped']:,} skipped | "
-                f"{result['items_written']:,} items"
-            )
+                result = sync_voucher_dataset(
+                    session=session,
+                    dataset=dataset,
+                    voucher_type=voucher_type,
+                    from_date=FROM_DATE,
+                    to_date=TO_DATE,
+                )
 
-        # ---------------------------------------------------------------
-        # ONE COMMIT FOR THE WHOLE SYNC
-        # ---------------------------------------------------------------
+                session.commit()
 
-        session.commit()
+                # Clear SQLAlchemy identity map so the next dataset
+                # reloads current database state.
+                session.expire_all()
 
-        print()
-        print("=" * 70)
-        print("TALLY SYNC COMPLETE")
-        print("=" * 70)
+                print(
+                    f"{dataset}: "
+                    f"{result['received']:,} received | "
+                    f"{result['upserted']:,} upserted | "
+                    f"{result['cancelled']:,} cancelled | "
+                    f"{result['skipped']:,} skipped | "
+                    f"{result['items_written']:,} items | "
+                    f"{result.get('items_skipped', 0):,} "
+                    f"unknown items skipped"
+                )
 
-    except Exception:
-        session.rollback()
+            except Exception:
 
-        print()
-        print("=" * 70)
-        print("TALLY SYNC FAILED — TRANSACTION ROLLED BACK")
-        print("=" * 70)
+                session.rollback()
 
-        raise
+                print(
+                    f"{dataset}: FAILED — "
+                    f"dataset transaction rolled back"
+                )
+
+                raise
+    except Exception as e:
+        print("Error : ", str(e))
 
     finally:
         session.close()
-
 
 if __name__ == "__main__":
     run()

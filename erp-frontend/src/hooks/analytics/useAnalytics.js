@@ -19,7 +19,7 @@ export default function useAnalytics(props){
 
     const sales = useSalesAnalytics({ salesKpis: data.salesKpis});
 
-    const production = useProductionAnalytics({prodKpis: data.prodKpis});
+    const production = useProductionAnalytics({prodKpis: data.prodKpis, sessionToken: props?.sessionToken, showErrorModal: props?.showErrorModal});
 
     //const inventory = useInventoryAnalytics({...props, ...workspace});
 

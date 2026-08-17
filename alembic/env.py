@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 config = context.config
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LaCOAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAaL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 config.set_main_option("sqlalchemy.url", DB_DSN)
 # Interpret the config file for Python logging.
