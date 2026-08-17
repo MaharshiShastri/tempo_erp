@@ -30,7 +30,7 @@ def extract_logistics_profile_from_text(contract_text: str) -> dict:
     """ + contract_text
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.1 # Low temperature for strict factual extraction

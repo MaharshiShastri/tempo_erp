@@ -51,7 +51,7 @@ def generate_mail(payload: dict):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                model="llama3-70b", # Extremely fast, great for JSON outputs
+                model="openai/gpt-oss-120b", # Extremely fast, great for JSON outputs
                 response_format={"type": "json_object"},
                 temperature=0.7
             )
