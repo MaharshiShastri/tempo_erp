@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe, FiUsers } from "react-icons/fi";
+import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe, FiUsers, FiCalendar  } from "react-icons/fi";
 import { FaFileWord } from "react-icons/fa";
 import useERPState from "./hooks/useERPState";
 import packageJson from "../package.json";
@@ -43,6 +43,7 @@ import DispatchPlannerView from "./views/DispatchPlannerView";
 import QuoteGenerationView from "./views/QuoteGenerationView";
 import QuotationListView from "./views/QuotationListView";
 import ExerciseGenerator from './views/ExerciseGeneratorView';
+import ProductionCalendar from "./components/production/ProductionCalendar";
 
 function App() {
     const state = useERPState();
@@ -172,6 +173,11 @@ function App() {
                                     <span>📦</span> 
                                     {!sidebarCollapsed && <span>Item Master</span>}
                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}>Alt+I</span>
+                                </a>
+                                <a href="#calendar" className={`menu-item ${state.activeTab === 'production-calendar' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('production-calendar')}}>
+                                    <span><FiCalendar /></span> 
+                                    {!sidebarCollapsed && <span>Factory Schedule</span>}
+                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                 </a>
                             </>
                         )}
@@ -475,6 +481,7 @@ function App() {
                     {isSales && state.activeTab === "lead-generation" && <LeadGeneratorView state={state}/>}
                     {isSuperUser && state.activeTab === 'sales-analytics' && <SalesAnalyticsView state={state} />}
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
+                    {state.activeTab === 'production-calendar' && <ProductionCalendar state={state}/>}
                     {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
                     {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
                     {isSuperUser && state.activeTab === 'exercise' && <ExerciseGenerator state={state}/>}

@@ -40,12 +40,15 @@ export default function QuoteGenerationView({state}){
 
                 <h4>Product Selection</h4>
 
-                <SearchableMultiselect label="Product Group" options={productGroups} value={state?.quoteSelectedGroup} onChange={state?.setQuoteSelectedGroup}/>
-                {state?.quoteSelectedGroup?.length === 1 && (
-                    <div style={{marginTop: 15}}>
-                        <SearchableMultiselect label="Item code" options={productItems} value={state?.quoteSelectedItemCode} onChange={state?.setQuoteSelectedItemCode} />
-                    </div>
-                )}
+                <div className="form-grid-layout" style={{gridTemplateColumns: "repeat(2, 1fr)"}}>
+                    <div><SearchableMultiselect label="Product Group" options={productGroups} value={state?.quoteSelectedGroup} onChange={state?.setQuoteSelectedGroup}/></div>
+                    
+                    {state?.quoteSelectedGroup?.length === 1 && (
+                        <div>
+                            <SearchableMultiselect label="Item code" options={productItems} value={state?.quoteSelectedItemCode} onChange={state?.setQuoteSelectedItemCode} />
+                        </div>
+                    )}
+                </div>
                 <h4 style={{ marginTop: 25 }}>Customer Details</h4>
 
                 <div className="form-grid-layout" style={{gridTemplateColumns:"repeat(2, 1fr)"}}>

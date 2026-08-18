@@ -1183,6 +1183,8 @@ class ProductionSchedule(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
 
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    
     order: Mapped["OrderHeader"] = relationship(back_populates="schedules", )
 
     stage: Mapped["ProductionStage"] = relationship(back_populates="schedules", )

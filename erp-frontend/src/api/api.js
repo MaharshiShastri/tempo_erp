@@ -1248,6 +1248,189 @@ const API = {
     return await response.blob();
   },
   
+  getProductionSchedules: async (
+        sessionToken,
+        {
+            from,
+            to,
+            stageCode,
+            assignedTeam,
+            status,
+        } = {}
+    ) => {
+
+        const params = new URLSearchParams();
+
+        params.set(
+            "from_datetime",
+            from
+        );
+
+        params.set(
+            "to_datetime",
+            to
+        );
+
+        if (stageCode) {
+            params.set(
+                "stage_code",
+                stageCode
+            );
+        }
+
+        if (assignedTeam) {
+            params.set(
+                "assigned_team",
+                assignedTeam
+            );
+        }
+
+        if (status) {
+            params.set(
+                "status",
+                status
+            );
+        }
+
+        const response = await fetch(
+            `/api/v1/production-schedules?${params.toString()}`,
+            {
+                headers: {
+                    Authorization:
+                        `Bearer ${sessionToken}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+
+            const error = await response
+                .json()
+                .catch(() => ({}));
+
+            throw new Error(
+                error.detail ||
+                "Failed to load production schedules."
+            );
+        }
+
+        return response.json();
+    },
+
+
+    createProductionSchedule: async (
+        sessionToken,
+        payload
+    ) => {
+
+        const response = await fetch(
+            "/api/v1/production-schedules",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    Authorization:
+                        `Bearer ${sessionToken}`,
+                },
+
+                body: JSON.stringify(
+                    payload
+                ),
+            }
+        );
+
+        if (!response.ok) {
+
+            const error = await response
+                .json()
+                .catch(() => ({}));
+
+            throw new Error(
+                error.detail ||
+                "Failed to create production schedule."
+            );
+        }
+
+        return response.json();
+    },
+
+
+    updateProductionSchedule: async (
+        sessionToken,
+        scheduleId,
+        payload
+    ) => {
+
+        const response = await fetch(
+            `/api/v1/production-schedules/${scheduleId}`,
+            {
+                method: "PATCH",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    Authorization:
+                        `Bearer ${sessionToken}`,
+                },
+
+                body: JSON.stringify(
+                    payload
+                ),
+            }
+        );
+
+        if (!response.ok) {
+
+            const error = await response
+                .json()
+                .catch(() => ({}));
+
+            throw new Error(
+                error.detail ||
+                "Failed to update production schedule."
+            );
+        }
+
+        return response.json();
+    },
+
+
+    deleteProductionSchedule: async (
+        sessionToken,
+        scheduleId
+    ) => {
+
+        const response = await fetch(
+            `/api/v1/production-schedules/${scheduleId}`,
+            {
+                method: "DELETE",
+
+                headers: {
+                    Authorization:
+                        `Bearer ${sessionToken}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+
+            const error = await response
+                .json()
+                .catch(() => ({}));
+
+            throw new Error(
+                error.detail ||
+                "Failed to delete production schedule."
+            );
+        }
+
+        return response.json();
+    },
+  
 };
 
 export default API;

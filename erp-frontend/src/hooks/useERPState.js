@@ -21,6 +21,7 @@ import useGeo from "./geographic/useGeo";
 import useDispatchPlannerHub from "./dispatch/useDispatchPlannerHub";
 import useQuotation from "./useQuotation";
 import useExerciseGenerator from "./useExerciseGenerator";
+import useProductionCalendar from "./useProductionCalendar";
 
 const API_HOST = window.location.hostname;
 
@@ -30,11 +31,84 @@ export default function useERPState() {
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
     
     const [isServerLive, setIsServerLive] = useState(true);
-    
+    const [isProductionScheduleModalOpen, setIsProductionScheduleModalOpen] = useState(false);
+
+    const [productionScheduleForm, setProductionScheduleForm] = useState(null);
+
+    const [isEditingProductionSchedule, setIsEditingProductionSchedule] = useState(false);
+
     const factoryRoles = ["Shop Floor Administrator", "Admin", "Chief Full Stack Developer"];
     const salesRoles = ["Sales Representative", "Admin", "Chief Full Stack Developer"];
     const transportRoles = ["Dispatch Engineer", "Admin", "Chief Full Stack Developer"];
     const adminRoles = ["Admin", "Chief Full Stack Developer"];
+
+    const onCreateSchedule = useCallback((defaults = {}) => {
+        setIsEditingProductionSchedule(false);
+
+        setProductionScheduleForm({
+            order_id: "",
+            stage_code: "",
+            planned_start: defaults.planned_start || "",
+            planned_end: defaults.planned_end || "",
+            priority: 0,
+            assigned_team: "",
+            status: "PLANNED",
+        });
+
+        setIsProductionScheduleModalOpen(true);
+    }, []);
+    
+    const onEditSchedule = useCallback((schedule) => {
+        if (!schedule) {
+            return;
+        }
+
+        setIsEditingProductionSchedule(true);
+
+        setProductionScheduleForm({
+            id: schedule.id,
+
+            order_id: schedule.order_id || "",
+            stage_code: schedule.stage_code || "",
+
+            planned_start:
+                schedule.planned_start || "",
+
+            planned_end:
+                schedule.planned_end || "",
+
+            actual_start:
+                schedule.actual_start || "",
+
+            actual_end:
+                schedule.actual_end || "",
+
+            priority:
+                schedule.priority ?? 0,
+
+            assigned_team:
+                schedule.assigned_team || "",
+
+            status:
+                schedule.status || "PLANNED",
+
+            // Useful display-only fields
+            order_acceptance_id:
+                schedule.order_acceptance_id || null,
+
+            client_name:
+                schedule.client_name || null,
+        });
+
+        setIsProductionScheduleModalOpen(true);
+    }, []);
+
+    const closeProductionScheduleModal = useCallback(() => {
+        setIsProductionScheduleModalOpen(false);
+        setProductionScheduleForm(null);
+        setIsEditingProductionSchedule(false);
+    }, []);
+
     //const rndRoles = [""]
     const core = useCore();
     const login = useLogin(core);
@@ -51,7 +125,8 @@ export default function useERPState() {
     //Global business state independent
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const indiaMap = useGeo({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal, itemsMaster: items.itemsMaster});
-
+    const productionCalendar = useProductionCalendar({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, onCreateSchedule: onCreateSchedule, onEditSchedule: onEditSchedule});
+    
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const exerciseGenerator = useExerciseGenerator({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -174,7 +249,7 @@ export default function useERPState() {
         ...truckPlanner,  ...logistics, ...dispatch, //Logistics business states
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, ...indiaMap, ...exerciseGenerator,//Admin business states
-        ...faq, ...items, ...production, ...login, ...analytics, ...core, //Global business states
+        ...faq, ...items, ...production, ...login, ...analytics, ...core, ...productionCalendar,//Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }
