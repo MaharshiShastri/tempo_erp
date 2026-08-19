@@ -62,6 +62,7 @@ def generate_qoute(request: QuoteGenerationRequest, user: dict=Depends(verify_be
         raise HTTPException(status_code=403, detail="Only Sales Representatives can access this API.")
 
     try:
+        print("The client email: ", request.client_email)
         output_path, sales_user = generate_qoute_document(request, user)
 
         EDBR.create_quotation(request=request, sales_user=sales_user, document_path=output_path)

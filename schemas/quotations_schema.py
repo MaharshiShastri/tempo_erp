@@ -7,8 +7,8 @@ class SpecialModelRow(BaseModel):
 
 
 class QuoteGenerationRequest(BaseModel):
-    product_name: str
-
+    product_group: str
+    item_code: str
     qoute_number: str
 
     client_company: str
@@ -36,7 +36,7 @@ class QuoteGenerationRequest(BaseModel):
     special_rows: list[SpecialModelRow] = Field(default_factory=list)
 
 class QuotationUpdateRequest(BaseModel):
-    product_name: Optional[str] = None
+    product_group: Optional[str] = None
 
     client_company: Optional[str] = None
     client_address_line1: Optional[str] = None
@@ -59,12 +59,12 @@ class QuotationUpdateRequest(BaseModel):
 
 class QuotationChangeSnapshotRequest(BaseModel):
 
-    quoted_product_name: str
+    quoted_product_group: str
     quoted_item_code: Optional[str] = None
     quoted_quantity: Optional[float] = None
     quoted_rate: Optional[float] = None
 
-    ordered_product_name: Optional[str] = None
+    ordered_product_group: Optional[str] = None
     ordered_item_code: Optional[str] = None
     ordered_quantity: Optional[float] = None
     ordered_rate: Optional[float] = None

@@ -104,7 +104,7 @@ export default function QuotationTable({quotations = [], onView, onEdit, onOrder
 
                                     <td>
                                         <div style={{fontWeight: 650,}}>
-                                            {quotation.product_name}
+                                            {quotation.product_group}
                                         </div>
                                     </td>
 

@@ -799,19 +799,39 @@ def upsert_order(
     # Replace Tally-owned item snapshot
     # ---------------------------------------------------------------
 
-    session.execute(
-        delete(OrderItem).where(
-            OrderItem.order_id == order_id
-        )
+    existing_items = session.scalars(
+    select(OrderItem)
+    .where(
+        OrderItem.order_id == order_id
     )
+    .order_by(
+        OrderItem.order_item_id
+    )
+).all()
+
+    existing_by_code = {}
+
+    for existing_item in existing_items:
+
+        existing_by_code.setdefault(
+            existing_item.item_code,
+            [],
+        ).append(
+            existing_item
+        )
+
+
+    used_order_items = set()
 
     items_written = 0
     items_skipped = 0
+
 
     for item_data in order.get(
         "items",
         [],
     ):
+
         item_code = _clean_text(
             item_data.get("item_code")
         )
@@ -821,8 +841,7 @@ def upsert_order(
             continue
 
         # -----------------------------------------------------------
-        # FK safety:
-        # item MUST exist in items_master.
+        # FK safety
         # -----------------------------------------------------------
 
         item_master = session.get(
@@ -831,6 +850,7 @@ def upsert_order(
         )
 
         if item_master is None:
+
             items_skipped += 1
 
             print(
@@ -841,6 +861,7 @@ def upsert_order(
 
             continue
 
+
         quantity = _parse_integer(
             item_data.get("quantity"),
             default=0,
@@ -850,12 +871,14 @@ def upsert_order(
             items_skipped += 1
             continue
 
+
         rate = (
             _parse_decimal(
                 item_data.get("rate")
             )
             or Decimal("0")
         )
+
 
         discount = (
             _parse_decimal(
@@ -866,11 +889,78 @@ def upsert_order(
             or Decimal("0")
         )
 
-        # OrderItem.amount is computed by PostgreSQL,
-        # so do not send amount.
 
-        session.add(
-            OrderItem(
+        hsn_code = (
+            _clean_text(
+                item_data.get("hsn_code")
+            )
+            or (
+                item_master.hsn_code
+                or "00000000"
+            )
+        )[:8]
+
+
+        # -----------------------------------------------------------
+        # Reuse an existing OrderItem when possible
+        # -----------------------------------------------------------
+
+        reusable_item = None
+
+        candidates = existing_by_code.get(
+            item_code,
+            [],
+        )
+
+        for candidate in candidates:
+
+            if candidate.order_item_id not in used_order_items:
+
+                reusable_item = candidate
+                break
+
+
+        if reusable_item is not None:
+
+            # -------------------------------------------------------
+            # Existing OrderItem
+            #
+            # Preserve order_item_id so existing BillItems remain
+            # correctly linked.
+            # -------------------------------------------------------
+
+            reusable_item.item_code = item_code
+
+            reusable_item.um = (
+                item_master.unit_measure
+                or None
+            )
+
+            reusable_item.additional_spec_text = (
+                item_data.get(
+                    "additional_spec_text"
+                )
+            )
+
+            reusable_item.hsn_code = hsn_code
+
+            reusable_item.quantity = quantity
+
+            reusable_item.rate = rate
+
+            reusable_item.discount_percentage = discount
+
+            used_order_items.add(
+                reusable_item.order_item_id
+            )
+
+        else:
+
+            # -------------------------------------------------------
+            # New OrderItem
+            # -------------------------------------------------------
+
+            new_item = OrderItem(
                 order_id=order_id,
 
                 item_code=item_code,
@@ -886,15 +976,7 @@ def upsert_order(
                     )
                 ),
 
-                hsn_code=(
-                    _clean_text(
-                        item_data.get("hsn_code")
-                    )
-                    or (
-                        item_master.hsn_code
-                        or "00000000"
-                    )
-                )[:8],
+                hsn_code=hsn_code,
 
                 quantity=quantity,
 
@@ -902,9 +984,63 @@ def upsert_order(
 
                 discount_percentage=discount,
             )
-        )
+
+            session.add(new_item)
 
         items_written += 1
+
+
+    # Flush first so new rows get identities and all FK state is
+    # current before stale-row reconciliation.
+
+    session.flush()
+
+
+    # ---------------------------------------------------------------
+    # Remove stale OrderItems
+    #
+    # Only delete rows that:
+    #
+    #   1. belonged to this order,
+    #   2. were not reused,
+    #   3. have no BillItem references.
+    #
+    # A stale OrderItem that has billing history is deliberately
+    # preserved because deleting it would destroy the bill linkage.
+    # ---------------------------------------------------------------
+
+    for existing_item in existing_items:
+
+        if existing_item.order_item_id in used_order_items:
+            continue
+
+
+        has_bill_reference = session.scalar(
+            select(BillItem.bill_item_id)
+            .where(
+                BillItem.order_item_id
+                == existing_item.order_item_id
+            )
+            .limit(1)
+        )
+
+
+        if has_bill_reference:
+
+            print(
+                f"ORDER {order_acceptance_id}: "
+                f"preserving historical OrderItem "
+                f"{existing_item.order_item_id} "
+                f"because it is referenced by BillItem."
+            )
+
+            continue
+
+
+        session.delete(
+            existing_item
+        )
+
 
     session.flush()
 
@@ -970,10 +1106,12 @@ def sync_item_master(session, name_prefix: str = "TI",) -> dict:
 
     return {
         "received": db_result["received"],
-        "upserted": db_result["upserted"],
-        "skipped": db_result["skipped"],
-        "xml_path": xml_path,
-        "json_path": json_path,
+    "upserted": db_result["upserted"],
+    "inserted": db_result["inserted"],
+    "stock_updated": db_result["stock_updated"],
+    "skipped": db_result["skipped"],
+    "xml_path": xml_path,
+    "json_path": json_path,
     }
 
 

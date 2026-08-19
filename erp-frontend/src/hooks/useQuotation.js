@@ -222,7 +222,7 @@ export default function useQuotation({sessionToken, showErrorModal}){
             setSelectedQuotation(data);
 
             setQuotationEditForm({
-                product_name: data.product_name || "",
+                product_group: data.product_group || "",
                 client_company: data.client_company || "",
                 client_address_line1: data.client_address_line1 || "",
                 client_city: data.client_city || "",
@@ -424,7 +424,8 @@ export default function useQuotation({sessionToken, showErrorModal}){
 
             const blob = await API.generateQuote(sessionToken, 
                 {
-                    product_name: quoteSelectedGroup[0],
+                    product_group: quoteSelectedGroup[0],
+                    item_code: quoteSelectedItemCode?.[0] || null,
                     qoute_number: qouteNum,
                     client_company: clientQuoteCompany, 
                     client_address_line1: qouteAddress,

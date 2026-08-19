@@ -34,7 +34,7 @@ from services.tally_service import (
 # ---------------------------------------------------------------------------
 
 FROM_DATE = "20260401"
-TO_DATE = "20260430"
+TO_DATE = "20260819"
 
 ITEM_NAME_PREFIX = "TI"
 
@@ -71,7 +71,8 @@ def run() -> None:
             session=session,
             name_prefix=ITEM_NAME_PREFIX,
         )
-
+        session.commit()
+        session.expire_all()
         print(
             "item_master: "
             f"{item_result['received']:,} received | "
@@ -129,8 +130,10 @@ def run() -> None:
 
                 raise
     except Exception as e:
+        session.rollback()
         print("Error : ", str(e))
-
+        raise
+    
     finally:
         session.close()
 

@@ -1232,6 +1232,12 @@ class PostgresRepository:
             )   
 
             return list(session.execute(stmt).scalars().all())
+
+    def get_item_names(self, item_group):
+        with SessionLocal() as session:
+            stmt = (select(ItemMaster.item_code).where(ItemMaster.item_group == item_group, ItemMaster.item_code.is_not(None), ItemMaster.item_code != "").distinct().order_by(ItemMaster.item_code))
+
+            return list(session.execute(stmt).scalars().all())
         
     def get_item(self, item_code):
         with SessionLocal() as session:
@@ -2771,7 +2777,7 @@ class PostgresRepository:
 
             quotation = Quotation(
                 quote_number=request.qoute_number,
-                product_name=request.product_name,
+                product_name=request.product_group,
 
                 client_company=request.client_company,
                 client_address_line1=request.client_address_line1,
