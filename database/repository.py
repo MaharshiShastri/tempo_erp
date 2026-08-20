@@ -2190,24 +2190,91 @@ class PostgresRepository:
             ).all()
 
             # =========================================================
-            # BILLS INSIDE SELECTED PERIOD
+            # LIFETIME BILLED QUANTITY
+            #
+            # Used ONLY to determine whether an order item is actually
+            # still pending.
+            #
+            # IMPORTANT:
+            # No date filter here.
+            #
+            # Pending quantity must be calculated against everything
+            # that has ever been billed for the order item.
             # =========================================================
 
-            billed_subquery = (
+            lifetime_billed_subquery = (
                 select(
-                    BillItem.order_item_id.label("order_item_id"),
+                    OrderHeader.order_acceptance_id.label(
+                        "order_acceptance_id"
+                    ),
+
+                    OrderItem.item_code.label(
+                        "item_code"
+                    ),
 
                     func.sum(
                         BillItem.quantity_shipped
-                    ).label("billed_quantity"),
+                    ).label(
+                        "lifetime_billed_quantity"
+                    ),
+                )
+                .join(
+                    OrderItem,
+                    OrderItem.order_item_id == BillItem.order_item_id,
+                )
+                .join(
+                    OrderHeader,
+                    OrderHeader.order_id == OrderItem.order_id,
+                )
+                .group_by(
+                    OrderHeader.order_acceptance_id,
+                    OrderItem.item_code,
+                )
+                .subquery()
+            )
+
+
+            lifetime_billed_quantity = func.coalesce(
+                lifetime_billed_subquery.c.lifetime_billed_quantity,
+                0,
+            )
+
+
+            pending_quantity = func.greatest(
+                OrderItem.quantity - lifetime_billed_quantity,
+                0,
+            )
+
+
+            # =========================================================
+            # BILLS INSIDE SELECTED PERIOD
+            #
+            # Used for analytics/reporting only.
+            # =========================================================
+
+            period_billed_subquery = (
+                select(
+                    BillItem.order_item_id.label(
+                        "order_item_id"
+                    ),
+
+                    func.sum(
+                        BillItem.quantity_shipped
+                    ).label(
+                        "period_billed_quantity"
+                    ),
 
                     func.min(
                         BillHeader.bill_date
-                    ).label("first_bill_date"),
+                    ).label(
+                        "first_bill_date"
+                    ),
 
                     func.max(
                         BillHeader.bill_date
-                    ).label("last_bill_date"),
+                    ).label(
+                        "last_bill_date"
+                    ),
                 )
                 .join(
                     BillHeader,
@@ -2221,16 +2288,6 @@ class PostgresRepository:
                     BillItem.order_item_id,
                 )
                 .subquery()
-            )
-
-            billed_quantity = func.coalesce(
-                billed_subquery.c.billed_quantity,
-                0,
-            )
-
-            pending_quantity = func.greatest(
-                OrderItem.quantity - billed_quantity,
-                0,
             )
 
             # =========================================================
@@ -2256,6 +2313,7 @@ class PostgresRepository:
                     ),
 
                     OrderItem.order_item_id,
+
                     OrderItem.item_code,
 
                     OrderItem.quantity.label(
@@ -2268,7 +2326,7 @@ class PostgresRepository:
 
                     OrderItem.amount,
 
-                    billed_quantity.label(
+                    lifetime_billed_quantity.label(
                         "billed_quantity"
                     ),
 
@@ -2281,9 +2339,14 @@ class PostgresRepository:
                     OrderItem.order_id == OrderHeader.order_id,
                 )
                 .outerjoin(
-                    billed_subquery,
-                    billed_subquery.c.order_item_id
-                    == OrderItem.order_item_id,
+                    lifetime_billed_subquery,
+                    and_(
+                        lifetime_billed_subquery.c.order_acceptance_id
+                        == OrderHeader.order_acceptance_id,
+
+                        lifetime_billed_subquery.c.item_code
+                        == OrderItem.item_code,
+                    ),
                 )
                 .where(
                     OrderHeader.order_acceptance_date >= from_date,
@@ -2305,25 +2368,22 @@ class PostgresRepository:
             total_pending = 0
 
             orders_booked = []
-            pending_order_items = []
+
+            # ---------------------------------------------------------
+            # First collect ALL order lines.
+            # Do NOT calculate pending yet.
+            # ---------------------------------------------------------
 
             for row in order_item_rows:
 
                 ordered = int(row.ordered_quantity or 0)
                 billed = int(row.billed_quantity or 0)
 
-                pending = max(
-                    ordered - billed,
-                    0,
-                )
-
-                total_ordered += ordered
-                total_shipped += billed
-                total_pending += pending
-
                 item_data = {
                     "_order_item_id": row.order_item_id,
+
                     "oa_id": row.order_acceptance_id,
+
                     "oa_date": (
                         str(row.order_acceptance_date)
                         if row.order_acceptance_date
@@ -2358,14 +2418,134 @@ class PostgresRepository:
 
                     "billed_quantity": billed,
 
-                    "pending_quantity": pending,
+                    # Temporary value.
+                    # Final pending quantity is calculated at
+                    # OA + item level below.
+                    "pending_quantity": 0,
                 }
 
                 orders_booked.append(item_data)
 
-                if pending > 0:
-                    pending_order_items.append(item_data)
 
+            # =========================================================
+            # AGGREGATE BY OA + ITEM
+            #
+            # Example:
+            #
+            # SPJ/001 / TI-BLOWER FOR MOTOR
+            #
+            # line 691 -> ordered 4
+            # line 692 -> ordered 4
+            #
+            # total ordered = 8
+            # total billed  = 8
+            # pending       = 0
+            #
+            # Therefore the OA/item must NOT appear in pending.
+            # =========================================================
+
+            order_item_groups = {}
+
+            for item in orders_booked:
+
+                key = (
+                    item["oa_id"],
+                    item["item_code"],
+                )
+
+                if key not in order_item_groups:
+                    order_item_groups[key] = {
+                        "ordered": 0,
+                        "billed": 0,
+                        "items": [],
+                    }
+
+                group = order_item_groups[key]
+
+                group["ordered"] += item["quantity"]
+                group["billed"] += item["billed_quantity"]
+                group["items"].append(item)
+
+
+            # =========================================================
+            # BUILD PENDING ITEMS
+            # =========================================================
+
+            pending_order_items = []
+
+            for group in order_item_groups.values():
+
+                group_ordered = int(group["ordered"] or 0)
+                group_billed = int(group["billed"] or 0)
+
+                group_pending = max(
+                    group_ordered - group_billed,
+                    0,
+                )
+
+                # Fully billed -> NOTHING goes into pending.
+                if group_pending <= 0:
+                    continue
+
+                remaining_pending = group_pending
+
+                for item in group["items"]:
+
+                    if remaining_pending <= 0:
+                        break
+
+                    line_quantity = int(
+                        item["quantity"] or 0
+                    )
+
+                    line_pending = min(
+                        line_quantity,
+                        remaining_pending,
+                    )
+
+                    if line_pending <= 0:
+                        continue
+
+                    pending_item = {
+                        **item,
+                        "pending_quantity": line_pending,
+                    }
+
+                    pending_order_items.append(
+                        pending_item
+                    )
+
+                    remaining_pending -= line_pending
+
+
+            # =========================================================
+            # TOTALS
+            #
+            # Calculate these ONCE, after all rows have been collected.
+            # =========================================================
+
+            total_ordered = sum(
+                int(group["ordered"] or 0)
+                for group in order_item_groups.values()
+            )
+
+            total_shipped = sum(
+                min(
+                    int(group["ordered"] or 0),
+                    int(group["billed"] or 0),
+                )
+                for group in order_item_groups.values()
+            )
+
+            total_pending = sum(
+                max(
+                    int(group["ordered"] or 0)
+                    - int(group["billed"] or 0),
+                    0,
+                )
+                for group in order_item_groups.values()
+            )
+            
             # =========================================================
             # BILLED DATASET
             #

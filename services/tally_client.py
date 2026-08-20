@@ -33,7 +33,8 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
-
+from collections.abc import Sequence
+from xml.sax.saxutils import escape as _xml_escape
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -284,77 +285,119 @@ def normalize_keys(obj,):
 # ===========================================================================
 
 def build_voucher_collection_xml(
-    voucher_type: str | None,
+    voucher_type: str | Sequence[str] | None,
     from_date: str,
     to_date: str,
     company: str = TALLY_COMPANY,
 ) -> str:
     """
     Build a Tally voucher collection request.
- 
-    from_date / to_date: 'YYYY-MM-DD' or 'YYYYMMDD'.
-    voucher_type=None -> no type filter, returns every voucher in range
-    (Day Book).
- 
-    Explicitly fetches cancellation/deletion flags because the
-    service needs to distinguish:
- 
-        valid order
-        cancelled order
-        deleted voucher
- 
-    Date bounds are enforced INSIDE the filter formula via
-    $$Date:##SVFROMDATE / ##SVTODATE -- plain SVFROMDATE/SVTODATE alone,
-    or $Date >= ##SVFROMDATE without the $$Date: type-coercion wrapper,
-    do not reliably bound an ad-hoc Voucher collection in this Tally
-    version (the comparison silently matches everything instead of
-    raising an error, which makes this bug easy to miss).
+
+    voucher_type can be:
+        - None
+        - "Sales"
+        - ("Sales", "Sales Amazon")
+
+    Multiple voucher types are combined using OR.
     """
+
     from_dt = from_date.replace("-", "")
     to_dt = to_date.replace("-", "")
+
     company_esc = _xml_escape(company)
- 
-    date_clause = "($Date &gt;= $$Date:##SVFROMDATE) AND ($Date &lt;= $$Date:##SVTODATE)"
-    if voucher_type:
-        voucher_type_esc = _xml_escape(voucher_type)
-        filter_formula = f'($VoucherTypeName = "{voucher_type_esc}") AND {date_clause}'
-    else:
+
+    date_clause = (
+        "($Date &gt;= $$Date:##SVFROMDATE) "
+        "AND "
+        "($Date &lt;= $$Date:##SVTODATE)"
+    )
+
+    if voucher_type is None:
+
         filter_formula = date_clause
- 
-    print("Date range from: ", from_dt, " to: ", to_dt)
+
+    else:
+
+        # Normalize a single string into a tuple.
+        if isinstance(voucher_type, str):
+            voucher_types = (voucher_type,)
+        else:
+            voucher_types = tuple(voucher_type)
+
+        if not voucher_types:
+            raise ValueError(
+                "voucher_type cannot be an empty sequence"
+            )
+
+        voucher_conditions = []
+
+        for value in voucher_types:
+
+            value_esc = _xml_escape(value)
+
+            voucher_conditions.append(
+                f'($VoucherTypeName = "{value_esc}")'
+            )
+
+        type_clause = (
+            "("
+            + " OR ".join(voucher_conditions)
+            + ")"
+        )
+
+        filter_formula = (
+            f"{type_clause} "
+            f"AND "
+            f"{date_clause}"
+        )
+
+    print(
+        "Date range from:",
+        from_dt,
+        "to:",
+        to_dt,
+    )
+
+    print(
+        "Voucher type filter:",
+        voucher_type,
+    )
+
     return f"""
-    <ENVELOPE>
-        <HEADER>
-            <VERSION>1</VERSION>
-            <TALLYREQUEST>EXPORT</TALLYREQUEST>
-            <TYPE>COLLECTION</TYPE>
-            <ID>VoucherRangeCollection</ID>
-        </HEADER>
-    
-        <BODY>
-            <DESC>
-    
-                <STATICVARIABLES>
-                    <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                    <SVFROMDATE>{from_dt}</SVFROMDATE>
-                    <SVTODATE>{to_dt}</SVTODATE>
-                    <SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY>
-                </STATICVARIABLES>
-    
-                <TDL>
-                    <TDLMESSAGE>
-    
-                        <COLLECTION
-                            NAME="VoucherRangeCollection"
-                            ISMODIFY="No"
-                            ISFIXED="No"
-                            ISINITIALIZE="Yes"
-                            ISOPTION="No"
-                            ISINTERNAL="No"
-                        >
-    
-                            <TYPE>Voucher</TYPE>
-                            <FETCH>DATE,
+<ENVELOPE>
+    <HEADER>
+        <VERSION>1</VERSION>
+        <TALLYREQUEST>EXPORT</TALLYREQUEST>
+        <TYPE>COLLECTION</TYPE>
+        <ID>VoucherRangeCollection</ID>
+    </HEADER>
+
+    <BODY>
+        <DESC>
+
+            <STATICVARIABLES>
+                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+                <SVFROMDATE>{from_dt}</SVFROMDATE>
+                <SVTODATE>{to_dt}</SVTODATE>
+                <SVCURRENTCOMPANY>{company_esc}</SVCURRENTCOMPANY>
+            </STATICVARIABLES>
+
+            <TDL>
+                <TDLMESSAGE>
+
+                    <COLLECTION
+                        NAME="VoucherRangeCollection"
+                        ISMODIFY="No"
+                        ISFIXED="No"
+                        ISINITIALIZE="Yes"
+                        ISOPTION="No"
+                        ISINTERNAL="No"
+                    >
+
+                        <TYPE>Voucher</TYPE>
+
+                        <FETCH>
+                            DATE,
                             REFERENCEDATE,
                             GUID,
                             VCHTYPE,
@@ -371,10 +414,10 @@ def build_voucher_collection_xml(
                             BASICORDERTERMS.*,
                             BASICDUEDATEOFPYMT,
                             BASICSHIPPEDBY,
- 
+
                             ISCANCELLED,
                             ISDELETED,
- 
+
                             ASORIGINAL,
                             ISDEEMEDPOSITIVE,
                             EFFECTIVEDATE,
@@ -383,29 +426,33 @@ def build_voucher_collection_xml(
                             VOUCHERKEY,
                             VOUCHERRETAINKEY,
                             VOUCHERNUMBERSERIES,
- 
+
                             ALLINVENTORYENTRIES.*,
                             BATCHALLOCATIONS.*,
                             ACCOUNTINGALLOCATIONS.*,
                             LEDGERENTRIES.*
-                            </FETCH>
-                            <FILTER>VoucherRangeFilter</FILTER>
-    
-                        </COLLECTION>
-    
-                        <SYSTEM
-                            TYPE="Formulae"
-                            NAME="VoucherRangeFilter"
-                        >{filter_formula}</SYSTEM>
-    
-                    </TDLMESSAGE>
-                </TDL>
-    
-            </DESC>
-        </BODY>
-    </ENVELOPE>
-    """.strip()
+                        </FETCH>
 
+                        <FILTER>
+                            VoucherRangeFilter
+                        </FILTER>
+
+                    </COLLECTION>
+
+                    <SYSTEM
+                        TYPE="Formulae"
+                        NAME="VoucherRangeFilter"
+                    >
+                        {filter_formula}
+                    </SYSTEM>
+
+                </TDLMESSAGE>
+            </TDL>
+
+        </DESC>
+    </BODY>
+</ENVELOPE>
+""".strip()
 
 
 # ===========================================================================
@@ -452,7 +499,7 @@ def send_to_tally(
 # ===========================================================================
 
 def fetch_voucher_range(
-    voucher_type: str | None,
+    voucher_type: str | tuple[str, ...] | None,
     from_date: str,
     to_date: str,
     company: str = TALLY_COMPANY,

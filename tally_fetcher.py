@@ -40,11 +40,10 @@ ITEM_NAME_PREFIX = "TI"
 
 DATASETS = (
     ("sales_orders", "Sales Order"),
-    ("sales", "Sales"),
+    ("sales", ("Sales", "Sales Amazon",),),
     ("purchase_orders", "Purchase Order"),
     ("purchase", "Purchase"),
 )
-
 
 # ---------------------------------------------------------------------------
 # Worker

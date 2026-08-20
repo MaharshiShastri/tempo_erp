@@ -55,7 +55,7 @@ Database persistence belongs to this service.
 from __future__ import annotations
 
 import re
-
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 
@@ -1123,7 +1123,7 @@ def sync_item_master(session, name_prefix: str = "TI",) -> dict:
 def sync_voucher_dataset(
     session,
     dataset: str,
-    voucher_type: str,
+    voucher_type: str | Sequence[str] | None,
     from_date: str,
     to_date: str,
 ) -> dict:
@@ -1184,7 +1184,7 @@ def sync_voucher_dataset(
     # SALES ORDER
     # ---------------------------------------------------------------
 
-    if voucher_type == "Sales Order":
+    if voucher_type == "sales_orders":
 
         mapped_orders = [
             voucher_to_order(voucher)
@@ -1263,7 +1263,7 @@ def sync_voucher_dataset(
     # SALES / BILL
     # ---------------------------------------------------------------
 
-    if voucher_type == "Sales":
+    if dataset == "sales":
 
         mapped_path = save_json(
             {
@@ -1273,6 +1273,7 @@ def sync_voucher_dataset(
             suffix="bills",
         )
 
+
         for raw_voucher in vouchers:
 
             bill_num = _clean_text(
@@ -1280,6 +1281,7 @@ def sync_voucher_dataset(
                     "vouchernumber"
                 )
             )
+
 
             if _is_cancelled_voucher(
                 raw_voucher
@@ -1300,26 +1302,32 @@ def sync_voucher_dataset(
 
                 continue
 
+
             result = voucher_to_bill(
                 session,
                 raw_voucher,
             )
 
+
             if result["status"] == "skipped":
+
                 skipped += 1
                 continue
 
+
             upserted += 1
 
-            items_written += result[
-                "items_written"
-            ]
+            items_written += (
+                result["items_written"]
+            )
 
-            items_skipped += result[
-                "items_skipped"
-            ]
+            items_skipped += (
+                result["items_skipped"]
+            )
+
 
         session.flush()
+
 
         return {
             "dataset": dataset,
@@ -1333,7 +1341,6 @@ def sync_voucher_dataset(
             "normalized_path": normalized_path,
             "mapped_path": mapped_path,
         }
-
     # ---------------------------------------------------------------
     # PURCHASE ORDER / PURCHASE
     #
