@@ -1575,3 +1575,353 @@ details div > strong {
         font-size: 11px;
     }
 }
+
+/* =========================================================
+   PROMPT GENERATOR
+   ========================================================= */
+
+.prompt-generator-page {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.prompt-generator-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    margin-bottom: 20px;
+}
+
+.prompt-generator-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+
+    margin-bottom: 6px;
+
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.prompt-generator-breadcrumb span:nth-child(2) {
+    opacity: 0.5;
+}
+
+.prompt-generator-header h1 {
+    margin: 0;
+
+    color: var(--text-primary);
+
+    font-size: 23px;
+    line-height: 1.25;
+    font-weight: 700;
+}
+
+.prompt-generator-header p {
+    margin: 6px 0 0;
+
+    color: var(--text-muted);
+
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   GRID
+   ========================================================= */
+
+.prompt-generator-grid {
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 1fr)
+        minmax(0, 1fr);
+
+    gap: 20px;
+
+    align-items: start;
+}
+
+.prompt-generator-card,
+.prompt-generator-output-card {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   CARD DESCRIPTION
+   ========================================================= */
+
+.prompt-generator-section-description {
+    margin: 5px 0 0;
+
+    color: var(--text-muted);
+
+    font-size: 12px;
+    font-weight: 400;
+}
+
+
+/* =========================================================
+   REQUIREMENTS
+   ========================================================= */
+
+.prompt-generator-requirements {
+    min-height: 230px;
+
+    resize: vertical;
+
+    line-height: 1.55;
+
+    background: var(--bg-main);
+}
+
+.prompt-generator-requirements::placeholder {
+    color: var(--text-muted);
+    opacity: 0.75;
+}
+
+
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+
+.prompt-generator-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    margin-top: 5px;
+
+    padding-top: 15px;
+
+    border-top: 1px solid var(--border-light);
+}
+
+.prompt-generator-actions .btn {
+    min-height: 36px;
+    padding-left: 18px;
+    padding-right: 18px;
+}
+
+.prompt-generator-actions .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.prompt-generator-error {
+    margin-top: 14px;
+
+    padding: 10px 12px;
+
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-left: 4px solid var(--brand-danger);
+
+    border-radius: var(--radius-sm);
+
+    background: var(--warning-row);
+
+    color: var(--brand-danger);
+
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+
+/* =========================================================
+   OUTPUT
+   ========================================================= */
+
+.prompt-generator-output-card {
+    min-height: 100%;
+}
+
+.prompt-generator-output {
+    min-height: 480px;
+
+    resize: vertical;
+
+    background: var(--bg-main);
+
+    font-family:
+        "SFMono-Regular",
+        Consolas,
+        "Liberation Mono",
+        monospace;
+
+    font-size: 12.5px;
+
+    line-height: 1.6;
+
+    white-space: pre-wrap;
+}
+
+.prompt-generator-output:focus {
+    outline: none;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+   ========================================================= */
+
+.prompt-generator-empty {
+    min-height: 480px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    padding: 30px;
+
+    box-sizing: border-box;
+
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-md);
+
+    background:
+        linear-gradient(
+            180deg,
+            var(--bg-main),
+            var(--bg-surface)
+        );
+
+    text-align: center;
+}
+
+.prompt-generator-empty-icon {
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 4px;
+
+    border-radius: 50%;
+
+    background: rgba(36, 144, 239, 0.10);
+
+    color: var(--brand-accent);
+
+    font-size: 20px;
+}
+
+.prompt-generator-empty strong {
+    color: var(--text-primary);
+
+    font-size: 13px;
+}
+
+.prompt-generator-empty span {
+    max-width: 300px;
+
+    color: var(--text-muted);
+
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1000px) {
+
+    .prompt-generator-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .prompt-generator-output {
+        min-height: 350px;
+    }
+
+    .prompt-generator-empty {
+        min-height: 350px;
+    }
+}
+
+
+@media (max-width: 600px) {
+
+    .prompt-generator-header {
+        margin-bottom: 15px;
+    }
+
+    .prompt-generator-header h1 {
+        font-size: 20px;
+    }
+
+    .prompt-generator-grid {
+        gap: 15px;
+    }
+
+    .prompt-generator-card,
+    .prompt-generator-output-card {
+        padding: 18px;
+    }
+
+    .prompt-generator-requirements {
+        min-height: 180px;
+    }
+
+    .form-grid-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .prompt-generator-actions {
+        justify-content: stretch;
+    }
+
+    .prompt-generator-actions .btn {
+        width: 100%;
+    }
+}
+
+.prompt-copy-icon-button {
+    width: 36px;
+    height: 36px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+
+    background: var(--bg-surface);
+    color: var(--text-primary);
+
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+.prompt-copy-icon-button:hover {
+    background: var(--bg-main);
+    border-color: var(--brand-accent);
+}
+
+.prompt-copy-icon-button:active {
+    transform: scale(0.95);
+}

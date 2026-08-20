@@ -22,6 +22,7 @@ import useDispatchPlannerHub from "./dispatch/useDispatchPlannerHub";
 import useQuotation from "./useQuotation";
 import useExerciseGenerator from "./useExerciseGenerator";
 import useProductionCalendar from "./useProductionCalendar";
+import { usePromptGenerator } from "./usePromptGenerator";
 
 const API_HOST = window.location.hostname;
 
@@ -126,7 +127,8 @@ export default function useERPState() {
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const indiaMap = useGeo({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal, itemsMaster: items.itemsMaster});
     const productionCalendar = useProductionCalendar({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, onCreateSchedule: onCreateSchedule, onEditSchedule: onEditSchedule});
-    
+    const promptGenerator = usePromptGenerator({sessionToken: core.sessionToken});
+
     //All admin business states
     const admin = useAdminHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const exerciseGenerator = useExerciseGenerator({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -249,7 +251,7 @@ export default function useERPState() {
         ...truckPlanner,  ...logistics, ...dispatch, //Logistics business states
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, ...indiaMap, ...exerciseGenerator,//Admin business states
-        ...faq, ...items, ...production, ...login, ...analytics, ...core, ...productionCalendar,//Global business states
+        ...faq, ...items, ...production, ...login, ...analytics, ...core, ...productionCalendar, ...promptGenerator, //Global business states
         notifications, unreadNotifCount, markAllNotifsRead, isServerLive
     };
 }

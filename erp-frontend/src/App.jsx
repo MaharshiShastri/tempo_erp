@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe, FiUsers, FiCalendar  } from "react-icons/fi";
+import { FiMenu, FiChevronLeft, FiChevronRight, FiPackage, FiBell, FiAlertTriangle, FiRefreshCw, FiGlobe, FiUsers, FiCalendar, FiType   } from "react-icons/fi";
 import { FaFileWord } from "react-icons/fa";
 import useERPState from "./hooks/useERPState";
 import packageJson from "../package.json";
@@ -44,7 +44,7 @@ import QuoteGenerationView from "./views/QuoteGenerationView";
 import QuotationListView from "./views/QuotationListView";
 import ExerciseGenerator from './views/ExerciseGeneratorView';
 import ProductionCalendar from "./components/production/ProductionCalendar";
-
+import PromptGeneratorView from "./views/PromptGenerator";
 function App() {
     const state = useERPState();
     const [theme, setTheme] = useState(localStorage.getItem('erp-theme') || 'light');
@@ -177,6 +177,11 @@ function App() {
                                 <a href="#calendar" className={`menu-item ${state.activeTab === 'production-calendar' ? 'active' : ''}`} onClick={(e) =>{e.preventDefault(); state.setActiveTab('production-calendar')}}>
                                     <span><FiCalendar /></span> 
                                     {!sidebarCollapsed && <span>Factory Schedule</span>}
+                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
+                                </a>
+                                <a href="#pulse" className={`menu-item ${state.activeTab === 'prompt' ? 'active' : ''}`} onClick={(e) => {e.preventDefault(); state.setActiveTab('prompt')}}>
+                                    <span><FiType /></span>
+                                    {!sidebarCollapsed && <span>Prompt Generator</span>}
                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', padding: '2px 4px', borderRadius: '4px', marginLeft: 'auto' }}></span>
                                 </a>
                             </>
@@ -483,6 +488,7 @@ function App() {
                     {state.activeTab === 'faq-workspace' && <FaqWorkspaceView state={state} />}
                     {state.activeTab === 'production-calendar' && <ProductionCalendar state={state}/>}
                     {state.activeTab === 'global-pulse' && <GlobalProductionPulseView state={state} />}
+                    {state.activeTab === 'prompt' && <PromptGeneratorView state={state}/>}
                     {isSales && state.activeTab === 'target' && <PersonalSalesAnalyticsView state={state}/>}
                     {isSuperUser && state.activeTab === 'exercise' && <ExerciseGenerator state={state}/>}
                     {isSuperUser && state.activeTab === 'map' && <GeoAnalyticsView state={state}/>}

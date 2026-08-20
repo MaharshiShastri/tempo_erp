@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
-from schemas.auth_schema import LoginInput, UserProfileResponse, UserCreateInput, UserUpdateInput
+from schemas.auth_schema import LoginInput, UserProfileResponse, UserCreateInput, UserUpdateInput, PromptGeneratorRequest
 from database.repository import EDBR
 from security import verify_bearer_token, SECRET_KEY
 import jwt
 import logging
 from datetime import datetime, timedelta, timezone
+from services.prompt_generator_service import PromptGeneratorService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -91,3 +92,29 @@ def get_phone_number(email: str, user_profile: dict = Depends(verify_bearer_toke
 
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+@router.post("/prompt-generator")
+async def generate_prompt(request: PromptGeneratorRequest, user_profile: dict = Depends(verify_bearer_token)):
+    if not user_profile:
+        raise HTTPException(status_code=401, detail="Authentication required.",)
+
+    # IMPORTANT:
+    # Never take the role from request.body.
+    #
+    # Get it from your authenticated DB user.
+    user_role = user_profile.get("role")
+
+    if not user_role:
+        raise HTTPException(status_code=400, detail="Authenticated user does not have a role.",)
+
+    service = PromptGeneratorService()
+
+    try:
+        generated_prompt = service.generate_prompt(requirements=request.requirements, user_role=user_role, target_llm=request.llm.value, prompt_type=request.prompt_type.value,)
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to generate prompt.",) from exc
+
+    return {
+        "prompt": generated_prompt,
+    }

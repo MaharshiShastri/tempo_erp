@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from datetime import date
+from enum import Enum
 
 class LoginInput(BaseModel):
     email: EmailStr
@@ -30,3 +31,24 @@ class UserUpdateInput(BaseModel):
     phone_personal: Optional[str] = ""
     phone_business: Optional[str] = ""
     regions: List[str] = []
+
+class PromptLLM(str, Enum):
+    CHATGPT = "chatgpt"
+    CLAUDE = "claude"
+    GEMINI = "gemini"
+    GROK = "grok"
+    DEEPSEEK = "deepseek"
+    LLAMA = "llama"
+
+
+class PromptType(str, Enum):
+    SYSTEM = "system"
+    NORMAL = "normal"
+
+
+class PromptGeneratorRequest(BaseModel):
+    requirements: str = Field(..., min_length=10, max_length=10000,)
+
+    llm: PromptLLM
+
+    prompt_type: PromptType

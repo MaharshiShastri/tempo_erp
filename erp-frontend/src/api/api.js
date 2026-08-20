@@ -1431,6 +1431,48 @@ const API = {
         return response.json();
     },
   
+  generatePrompt: async (
+        sessionToken,
+        requirements,
+        llm,
+        promptType
+    ) => {
+
+        const response = await fetch(
+            "/api/v1/auth/prompt-generator",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    Authorization:
+                        `Bearer ${sessionToken}`,
+                },
+
+                body: JSON.stringify({
+                    requirements,
+                    llm,
+                    prompt_type: promptType,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+
+            const error = await response
+                .json()
+                .catch(() => ({}));
+
+            throw new Error(
+                error.detail ||
+                "Failed to generate prompt."
+            );
+        }
+
+        return response.json();
+  },
 };
 
 export default API;
