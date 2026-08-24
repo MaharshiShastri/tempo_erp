@@ -1,11 +1,17 @@
 import useTruckPlanner from "./useTruckPlanner";
 import useTruckLayout from "./useTruckLayout";
 
-export default function useDispatchPlannerHub({sessionToken, showErrorModal, addToast}) {
-
+export default function useDispatchPlannerHub() {
     const planner = useTruckPlanner();
 
-    const visualizer = useTruckLayout(planner.plannerProducts, planner.unit, planner.truckDim);
+    const { packedBoxes } = useTruckLayout(
+        planner.plannerProducts,
+        planner.unit,
+        planner.truckDim
+    );
 
-    return {...planner, ...visualizer};
+    return {
+        ...planner,
+        packedBoxes,
+    };
 }

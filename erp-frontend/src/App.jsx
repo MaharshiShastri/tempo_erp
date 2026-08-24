@@ -496,7 +496,7 @@ function App() {
                     {isFactory && state.activeTab==='prod-stats' && <ProductionAnalyticsView state={state}/>}
                     {isFactory && state.activeTab==='audit' && <InventoryAuditLogsView state={state}/>}
                     {(isSales || isTransporter) && state.activeTab==='logistics-read' && <LogisticsPartnerReadOnlyView state={state}/>}
-                    {isTransporter && state.activeTab==='dispatch-planner' && <DispatchPlannerView state={state}/>}
+                    {isTransporter && state.activeTab==='dispatch-planner' && <DispatchPlannerView state={state.dispatchPlanner}/>}
                     {isSales && state.activeTab==='qoute-list' && <QuotationListView state={state}/>}
                     {isSales && state.activeTab=="quote-generation" && <QuoteGenerationView state={state}/>}
                 </div>

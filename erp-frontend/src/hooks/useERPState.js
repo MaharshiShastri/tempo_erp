@@ -149,7 +149,7 @@ export default function useERPState() {
     //all the logistcsi business state
     const dispatch = useDispatchCalculator({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
     const logistics = useLogisticsHub({sessionToken: core.sessionToken, setModalAlert: login.setModalAlert, showErrorModal: core.showErrorModal, addToast: core.addToast});
-    const truckPlanner = useDispatchPlannerHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
+    const dispatchPlanner = useDispatchPlannerHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
 
     //Global business state dependent
     const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
@@ -248,7 +248,7 @@ export default function useERPState() {
 
     return {
         ...companies, ...orders, ...billing, ...crm, ...leadTargets, ...qoutation, //Sales Business states unwinding
-        ...truckPlanner,  ...logistics, ...dispatch, //Logistics business states
+        dispatchPlanner,  ...logistics, ...dispatch, //Logistics business states
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, ...indiaMap, ...exerciseGenerator,//Admin business states
         ...faq, ...items, ...production, ...login, ...analytics, ...core, ...productionCalendar, ...promptGenerator, //Global business states
