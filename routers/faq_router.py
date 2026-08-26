@@ -16,10 +16,35 @@ router = APIRouter(prefix="/api/v1/faq", tags=["FAQ & Knowledge Base"])
 @router.post("/ask", dependencies=[Depends(check_department("Sales Representative"))])
 def ask_question(payload: AskPayload, user: dict = Depends(verify_bearer_token)):
     try:
-        return EDBR.create_faq_query(payload.question, user["email"])
+        item_code = payload.item_code.strip() if payload.item_code else None
+        item_group = payload.item_group.strip() if payload.item_group else None
+
+        if item_code:
+            item = EDBR.get_item(item_code)
+
+            if not item:
+                raise HTTPException(status_code=400, detail=f"Item code '{item_code}' was not found.")
+
+            if not item.get("is_active", True):
+                raise HTTPException(status_code=400, detail=f"Item code '{item_code}' is inactive.")
+
+            # Keep group consistent with ItemMaster
+            if not item_group:
+                item_group = item.get("item_group")
+
+        return EDBR.create_faq_query(
+            question=payload.question,
+            asked_by=user["email"],
+            item_code=item_code,
+            item_group=item_group,
+        )
+
+    except HTTPException:
+        raise
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
+    
 @router.get("/list")
 def get_all_faqs(user: dict = Depends(verify_bearer_token)):
     faqs = EDBR.get_faq_queries()

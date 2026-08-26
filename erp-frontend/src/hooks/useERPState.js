@@ -152,7 +152,7 @@ export default function useERPState() {
     const dispatchPlanner = useDispatchPlannerHub({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, addToast: core.addToast});
 
     //Global business state dependent
-    const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
+    const faq = useFAQHub({sessionToken: core.sessionToken, user: core.user, itemsMaster: items.itemsMaster, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const production = useProductionHub({sessionToken: core.sessionToken, user: core.user, addToast: core.addToast, showErrorModal: core.showErrorModal, orders: orders.orders, setOrders: orders.setOrders});
     const analytics = useAnalytics({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal});
 

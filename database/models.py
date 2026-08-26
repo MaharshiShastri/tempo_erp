@@ -771,10 +771,16 @@ class FAQQuery(Base):
 
     status: Mapped[str] = mapped_column(String(50), server_default="Pending", nullable=True)
 
+    item_code: Mapped[str | None] = mapped_column(String(100), ForeignKey("items_master.item_code"), nullable=True, index=True)
+
+    item_group: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
 
+    item: Mapped["ItemMaster | None"] = relationship("ItemMaster", foreign_keys=[item_code])
+    
 class SystemAuditLog(Base):
     __tablename__ = "system_audit_logs"
     #Done

@@ -1,42 +1,16 @@
 import useTruckCanvas from "../hooks/dispatch/useTruckVisualizer";
 
-import {
-    Truck,
-    Plus,
-    Trash2,
-    Box,
-    Calendar,
-    IndianRupee,
-    Maximize2,
-    RotateCw,
-} from "lucide-react";
+import {Truck, Plus, Trash2, Box, Calendar, IndianRupee, Maximize2, RotateCw,} from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import {Card, CardContent, CardHeader, CardTitle,} from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 
 const getToday = () => {
     return new Date().toISOString().split("T")[0];
@@ -65,9 +39,9 @@ export default function DispatchPlannerView({ state }) {
 
     return (
         <div className="space-y-6">
-            {/* ===================================================== */}
-            {/* TRUCK CONFIGURATION */}
-            {/* ===================================================== */}
+            {/* =====================================================
+                TRUCK CONFIGURATION
+            ===================================================== */}
 
             <Card>
                 <CardHeader>
@@ -80,11 +54,8 @@ export default function DispatchPlannerView({ state }) {
                 <CardContent>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         {/* UNIT */}
-
                         <div className="space-y-2">
-                            <Label>
-                                Package Dimension Unit
-                            </Label>
+                            <Label>Package Dimension Unit</Label>
 
                             <Select
                                 value={state.unit}
@@ -107,7 +78,6 @@ export default function DispatchPlannerView({ state }) {
                         </div>
 
                         {/* LENGTH */}
-
                         <div className="space-y-2">
                             <Label htmlFor="truck-length">
                                 Truck Length
@@ -128,7 +98,6 @@ export default function DispatchPlannerView({ state }) {
                         </div>
 
                         {/* WIDTH */}
-
                         <div className="space-y-2">
                             <Label htmlFor="truck-width">
                                 Truck Width
@@ -149,7 +118,6 @@ export default function DispatchPlannerView({ state }) {
                         </div>
 
                         {/* HEIGHT */}
-
                         <div className="space-y-2">
                             <Label htmlFor="truck-height">
                                 Truck Height
@@ -172,15 +140,16 @@ export default function DispatchPlannerView({ state }) {
                 </CardContent>
             </Card>
 
-            {/* ===================================================== */}
-            {/* PACKAGE INPUT TABLE */}
-            {/* ===================================================== */}
+            {/* =====================================================
+                PACKAGE INPUT TABLE
+            ===================================================== */}
 
             <Card>
                 <CardHeader>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Box className="size-5 text-primary" />
+
                             Dispatch Packages
 
                             <Badge variant="secondary">
@@ -210,29 +179,12 @@ export default function DispatchPlannerView({ state }) {
                                         #
                                     </TableHead>
 
-                                    <TableHead>
-                                        Width
-                                    </TableHead>
-
-                                    <TableHead>
-                                        Height
-                                    </TableHead>
-
-                                    <TableHead>
-                                        Depth
-                                    </TableHead>
-
-                                    <TableHead>
-                                        Invoice Value
-                                    </TableHead>
-
-                                    <TableHead>
-                                        Due Date
-                                    </TableHead>
-
-                                    <TableHead>
-                                        Colour
-                                    </TableHead>
+                                    <TableHead>Width</TableHead>
+                                    <TableHead>Height</TableHead>
+                                    <TableHead>Depth</TableHead>
+                                    <TableHead>Invoice Value</TableHead>
+                                    <TableHead>Due Date</TableHead>
+                                    <TableHead>Colour</TableHead>
 
                                     <TableHead className="w-[80px]">
                                         Action
@@ -245,21 +197,17 @@ export default function DispatchPlannerView({ state }) {
                                     (product, index) => (
                                         <TableRow key={product.id}>
                                             {/* NUMBER */}
-
                                             <TableCell className="font-medium">
                                                 {index + 1}
                                             </TableCell>
 
                                             {/* WIDTH */}
-
                                             <TableCell>
                                                 <Input
                                                     type="number"
                                                     min="0"
                                                     step="any"
-                                                    value={
-                                                        product.width
-                                                    }
+                                                    value={product.width}
                                                     onChange={(e) =>
                                                         state.updateProduct(
                                                             index,
@@ -271,15 +219,12 @@ export default function DispatchPlannerView({ state }) {
                                             </TableCell>
 
                                             {/* HEIGHT */}
-
                                             <TableCell>
                                                 <Input
                                                     type="number"
                                                     min="0"
                                                     step="any"
-                                                    value={
-                                                        product.height
-                                                    }
+                                                    value={product.height}
                                                     onChange={(e) =>
                                                         state.updateProduct(
                                                             index,
@@ -291,15 +236,12 @@ export default function DispatchPlannerView({ state }) {
                                             </TableCell>
 
                                             {/* DEPTH */}
-
                                             <TableCell>
                                                 <Input
                                                     type="number"
                                                     min="0"
                                                     step="any"
-                                                    value={
-                                                        product.depth
-                                                    }
+                                                    value={product.depth}
                                                     onChange={(e) =>
                                                         state.updateProduct(
                                                             index,
@@ -311,7 +253,6 @@ export default function DispatchPlannerView({ state }) {
                                             </TableCell>
 
                                             {/* INVOICE */}
-
                                             <TableCell>
                                                 <div className="relative">
                                                     <IndianRupee className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -336,7 +277,6 @@ export default function DispatchPlannerView({ state }) {
                                             </TableCell>
 
                                             {/* DUE DATE */}
-
                                             <TableCell>
                                                 <div className="relative">
                                                     <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -360,7 +300,6 @@ export default function DispatchPlannerView({ state }) {
                                             </TableCell>
 
                                             {/* COLOR */}
-
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Input
@@ -386,7 +325,6 @@ export default function DispatchPlannerView({ state }) {
                                             </TableCell>
 
                                             {/* DELETE */}
-
                                             <TableCell>
                                                 <Button
                                                     type="button"
@@ -400,8 +338,7 @@ export default function DispatchPlannerView({ state }) {
                                                     disabled={
                                                         state
                                                             .plannerProducts
-                                                            .length <=
-                                                        1
+                                                            .length <= 1
                                                     }
                                                     title="Remove package"
                                                 >
@@ -416,7 +353,6 @@ export default function DispatchPlannerView({ state }) {
                     </div>
 
                     {/* PRIORITY */}
-
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <RotateCw className="size-4" />
 
@@ -435,9 +371,9 @@ export default function DispatchPlannerView({ state }) {
                 </CardContent>
             </Card>
 
-            {/* ===================================================== */}
-            {/* TRUCK VIEWS */}
-            {/* ===================================================== */}
+            {/* =====================================================
+                TRUCK VIEWS
+            ===================================================== */}
 
             <Card>
                 <CardHeader>
@@ -473,9 +409,9 @@ export default function DispatchPlannerView({ state }) {
                 </CardContent>
             </Card>
 
-            {/* ===================================================== */}
-            {/* REJECTED PACKAGES */}
-            {/* ===================================================== */}
+            {/* =====================================================
+                REJECTED PACKAGES
+            ===================================================== */}
 
             {state.packedBoxes.rejectedBoxes?.length > 0 && (
                 <Alert variant="destructive">
@@ -490,9 +426,9 @@ export default function DispatchPlannerView({ state }) {
     );
 }
 
-/* ========================================================= */
-/* TRUCK VIEW */
-/* ========================================================= */
+/* =========================================================
+   TRUCK VIEW
+========================================================= */
 
 function TruckView({ title, canvasRef }) {
     return (

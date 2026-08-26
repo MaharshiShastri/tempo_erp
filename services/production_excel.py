@@ -21,6 +21,7 @@ ORDER_HEADERS = [
     "Purchase Order Date",
     "PO Number",
     "Client Name",
+    "State",
     "Item Code",
     "Quantity",
     "Rate",
@@ -36,6 +37,7 @@ BILLED_HEADERS = [
     "Purchase Order Date",
     "PO Number",
     "Client Name",
+    "State",
     "Item Code",
     "Quantity",
     "Rate",
@@ -173,6 +175,7 @@ def order_row(item):
         item.get("purchase_order_date"),
         item.get("po_number"),
         item.get("client_name"),
+        item.get("state_name"),
         item.get("item_code"),
         item.get("quantity"),
         item.get("rate"),
@@ -188,6 +191,7 @@ def billed_row(item):
         item.get("purchase_order_date"),
         item.get("po_number"),
         item.get("client_name"),
+        item.get("state_name"),
         item.get("item_code"),
         item.get("quantity"),
         item.get("rate"),
@@ -220,24 +224,25 @@ def generate_production_excel(
     )
 
     common_widths = {
-        1: 20,
-        2: 16,
-        3: 22,
-        4: 20,
-        5: 20,
-        6: 30,
-        7: 20,
-        8: 14,
-        9: 16,
-        10: 15,
-        11: 18,
+        1: 20,  # OA ID
+    2: 16,  # OA Date
+    3: 22,  # Payment Terms
+    4: 20,  # Purchase Order Date
+    5: 20,  # PO Number
+    6: 30,  # Client Name
+    7: 18,  # State
+    8: 20,  # Item Code
+    9: 14,  # Quantity
+    10: 16, # Rate
+    11: 15, # Discount
+    12: 18, # Amount
     }
 
     billed_widths = {
         **common_widths,
-        12: 18,
-        13: 16,
-        14: 18,
+    13: 18, # Bill Number
+    14: 16, # Bill Date
+    15: 18, # Billed Quantity
     }
 
     # =========================================================
@@ -346,27 +351,26 @@ def generate_production_excel(
 
     for worksheet in workbook.worksheets:
 
-        # Rate / Amount columns
         for row in range(5, worksheet.max_row + 1):
 
             # Rate
             worksheet.cell(
                 row=row,
-                column=9,
+                column=10,
             ).number_format = '₹#,##0.00'
 
             # Discount
             worksheet.cell(
                 row=row,
-                column=10,
+                column=11,
             ).number_format = '0.00'
 
             # Amount
             worksheet.cell(
                 row=row,
-                column=11,
+                column=12,
             ).number_format = '₹#,##0.00'
-
+            
     # =========================================================
     # SAVE
     # =========================================================

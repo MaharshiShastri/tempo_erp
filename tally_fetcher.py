@@ -33,8 +33,8 @@ from services.tally_service import (
 # Configuration
 # ---------------------------------------------------------------------------
 
-FROM_DATE = "20250401"
-TO_DATE = "20260401"
+FROM_DATE = "20260401"
+TO_DATE = "20260824"
 
 ITEM_NAME_PREFIX = "TI"
 

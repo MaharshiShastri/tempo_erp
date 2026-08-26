@@ -30,7 +30,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOaAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAaL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1903,9 +1903,9 @@ class PostgresRepository:
             session.commit()
     # --- SYSTEM AUDIT end ---
     # --- FAQ Engine start ---
-    def create_faq_query(self, question: str, asked_by: str):
+    def create_faq_query(self, question: str, asked_by: str, item_code: str | None, item_group: str | None):
         with SessionLocal() as session:
-            faq = FAQQuery(question=question.strip(), asked_by=asked_by)
+            faq = FAQQuery(question=question.strip(), asked_by=asked_by, item_code = item_code, item_group = item_group)
 
             session.add(faq)
             session.commit()
@@ -2312,6 +2312,8 @@ class PostgresRepository:
                         "client_name"
                     ),
 
+                    OrderHeader.state_name,
+
                     OrderItem.order_item_id,
 
                     OrderItem.item_code,
@@ -2389,6 +2391,8 @@ class PostgresRepository:
                         if row.order_acceptance_date
                         else None
                     ),
+
+                    "state_name": row.state_name,
 
                     "payment_terms": row.payment_terms,
 
@@ -2575,6 +2579,8 @@ class PostgresRepository:
                         "client_name"
                     ),
 
+                    OrderHeader.state_name,
+
                     OrderItem.order_item_id,
 
                     OrderItem.item_code,
@@ -2637,6 +2643,8 @@ class PostgresRepository:
                         if row.order_acceptance_date
                         else None
                     ),
+
+                    "state_name": row.state_name,
 
                     "payment_terms": row.payment_terms,
 

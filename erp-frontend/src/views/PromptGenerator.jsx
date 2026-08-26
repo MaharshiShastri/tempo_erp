@@ -26,6 +26,10 @@ const LLM_OPTIONS = [
         value: "llama",
         label: "Llama",
     },
+    {
+        value: "perplexity",
+        label: "Perplexity"
+    }
 ];
 
 

@@ -1184,7 +1184,7 @@ def sync_voucher_dataset(
     # SALES ORDER
     # ---------------------------------------------------------------
 
-    if voucher_type == "sales_orders":
+    if voucher_type == "Sales Order" or voucher_type == "sales_order":
 
         mapped_orders = [
             voucher_to_order(voucher)

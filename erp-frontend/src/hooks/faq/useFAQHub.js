@@ -1,8 +1,8 @@
 import useFAQWorkspace from "./useFAQWorkspace";
 
-export default function useFAQHub({sessionToken, user, showErrorModal, addToast, setAlertMessage, setIsAlertOpen}){
+export default function useFAQHub({sessionToken, user, itemsMaster, showErrorModal, addToast, setAlertMessage, setIsAlertOpen}){
 
-    const workspace = useFAQWorkspace({sessionToken, user, showErrorModal, addToast, setAlertMessage, setAlertMessage});
+    const workspace = useFAQWorkspace({sessionToken, user, itemsMaster, showErrorModal, addToast, setAlertMessage, setIsAlertOpen});
 
     return {...workspace};
 }
