@@ -1242,698 +1242,128 @@ details div > strong {
     text-decoration: underline;
 }
 
-/* =========================================================
+/* ============================================================
    PRODUCTION CALENDAR
-========================================================= */
+   ============================================================ */
 
-.production-calendar-shell {
-    display: flex;
+.production-calendar-wrapper {
+    width: 100%;
+    height: 700px;
+    min-height: 0;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-radius: 0.75rem;
 
-    flex-direction: column;
+    --fc-border-color: hsl(var(--border));
+    --fc-page-bg-color: hsl(var(--background));
+    --fc-neutral-bg-color: hsl(var(--muted) / 0.35);
+    --fc-list-event-hover-bg-color: hsl(var(--accent));
+    --fc-today-bg-color: hsl(var(--primary) / 0.06);
+}
 
+.production-calendar-wrapper .fc {
     width: 100%;
     height: 100%;
-
-    min-height: 0;
-
-    background: var(--bg-main);
-
-    color: var(--text-primary);
-
-    overflow: hidden;
-
-    box-sizing: border-box;
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+    font-family: inherit;
 }
 
-.production-calendar-header {
-    display: flex;
+/* Toolbar */
 
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 24px;
-
-    flex: 0 0 auto;
-
-    padding: 20px 24px;
-
-    background: var(--bg-surface);
-
-    border-bottom: 1px solid var(--border-subtle);
-
-    box-sizing: border-box;
+.production-calendar-wrapper .fc .fc-toolbar {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
 }
 
-.production-calendar-header-info {
-    min-width: 0;
+.production-calendar-wrapper .fc .fc-toolbar-title {
+    color: hsl(var(--foreground));
+    font-size: 1.05rem;
+    font-weight: 700;
 }
 
-.production-calendar-breadcrumb {
-    display: flex;
+/* Buttons */
 
-    align-items: center;
-
-    gap: 7px;
-
-    margin-bottom: 5px;
-
-    color: var(--text-muted);
-
-    font-size: 12px;
-
+.production-calendar-wrapper .fc .fc-button {
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-radius: 0.5rem;
+    box-shadow: none;
     font-weight: 500;
-}
-
-.production-calendar-breadcrumb span:nth-child(2) {
-    opacity: 0.55;
-}
-
-.production-calendar-header h1 {
-    margin: 0;
-
-    color: var(--text-primary);
-
-    font-size: 23px;
-
-    line-height: 1.25;
-
-    font-weight: 700;
-}
-
-.production-calendar-header p {
-    margin: 6px 0 0;
-
-    color: var(--text-muted);
-
-    font-size: 13px;
-
-    line-height: 1.45;
-}
-
-.production-calendar-actions {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: flex-end;
-
-    gap: 8px;
-
-    flex-shrink: 0;
-}
-
-.production-calendar-button {
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    height: 36px;
-
-    padding: 0 14px;
-
-    border: 1px solid var(--border-subtle);
-
-    border-radius: var(--radius-sm);
-
-    background: var(--bg-surface);
-
-    color: var(--text-primary);
-
-    font-family: inherit;
-
-    font-size: 13px;
-
-    font-weight: 600;
-
-    cursor: pointer;
-
     transition:
-        background 0.15s ease,
-        border-color 0.15s ease,
-        color 0.15s ease,
-        box-shadow 0.15s ease;
+        background-color 0.15s ease,
+        border-color 0.15s ease;
 }
 
-.production-calendar-button:hover {
-    background: var(--combobox-hover);
-
-    border-color: var(--brand-accent);
+.production-calendar-wrapper .fc .fc-button:hover {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
 }
 
-.production-calendar-button:focus-visible {
-    outline: none;
-
-    border-color: var(--brand-accent);
-
-    box-shadow:
-        0 0 0 3px rgba(36, 144, 239, 0.15);
+.production-calendar-wrapper .fc .fc-button-primary {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
 }
 
-.production-calendar-button-primary {
-    border-color: var(--brand-accent);
+/* Grid */
 
-    background: var(--brand-accent);
-
-    color: #ffffff;
+.production-calendar-wrapper .fc .fc-scrollgrid {
+    border-color: hsl(var(--border));
 }
 
-.production-calendar-button-primary:hover {
-    background: #1976d2;
-
-    border-color: #1976d2;
+.production-calendar-wrapper .fc-theme-standard td,
+.production-calendar-wrapper .fc-theme-standard th {
+    border-color: hsl(var(--border));
 }
 
-/* =========================================================
-   PRODUCTION CALENDAR TOOLBAR
-========================================================= */
+/* Day headers */
 
-.production-calendar-toolbar {
-    display: flex;
-
-    align-items: flex-end;
-
-    justify-content: space-between;
-
-    gap: 20px;
-
-    flex: 0 0 auto;
-
-    padding: 11px 24px;
-
-    background: var(--bg-surface);
-
-    border-bottom: 1px solid var(--border-subtle);
-
-    box-sizing: border-box;
+.production-calendar-wrapper .fc .fc-col-header-cell {
+    background: hsl(var(--muted) / 0.45);
 }
 
-.production-calendar-toolbar-left {
-    display: flex;
-
-    align-items: flex-end;
-
-    gap: 12px;
-
-    min-width: 0;
-}
-
-.production-calendar-toolbar-right {
-    display: flex;
-
-    align-items: center;
-
-    flex-shrink: 0;
-}
-
-.production-calendar-filter {
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 4px;
-
-    flex-shrink: 0;
-}
-
-.production-calendar-filter label {
-    color: var(--text-muted);
-
-    font-size: 10px;
-
-    font-weight: 700;
-
+.production-calendar-wrapper .fc .fc-col-header-cell-cushion {
+    padding: 0.75rem 0.5rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.72rem;
+    font-weight: 600;
     text-transform: uppercase;
-
-    letter-spacing: 0.05em;
 }
 
-.production-calendar-filter select {
-    width: 145px;
+/* Time grid */
 
-    height: 34px;
-
-    padding: 0 28px 0 10px;
-
-    border: 1px solid var(--border-subtle);
-
-    border-radius: var(--radius-sm);
-
-    background: var(--bg-surface);
-
-    color: var(--text-primary);
-
-    font-family: inherit;
-
-    font-size: 13px;
-
-    outline: none;
-
-    cursor: pointer;
-
-    box-sizing: border-box;
+.production-calendar-wrapper .fc .fc-timegrid-slot {
+    height: 2.75rem;
+    background: hsl(var(--background));
 }
 
-.production-calendar-filter select:hover {
-    border-color: var(--brand-accent);
+.production-calendar-wrapper .fc .fc-timegrid-slot-label {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.7rem;
 }
 
-.production-calendar-filter select:focus {
-    border-color: var(--brand-accent);
+/* Today */
 
-    box-shadow:
-        0 0 0 3px rgba(36, 144, 239, 0.12);
+.production-calendar-wrapper .fc .fc-day-today {
+    background: hsl(var(--primary) / 0.07) !important;
 }
 
-.production-calendar-clear {
-    height: 34px;
+/* Events */
 
-    padding: 0 8px;
-
-    border: 0;
-
-    background: transparent;
-
-    color: var(--brand-accent);
-
-    font-family: inherit;
-
-    font-size: 12px;
-
-    font-weight: 600;
-
+.production-calendar-wrapper .fc .fc-event {
+    border-radius: 0.4rem;
+    border-width: 1px;
+    padding: 1px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
     cursor: pointer;
 }
 
-.production-calendar-clear:hover {
-    text-decoration: underline;
+.production-calendar-wrapper .fc .fc-event-main {
+    color: white;
 }
-
-.production-calendar-status {
-    display: flex;
-
-    align-items: center;
-
-    gap: 7px;
-
-    color: var(--text-muted);
-
-    font-size: 12px;
-
-    white-space: nowrap;
-}
-
-.production-calendar-status-dot {
-    width: 7px;
-    height: 7px;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-
-    background: var(--brand-success);
-}
-
-.production-calendar-status-dot.loading {
-    background: #f59e0b;
-}
-
-/* =========================================================
-   PRODUCTION CALENDAR CONTAINER
-========================================================= */
-
-.production-calendar-container {
-    position: relative;
-
-    display: flex;
-
-    flex: 1 1 auto;
-
-    width: 100%;
-
-    min-height: 0;
-
-    flex-direction: column;
-
-    padding: 12px 16px 8px;
-
-    box-sizing: border-box;
-
-    overflow: hidden;
-}
-
-.production-calendar-frame {
-    width: 100%;
-
-    height: 100%;
-
-    min-height: 0;
-
-    flex: 1;
-
-    background: var(--bg-surface);
-
-    border: 1px solid var(--border-subtle);
-
-    border-radius: var(--radius-md);
-
-    overflow: hidden;
-
-    box-shadow: var(--shadow-sm);
-
-    box-sizing: border-box;
-}
-
-.production-calendar-frame .fc {
-    width: 100%;
-    height: 100%;
-
-    background: var(--bg-surface);
-
-    color: var(--text-primary);
-
-    font-family: inherit;
-
-    --fc-border-color: rgba(120, 130, 145, 0.28);
-    --fc-page-bg-color: var(--bg-surface);
-    --fc-neutral-bg-color: var(--bg-main);
-    --fc-list-event-hover-bg-color: var(--combobox-hover);
-    --fc-today-bg-color: rgba(36, 144, 239, 0.07);
-}
-
-.production-calendar-frame .fc .fc-button {
-    min-height: 32px;
-
-    padding: 5px 10px;
-
-    border: 1px solid var(--border-subtle);
-
-    border-radius: var(--radius-sm);
-
-    background: var(--bg-surface);
-
-    color: var(--text-primary);
-
-    box-shadow: none;
-
-    font-family: inherit;
-
-    font-size: 12px;
-
-    font-weight: 600;
-
-    white-space: nowrap;
-}
-
-.production-calendar-frame .fc .fc-scrollgrid {
-    border: 1px solid var(--fc-border-color);
-}
-
-.production-calendar-frame .fc .fc-scrollgrid td,
-.production-calendar-frame .fc .fc-scrollgrid th {
-    border-color: var(--fc-border-color);
-}
-
-.production-calendar-frame .fc .fc-col-header-cell {
-    background: var(--bg-main);
-}
-
-.production-calendar-frame .fc .fc-col-header-cell-cushion {
-    display: block;
-
-    padding: 9px 6px;
-
-    color: var(--text-muted);
-
-    font-size: 11px;
-
-    font-weight: 700;
-
-    text-transform: uppercase;
-
-    text-decoration: none;
-}
-
-.production-calendar-frame .fc .fc-timegrid-col {
-    border-left-color: var(--fc-border-color);
-}
-
-.production-calendar-frame .fc .fc-timegrid-slot {
-    height: 3em;
-
-    border-top-color: var(--fc-border-color);
-}
-
-.production-calendar-frame .fc .fc-timegrid-slot-minor {
-    border-top-color: rgba(120, 130, 145, 0.16);
-}
-
-.production-calendar-frame .fc .fc-timegrid-axis {
-    border-color: var(--fc-border-color);
-}
-
-.production-calendar-frame .fc .fc-timegrid-slot-label {
-    color: var(--text-muted);
-
-    font-size: 11px;
-}
-
-.production-calendar-frame .fc .fc-timegrid-slot-label-cushion {
-    padding: 4px 8px;
-}
-
-.production-calendar-frame .fc .fc-day-today {
-    background: var(--fc-today-bg-color) !important;
-}
-
-.production-calendar-frame .fc .fc-timegrid-now-indicator-line {
-    border-color: var(--brand-danger);
-
-    border-width: 2px;
-}
-
-.production-calendar-frame .fc .fc-timegrid-now-indicator-arrow {
-    border-top-color: var(--brand-danger);
-}
-
-/* =========================================================
-   PRODUCTION EVENTS
-========================================================= */
-
-.production-calendar-frame .fc .fc-event {
-    border: 0;
-
-    border-radius: 5px;
-
-    padding: 2px 3px;
-
-    box-shadow: none;
-
-    cursor: pointer;
-
-    overflow: hidden;
-}
-
-.production-calendar-event {
-    min-width: 0;
-
-    padding: 2px 3px;
-
-    overflow: hidden;
-}
-
-.production-calendar-event-title {
-    overflow: hidden;
-
-    color: inherit;
-
-    font-size: 11px;
-
-    font-weight: 700;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-}
-
-.production-calendar-event-stage {
-    margin-top: 1px;
-
-    color: inherit;
-
-    font-size: 10px;
-
-    font-weight: 600;
-
-    opacity: 0.85;
-}
-
-.production-calendar-event-team {
-    margin-top: 1px;
-
-    color: inherit;
-
-    font-size: 9px;
-
-    opacity: 0.72;
-
-    white-space: nowrap;
-
-    overflow: hidden;
-
-    text-overflow: ellipsis;
-}
-
-/* STATUS COLORS */
-
-.production-calendar-frame .production-event-planned {
-    background: #dbeafe;
-
-    color: #1d4ed8;
-}
-
-.production-calendar-frame .production-event-progress {
-    background: #fef3c7;
-
-    color: #92400e;
-}
-
-.production-calendar-frame .production-event-completed {
-    background: #dcfce7;
-
-    color: #166534;
-}
-
-.production-calendar-frame .production-event-hold {
-    background: #f3e8ff;
-
-    color: #7e22ce;
-}
-
-.production-calendar-frame .production-event-cancelled {
-    background: #fee2e2;
-
-    color: #991b1b;
-}
-
-/* =========================================================
-   CALENDAR LOADING
-========================================================= */
-
-.production-calendar-loading {
-    position: absolute;
-
-    top: 24px;
-    right: 28px;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    padding: 8px 11px;
-
-    border: 1px solid var(--border-subtle);
-
-    border-radius: var(--radius-sm);
-
-    background: var(--bg-surface);
-
-    color: var(--text-muted);
-
-    font-size: 12px;
-
-    box-shadow: var(--shadow-sm);
-
-    z-index: 20;
-
-    pointer-events: none;
-}
-
-.production-calendar-loading-spinner {
-    width: 12px;
-    height: 12px;
-
-    flex-shrink: 0;
-
-    border: 2px solid var(--border-light);
-
-    border-top-color: var(--brand-accent);
-
-    border-radius: 50%;
-
-    animation: production-calendar-spin 0.7s linear infinite;
-}
-
-@keyframes production-calendar-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* =========================================================
-   LEGEND
-========================================================= */
-
-.production-calendar-legend {
-    display: flex;
-
-    align-items: center;
-
-    gap: 18px;
-
-    min-height: 34px;
-
-    flex: 0 0 auto;
-
-    padding: 0 24px;
-
-    background: var(--bg-surface);
-
-    border-top: 1px solid var(--border-subtle);
-
-    box-sizing: border-box;
-}
-
-.production-calendar-legend-item {
-    display: flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    color: var(--text-muted);
-
-    font-size: 11px;
-}
-
-.production-legend-dot {
-    width: 8px;
-    height: 8px;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-}
-
-.production-legend-dot.planned {
-    background: #3b82f6;
-}
-
-.production-legend-dot.progress {
-    background: #f59e0b;
-}
-
-.production-legend-dot.completed {
-    background: #22c55e;
-}
-
-.production-legend-dot.hold {
-    background: #a855f7;
-}
-
 /* =========================================================
    PROMPT GENERATOR
 ========================================================= */
@@ -2372,4 +1802,376 @@ details div > strong {
     font-weight: 700;
 
     background: rgba(36, 144, 239, 0.08);
+}
+
+/* ============================================================
+   PRODUCTION CALENDAR
+   ============================================================ */
+
+.production-calendar-wrapper .fc {
+    --fc-border-color: hsl(var(--border));
+    --fc-page-bg-color: hsl(var(--background));
+    --fc-neutral-bg-color: hsl(var(--muted) / 0.35);
+    --fc-list-event-hover-bg-color: hsl(var(--muted));
+    --fc-today-bg-color: hsl(var(--primary) / 0.06);
+
+    font-size: 0.875rem;
+}
+
+.production-calendar-wrapper .fc-theme-standard td,
+.production-calendar-wrapper .fc-theme-standard th {
+    border-color: hsl(var(--border));
+}
+
+.production-calendar-wrapper .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.production-calendar-wrapper .fc .fc-toolbar-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+}
+
+.production-calendar-wrapper .fc .fc-button {
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+    box-shadow: none;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.75rem;
+}
+
+.production-calendar-wrapper .fc .fc-button:hover {
+    background: hsl(var(--muted));
+    border-color: hsl(var(--primary) / 0.4);
+}
+
+.production-calendar-wrapper .fc .fc-button-active,
+.production-calendar-wrapper .fc .fc-button-primary:not(:disabled).fc-button-active {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+}
+
+.production-calendar-wrapper .fc .fc-col-header-cell {
+    background: hsl(var(--muted) / 0.45);
+}
+
+.production-calendar-wrapper .fc .fc-col-header-cell-cushion {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: hsl(var(--muted-foreground));
+}
+
+.production-calendar-wrapper .fc .fc-daygrid-day-number {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+}
+
+.production-calendar-wrapper .fc .fc-day-today .fc-daygrid-day-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.3rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 9999px;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+}
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+
+.production-calendar-wrapper .fc-event {
+    border: none;
+    border-radius: 0.4rem;
+    padding: 2px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.production-calendar-wrapper .fc-event:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    transition: all 0.15s ease;
+}
+
+.production-calendar-wrapper .fc-daygrid-event {
+    white-space: normal;
+}
+
+/* Make calendar readable in dark mode */
+
+[data-theme="dark"] .production-calendar-wrapper .fc {
+    --fc-page-bg-color: hsl(var(--background));
+    --fc-neutral-bg-color: hsl(var(--muted) / 0.25);
+}
+
+[data-theme="dark"] .production-calendar-wrapper .fc-button {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+}
+
+/* =========================================================
+   PRODUCTION CALENDAR
+   ========================================================= */
+
+.production-calendar-wrapper {
+    --fc-border-color: hsl(var(--border));
+    --fc-page-bg-color: hsl(var(--background));
+    --fc-neutral-bg-color: hsl(var(--muted) / 0.35);
+    --fc-list-event-hover-bg-color: hsl(var(--accent));
+    --fc-today-bg-color: hsl(var(--primary) / 0.06);
+
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-radius: 0.75rem;
+}
+
+/* Main calendar surface */
+
+.production-calendar-wrapper .fc {
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+    font-family: inherit;
+}
+
+/* Toolbar */
+
+.production-calendar-wrapper .fc .fc-toolbar {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.production-calendar-wrapper .fc .fc-toolbar-title {
+    color: hsl(var(--foreground));
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+/* FullCalendar buttons */
+
+.production-calendar-wrapper .fc .fc-button {
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-radius: 0.5rem;
+    box-shadow: none;
+    font-weight: 500;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.production-calendar-wrapper .fc .fc-button:hover {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+    border-color: hsl(var(--border));
+}
+
+.production-calendar-wrapper .fc .fc-button:focus {
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
+}
+
+.production-calendar-wrapper .fc .fc-button-primary {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+}
+
+.production-calendar-wrapper .fc .fc-button-primary:hover {
+    background: hsl(var(--primary) / 0.9);
+    border-color: hsl(var(--primary) / 0.9);
+    color: hsl(var(--primary-foreground));
+}
+
+/* Active calendar view button */
+
+.production-calendar-wrapper .fc .fc-button-primary:not(:disabled).fc-button-active,
+.production-calendar-wrapper .fc .fc-button-primary:not(:disabled):active {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+}
+
+/* Calendar borders */
+
+.production-calendar-wrapper .fc-theme-standard td,
+.production-calendar-wrapper .fc-theme-standard th {
+    border-color: hsl(var(--border));
+}
+
+.production-calendar-wrapper .fc-scrollgrid {
+    border-color: hsl(var(--border));
+    border-radius: 0.65rem;
+    overflow: hidden;
+}
+
+/* Day headers */
+
+.production-calendar-wrapper .fc .fc-col-header-cell {
+    background: hsl(var(--muted) / 0.45);
+}
+
+.production-calendar-wrapper .fc .fc-col-header-cell-cushion {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Date cells */
+
+.production-calendar-wrapper .fc .fc-daygrid-day {
+    background: hsl(var(--background));
+    transition: background-color 0.15s ease;
+}
+
+.production-calendar-wrapper .fc .fc-daygrid-day:hover {
+    background: hsl(var(--accent) / 0.45);
+}
+
+/* Date numbers */
+
+.production-calendar-wrapper .fc .fc-daygrid-day-number {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.45rem;
+}
+
+/* Today */
+
+.production-calendar-wrapper .fc .fc-day-today {
+    background: hsl(var(--primary) / 0.07) !important;
+}
+
+.production-calendar-wrapper .fc .fc-day-today .fc-daygrid-day-number {
+    color: hsl(var(--primary));
+    font-weight: 800;
+}
+
+/* Selection */
+
+.production-calendar-wrapper .fc .fc-highlight {
+    background: hsl(var(--primary) / 0.12);
+}
+
+/* Events */
+
+.production-calendar-wrapper .fc .fc-event {
+    border-radius: 0.4rem;
+    border-width: 1px;
+    padding: 1px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+    cursor: pointer;
+    transition:
+        filter 0.15s ease,
+        transform 0.15s ease;
+}
+
+.production-calendar-wrapper .fc .fc-event:hover {
+    filter: brightness(0.96);
+    transform: translateY(-1px);
+}
+
+.production-calendar-wrapper .fc .fc-event-main {
+    color: white;
+}
+
+/* More events */
+
+.production-calendar-wrapper .fc .fc-daygrid-more-link {
+    color: hsl(var(--primary));
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.production-calendar-wrapper .fc .fc-daygrid-more-link:hover {
+    color: hsl(var(--primary));
+}
+
+/* Time grid */
+
+.production-calendar-wrapper .fc .fc-timegrid-slot {
+    background: hsl(var(--background));
+    height: 2.75rem;
+}
+
+.production-calendar-wrapper .fc .fc-timegrid-slot-label {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.7rem;
+}
+
+.production-calendar-wrapper .fc .fc-timegrid-axis-cushion {
+    color: hsl(var(--muted-foreground));
+}
+
+/* Current time */
+
+.production-calendar-wrapper .fc .fc-timegrid-now-indicator-line {
+    border-color: hsl(var(--destructive));
+}
+
+.production-calendar-wrapper .fc .fc-timegrid-now-indicator-arrow {
+    border-bottom-color: hsl(var(--destructive));
+}
+
+/* List view */
+
+.production-calendar-wrapper .fc .fc-list {
+    border-color: hsl(var(--border));
+}
+
+.production-calendar-wrapper .fc .fc-list-day-cushion {
+    background: hsl(var(--muted) / 0.5);
+}
+
+.production-calendar-wrapper .fc .fc-list-day-text,
+.production-calendar-wrapper .fc .fc-list-day-side-text {
+    color: hsl(var(--foreground));
+}
+
+.production-calendar-wrapper .fc .fc-list-event:hover td {
+    background: hsl(var(--accent));
+}
+
+.production-calendar-wrapper .fc .fc-list-event-title {
+    color: hsl(var(--foreground));
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+    .production-calendar-wrapper .fc .fc-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .production-calendar-wrapper .fc .fc-toolbar-chunk {
+        display: flex;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+
+    .production-calendar-wrapper .fc .fc-toolbar-title {
+        font-size: 0.95rem;
+    }
+
+    .production-calendar-wrapper .fc .fc-button {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.6rem;
+    }
 }

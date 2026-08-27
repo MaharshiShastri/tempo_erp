@@ -144,7 +144,7 @@ def get_production_schedules(
 def create_production_schedule(
     session: Session,
     *,
-    order_id: int,
+    order_acceptance_id: str,
     stage_code: str,
     planned_start: datetime,
     planned_end: datetime,
@@ -170,14 +170,11 @@ def create_production_schedule(
     # Validate order
     # ---------------------------------------------------------
 
-    order = session.get(
-        OrderHeader,
-        order_id,
-    )
+    order = session.query(OrderHeader).filter(OrderHeader.order_acceptance_id == order_acceptance_id).first()
 
     if not order:
         raise ValueError(
-            f"Order {order_id} not found."
+            f"Order {order_acceptance_id} not found."
         )
 
     # ---------------------------------------------------------
@@ -199,7 +196,7 @@ def create_production_schedule(
     # ---------------------------------------------------------
 
     schedule = ProductionSchedule(
-        order_id=order_id,
+        order_id=order.order_id,
         stage_code=stage_code,
         planned_start=planned_start,
         planned_end=planned_end,

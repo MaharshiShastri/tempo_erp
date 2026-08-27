@@ -1,16 +1,42 @@
 import useTruckCanvas from "../hooks/dispatch/useTruckVisualizer";
 
-import {Truck, Plus, Trash2, Box, Calendar, IndianRupee, Maximize2, RotateCw,} from "lucide-react";
+import {
+    Truck,
+    Plus,
+    Trash2,
+    Box,
+    Calendar,
+    IndianRupee,
+    Maximize2,
+    RotateCw,
+} from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle,} from "@/components/ui/card";
-
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 const getToday = () => {
     return new Date().toISOString().split("T")[0];
@@ -23,37 +49,32 @@ export default function DispatchPlannerView({ state }) {
         "top"
     );
 
-    const leftCanvasRef = useTruckCanvas(
+    const sideCanvasRef = useTruckCanvas(
         state.packedBoxes,
         state.truckDim,
-        "left"
-    );
-
-    const rightCanvasRef = useTruckCanvas(
-        state.packedBoxes,
-        state.truckDim,
-        "right"
+        "side"
     );
 
     const today = getToday();
 
     return (
         <div className="space-y-6">
+
             {/* =====================================================
                 TRUCK CONFIGURATION
             ===================================================== */}
 
-            <Card>
-                <CardHeader>
+            <Card className="overflow-hidden border-primary/15">
+                <CardHeader className="bg-gradient-to-r from-primary/10 via-background to-blue-500/10">
                     <CardTitle className="flex items-center gap-2 text-base">
                         <Truck className="size-5 text-primary" />
-                        Dynamic Truck Spatial Visualizer
+                        Truck Configuration
                     </CardTitle>
                 </CardHeader>
 
-                <CardContent>
+                <CardContent className="pt-6">
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {/* UNIT */}
+
                         <div className="space-y-2">
                             <Label>Package Dimension Unit</Label>
 
@@ -61,7 +82,7 @@ export default function DispatchPlannerView({ state }) {
                                 value={state.unit}
                                 onValueChange={state.setUnit}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
 
@@ -77,7 +98,6 @@ export default function DispatchPlannerView({ state }) {
                             </Select>
                         </div>
 
-                        {/* LENGTH */}
                         <div className="space-y-2">
                             <Label htmlFor="truck-length">
                                 Truck Length
@@ -97,7 +117,6 @@ export default function DispatchPlannerView({ state }) {
                             />
                         </div>
 
-                        {/* WIDTH */}
                         <div className="space-y-2">
                             <Label htmlFor="truck-width">
                                 Truck Width
@@ -117,7 +136,6 @@ export default function DispatchPlannerView({ state }) {
                             />
                         </div>
 
-                        {/* HEIGHT */}
                         <div className="space-y-2">
                             <Label htmlFor="truck-height">
                                 Truck Height
@@ -136,9 +154,11 @@ export default function DispatchPlannerView({ state }) {
                                 }
                             />
                         </div>
+
                     </div>
                 </CardContent>
             </Card>
+
 
             {/* =====================================================
                 PACKAGE INPUT TABLE
@@ -147,6 +167,7 @@ export default function DispatchPlannerView({ state }) {
             <Card>
                 <CardHeader>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Box className="size-5 text-primary" />
 
@@ -167,14 +188,17 @@ export default function DispatchPlannerView({ state }) {
                             <Plus className="size-4" />
                             Add Package
                         </Button>
+
                     </div>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                    <div className="overflow-x-auto rounded-md border">
+
+                    <div className="overflow-x-auto rounded-lg border">
                         <Table className="min-w-[1000px]">
+
                             <TableHeader>
-                                <TableRow>
+                                <TableRow className="bg-muted/40">
                                     <TableHead className="w-[50px]">
                                         #
                                     </TableHead>
@@ -185,7 +209,6 @@ export default function DispatchPlannerView({ state }) {
                                     <TableHead>Invoice Value</TableHead>
                                     <TableHead>Due Date</TableHead>
                                     <TableHead>Colour</TableHead>
-
                                     <TableHead className="w-[80px]">
                                         Action
                                     </TableHead>
@@ -196,12 +219,11 @@ export default function DispatchPlannerView({ state }) {
                                 {state.plannerProducts.map(
                                     (product, index) => (
                                         <TableRow key={product.id}>
-                                            {/* NUMBER */}
+
                                             <TableCell className="font-medium">
                                                 {index + 1}
                                             </TableCell>
 
-                                            {/* WIDTH */}
                                             <TableCell>
                                                 <Input
                                                     type="number"
@@ -218,7 +240,6 @@ export default function DispatchPlannerView({ state }) {
                                                 />
                                             </TableCell>
 
-                                            {/* HEIGHT */}
                                             <TableCell>
                                                 <Input
                                                     type="number"
@@ -235,7 +256,6 @@ export default function DispatchPlannerView({ state }) {
                                                 />
                                             </TableCell>
 
-                                            {/* DEPTH */}
                                             <TableCell>
                                                 <Input
                                                     type="number"
@@ -252,7 +272,6 @@ export default function DispatchPlannerView({ state }) {
                                                 />
                                             </TableCell>
 
-                                            {/* INVOICE */}
                                             <TableCell>
                                                 <div className="relative">
                                                     <IndianRupee className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -276,7 +295,6 @@ export default function DispatchPlannerView({ state }) {
                                                 </div>
                                             </TableCell>
 
-                                            {/* DUE DATE */}
                                             <TableCell>
                                                 <div className="relative">
                                                     <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -299,7 +317,6 @@ export default function DispatchPlannerView({ state }) {
                                                 </div>
                                             </TableCell>
 
-                                            {/* COLOR */}
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Input
@@ -324,7 +341,6 @@ export default function DispatchPlannerView({ state }) {
                                                 </div>
                                             </TableCell>
 
-                                            {/* DELETE */}
                                             <TableCell>
                                                 <Button
                                                     type="button"
@@ -345,14 +361,15 @@ export default function DispatchPlannerView({ state }) {
                                                     <Trash2 className="size-4" />
                                                 </Button>
                                             </TableCell>
+
                                         </TableRow>
                                     )
                                 )}
                             </TableBody>
+
                         </Table>
                     </div>
 
-                    {/* PRIORITY */}
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <RotateCw className="size-4" />
 
@@ -368,46 +385,52 @@ export default function DispatchPlannerView({ state }) {
                             highest invoice value
                         </Badge>
                     </div>
+
                 </CardContent>
             </Card>
 
+
             {/* =====================================================
-                TRUCK VIEWS
+                TRUCK SPATIAL VIEWS
             ===================================================== */}
 
-            <Card>
-                <CardHeader>
+            <Card className="overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-blue-500/10 via-background to-primary/5">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Maximize2 className="size-5 text-primary" />
                             Truck Spatial Comparison
                         </CardTitle>
 
                         <span className="text-sm text-muted-foreground">
-                            All projections update simultaneously
+                            Top and side projections update simultaneously
                         </span>
+
                     </div>
                 </CardHeader>
 
-                <CardContent>
-                    <div className="grid gap-4 lg:grid-cols-3">
+                <CardContent className="p-4 md:p-6">
+
+                    <div className="grid gap-5 lg:grid-cols-2">
+
                         <TruckView
                             title="Top View"
+                            description="Cargo layout • length × width"
                             canvasRef={topCanvasRef}
                         />
 
                         <TruckView
-                            title="Left Side View"
-                            canvasRef={leftCanvasRef}
+                            title="Side View"
+                            description="Cargo height • length × height"
+                            canvasRef={sideCanvasRef}
                         />
 
-                        <TruckView
-                            title="Right Side View"
-                            canvasRef={rightCanvasRef}
-                        />
                     </div>
+
                 </CardContent>
             </Card>
+
 
             {/* =====================================================
                 REJECTED PACKAGES
@@ -422,28 +445,58 @@ export default function DispatchPlannerView({ state }) {
                     </AlertDescription>
                 </Alert>
             )}
+
         </div>
     );
 }
+
 
 /* =========================================================
    TRUCK VIEW
 ========================================================= */
 
-function TruckView({ title, canvasRef }) {
+function TruckView({
+    title,
+    description,
+    canvasRef,
+}) {
     return (
-        <div className="overflow-hidden rounded-lg border bg-muted/30">
-            <div className="flex items-center gap-2 border-b bg-background px-4 py-3 text-sm font-semibold">
-                <Truck className="size-4" />
-                {title}
+        <div className="overflow-hidden rounded-xl border bg-muted/20 shadow-sm">
+
+            <div className="flex items-center justify-between border-b bg-background px-4 py-3">
+
+                <div className="flex items-center gap-2">
+                    <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                        <Truck className="size-4 text-primary" />
+                    </div>
+
+                    <div>
+                        <div className="text-sm font-semibold">
+                            {title}
+                        </div>
+
+                        <div className="text-xs text-muted-foreground">
+                            {description}
+                        </div>
+                    </div>
+                </div>
+
+                <Badge
+                    variant="outline"
+                    className="hidden sm:inline-flex"
+                >
+                    Live
+                </Badge>
+
             </div>
 
-            <div className="relative h-[350px] w-full bg-muted/20">
+            <div className="relative h-[360px] w-full overflow-hidden bg-slate-100 dark:bg-slate-900/60">
                 <canvas
                     ref={canvasRef}
                     className="block size-full"
                 />
             </div>
+
         </div>
     );
 }

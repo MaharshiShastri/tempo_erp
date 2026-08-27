@@ -1,122 +1,358 @@
 import { useState, useRef } from "react";
+
+import {
+    Upload,
+    FileSpreadsheet,
+    FileCheck2,
+    Info,
+    X,
+    Loader2,
+    Database,
+} from "lucide-react";
+
 import API from "../api/api";
 
+import { Button } from "@/components/ui/button";
+
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from "@/components/ui/alert";
+
+import { Badge } from "@/components/ui/badge";
+
+import { Separator } from "@/components/ui/separator";
+
+
 export default function ItemMasterUploadView({ state }) {
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [isUploading, setIsUploading] = useState(false);
+
+    const [selectedFile, setSelectedFile] =
+        useState(null);
+
+    const [isUploading, setIsUploading] =
+        useState(false);
+
     const fileInputRef = useRef(null);
 
+
     const handleFileSelect = (e) => {
-        const file = e.target.files[0];
-        if (file && file.name.endsWith('.csv')) {
+
+        const file = e.target.files?.[0];
+
+        if (!file) return;
+
+
+        if (file.name.toLowerCase().endsWith(".csv")) {
+
             setSelectedFile(file);
-        } else if (file) {
-            if (state.setAlertMessage) {
-                state.setAlertMessage("Invalid file type. Please upload a strictly formatted .csv file.");
-                state.setIsAlertOpen(true);
-            }
+
+        } else {
+
+            state.setAlertMessage?.(
+                "Invalid file type. Please upload a strictly formatted CSV file."
+            );
+
+            state.setIsAlertOpen?.(true);
+
             setSelectedFile(null);
         }
     };
 
+
     const handleUpload = async () => {
+
         if (!selectedFile) return;
 
         setIsUploading(true);
+
         try {
-            const result = await API.uploadItemMasterCSV(selectedFile, state.user.access_token);
-            
-            if (state.setAlertMessage) {
-                state.setAlertMessage(`✅ Success: ${result.message}`);
-                state.setIsAlertOpen(true);
-            }
-            
-            // Reset after successful upload
+
+            const result =
+                await API.uploadItemMasterCSV(
+                    selectedFile,
+                    state.user.access_token
+                );
+
+
+            state.setAlertMessage?.(
+                `Success: ${result.message}`
+            );
+
+            state.setIsAlertOpen?.(true);
+
+
             setSelectedFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-            
-            // Optionally refresh the global items master if you decide to point this at production later
-            // if (state.refreshDataHub) state.refreshDataHub();
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
 
         } catch (err) {
-            if (state.setAlertMessage) {
-                state.setAlertMessage(`❌ Upload Failed: ${err.message}`);
-                state.setIsAlertOpen(true);
-            }
+
+            state.setAlertMessage?.(
+                `Upload Failed: ${err.message}`
+            );
+
+            state.setIsAlertOpen?.(true);
+
         } finally {
+
             setIsUploading(false);
+
         }
     };
 
+
+    const clearFile = () => {
+
+        setSelectedFile(null);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+
+    };
+
+
     return (
-        <div className="frappe-card" style={{ maxWidth: 800, margin: "0 auto", padding: 30 }}>
-            <div className="system-header">
-                <h3>📥 Bulk Import: Product Master</h3>
-                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Seed the testing database using vendor CSV files</p>
-            </div>
 
-            <div style={{ background: "var(--bg-main)", border: "1px solid var(--border-light)", borderRadius: "var(--radius-sm)", padding: "20px", marginBottom: "30px" }}>
-                <h4 style={{ margin: "0 0 10px 0", color: "var(--brand-accent)" }}>Data Formatting Requirements</h4>
-                <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "15px", lineHeight: "1.5" }}>
-                    To ensure the database ingests your records correctly, your CSV file must contain exactly these column headers in the first row. The system is case-sensitive.
-                </p>
-                <div style={{ display: "flex", gap: "10px" }}>
-                    <span style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", padding: "6px 12px", borderRadius: "4px", fontSize: "13px", fontWeight: "bold", fontFamily: "monospace" }}>
-                        Item code
-                    </span>
-                    <span style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", padding: "6px 12px", borderRadius: "4px", fontSize: "13px", fontWeight: "bold", fontFamily: "monospace" }}>
-                        Item Specifications
-                    </span>
+        <Card className="mx-auto max-w-3xl">
+
+            <CardHeader className="border-b bg-muted/20">
+
+                <div className="flex items-center gap-3">
+
+                    <div className="flex size-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+
+                        <FileSpreadsheet className="size-6" />
+
+                    </div>
+
+
+                    <div>
+
+                        <CardTitle>
+                            Bulk Import Product Master
+                        </CardTitle>
+
+                        <CardDescription>
+                            Import structured product information using a CSV file.
+                        </CardDescription>
+
+                    </div>
+
                 </div>
-            </div>
 
-            <div 
-                style={{ 
-                    border: "2px dashed var(--border-subtle)", 
-                    borderRadius: "var(--radius-md)", 
-                    padding: "40px 20px", 
-                    textAlign: "center",
-                    background: selectedFile ? "var(--combobox-hover)" : "var(--bg-surface)",
-                    transition: "all 0.2s ease"
-                }}
-            >
-                <input 
-                    type="file" 
-                    accept=".csv" 
-                    ref={fileInputRef} 
-                    style={{ display: 'none' }} 
-                    onChange={handleFileSelect} 
-                />
-                
-                <div style={{ fontSize: "40px", marginBottom: "15px" }}>📊</div>
-                
-                {selectedFile ? (
-                    <div>
-                        <h4 style={{ margin: "0 0 5px 0", color: "var(--text-main)" }}>{selectedFile.name}</h4>
-                        <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: "0 0 20px 0" }}>
-                            {(selectedFile.size / 1024).toFixed(2)} KB ready for processing
+            </CardHeader>
+
+
+            <CardContent className="space-y-6 p-6">
+
+
+                {/* REQUIREMENTS */}
+
+                <Alert className="border-blue-500/20 bg-blue-500/5">
+
+                    <Info className="size-4 text-blue-600" />
+
+                    <AlertTitle>
+                        Data Formatting Requirements
+                    </AlertTitle>
+
+
+                    <AlertDescription className="mt-2 space-y-3">
+
+                        <p>
+
+                            Your CSV must contain the required
+                            headers in the first row. Column names
+                            are case-sensitive.
+
                         </p>
-                        <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                            <button className="btn btn-secondary" onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value=""; }}>
-                                Cancel
-                            </button>
-                            <button className="btn btn-primary" onClick={handleUpload} disabled={isUploading}>
-                                {isUploading ? "⏳ Uploading..." : "Commence Import"}
-                            </button>
+
+
+                        <div className="flex flex-wrap gap-2">
+
+                            <Badge
+                                variant="secondary"
+                                className="font-mono"
+                            >
+                                Item code
+                            </Badge>
+
+                            <Badge
+                                variant="secondary"
+                                className="font-mono"
+                            >
+                                Item Specifications
+                            </Badge>
+
                         </div>
-                    </div>
-                ) : (
-                    <div>
-                        <h4 style={{ margin: "0 0 10px 0", color: "var(--text-main)" }}>Select a CSV file to upload</h4>
-                        <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "0 0 20px 0" }}>
-                            Maximum file size: 5MB
-                        </p>
-                        <button className="btn btn-secondary" onClick={() => fileInputRef.current.click()}>
-                            Browse Local Files
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
+
+                    </AlertDescription>
+
+                </Alert>
+
+
+                <Separator />
+
+
+                {/* UPLOAD AREA */}
+
+                <div
+                    className={[
+                        "rounded-xl border-2 border-dashed p-10 text-center transition-all",
+                        selectedFile
+                            ? "border-emerald-500/50 bg-emerald-500/5"
+                            : "border-muted-foreground/20 bg-muted/20 hover:border-primary/50 hover:bg-primary/5",
+                    ].join(" ")}
+                >
+
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                    />
+
+
+                    {selectedFile ? (
+
+                        <div className="flex flex-col items-center">
+
+
+                            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+
+                                <FileCheck2 className="size-8" />
+
+                            </div>
+
+
+                            <h3 className="font-semibold">
+
+                                {selectedFile.name}
+
+                            </h3>
+
+
+                            <p className="mt-1 text-sm text-muted-foreground">
+
+                                {(
+                                    selectedFile.size / 1024
+                                ).toFixed(2)} KB ready for import
+
+                            </p>
+
+
+                            <div className="mt-6 flex flex-wrap justify-center gap-3">
+
+                                <Button
+                                    variant="outline"
+                                    onClick={clearFile}
+                                    disabled={isUploading}
+                                >
+
+                                    <X className="mr-2 size-4" />
+
+                                    Cancel
+
+                                </Button>
+
+
+                                <Button
+                                    onClick={handleUpload}
+                                    disabled={isUploading}
+                                >
+
+                                    {isUploading ? (
+
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+
+                                    ) : (
+
+                                        <Database className="mr-2 size-4" />
+
+                                    )}
+
+
+                                    {isUploading
+                                        ? "Importing..."
+                                        : "Commence Import"}
+
+                                </Button>
+
+                            </div>
+
+                        </div>
+
+                    ) : (
+
+                        <div className="flex flex-col items-center">
+
+
+                            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+
+                                <Upload className="size-8" />
+
+                            </div>
+
+
+                            <h3 className="font-semibold">
+
+                                Select a CSV file
+
+                            </h3>
+
+
+                            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+
+                                Upload a structured product master CSV.
+                                Maximum recommended file size: 5MB.
+
+                            </p>
+
+
+                            <Button
+                                variant="outline"
+                                className="mt-6"
+                                onClick={() =>
+                                    fileInputRef.current?.click()
+                                }
+                            >
+
+                                <FileSpreadsheet className="mr-2 size-4 text-blue-500" />
+
+                                Browse Local Files
+
+                            </Button>
+
+                        </div>
+
+                    )}
+
+                </div>
+
+
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+
+                    <FileSpreadsheet className="size-3.5 text-emerald-600" />
+
+                    CSV files only • Maximum 5MB recommended
+
+                </div>
+
+            </CardContent>
+
+        </Card>
     );
 }

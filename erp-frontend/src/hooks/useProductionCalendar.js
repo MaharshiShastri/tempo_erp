@@ -10,19 +10,33 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
     const calendarRef = useRef(null);
 
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
-
+    
+    const filtersRef = useRef(DEFAULT_FILTERS);
+    
     const [loading, setLoading] = useState(false);
 
     const [lastRefresh, setLastRefresh] = useState(null);
 
+    const sessionTokenRef = useRef(sessionToken);
+    const showErrorModalRef = useRef(showErrorModal);
+
+    useEffect(() => {
+        filtersRef.current = filters;
+    }, [filters]);
+
+    useEffect(() => {
+        sessionTokenRef.current = sessionToken;
+    }, [sessionToken]);
+
+    useEffect(() => {
+        showErrorModalRef.current = showErrorModal;
+    }, [showErrorModal]);
 
     /*
      * ---------------------------------------------------------
      * Filters
      * ---------------------------------------------------------
      */
-
-    const filtersRef = useRef(filters);
 
     useEffect(() => {
         const calendar =
@@ -39,18 +53,87 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
         filters.status,
     ]);
     
-    const updateFilter = useCallback(
-        (name, value) => {
-            setFilters((current) => ({
-                ...current,
-                [name]: value,
-            }));
+    const refresh = useCallback(() => {
+        const calendar =
+            calendarRef.current?.getApi();
+
+        if (!calendar) {
+            return;
+        }
+
+        calendar.refetchEvents();
+
+        setLastRefresh(new Date());
+    }, []);
+
+
+    const createProductionSchedule = useCallback(
+        async (scheduleData) => {
+            try {
+                setLoading(true);
+
+                const createdSchedule =
+                    await API.createProductionSchedule(
+                        sessionTokenRef.current,
+                        scheduleData
+                    );
+
+                refresh();
+
+                return createdSchedule;
+            } catch (error) {
+                showErrorModalRef.current?.(
+                    "Create Production Schedule",
+                    error.message || "Failed to create production schedule."
+                );
+
+                throw error;
+            } finally {
+                setLoading(false);
+            }
         },
-        []
+        [refresh]
     );
 
+    const handleCreateSchedule = useCallback(
+        (defaults = {}) => {
+            onCreateSchedule?.({
+                planned_start:
+                    defaults.planned_start || "",
+                planned_end:
+                    defaults.planned_end || "",
+                stage_code:
+                    defaults.stage_code ||
+                    filtersRef.current.stageCode ||
+                    "",
+                assigned_team:
+                    defaults.assigned_team ||
+                    filtersRef.current.assignedTeam ||
+                    "",
+                status:
+                    defaults.status || "PLANNED",
+                priority:
+                    defaults.priority ?? 0,
+            });
+        },
+        [onCreateSchedule]
+    );
 
+    const updateFilter = useCallback((name, value) => {
+        setFilters((current) => {
+            const nextFilters = {
+                ...current,
+                [name]: value,
+            };
+
+            filtersRef.current = nextFilters;
+
+            return nextFilters;
+        });
+    }, []);
+    
     const clearFilters = useCallback(() => {
+        filtersRef.current = DEFAULT_FILTERS;
         setFilters(DEFAULT_FILTERS);
     }, []);
 
@@ -75,120 +158,63 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
      * currently visible date range.
      */
 
-    const loadSchedules = useCallback(
-        async (fetchInfo) => {
-            try {
-                const currentFilters = filtersRef.current;
-                const schedules =
-                    await API.getProductionSchedules(
-                        sessionToken,
-                        {
-                            from:
-                                fetchInfo.start.toISOString(),
+    const loadSchedules = useCallback(async (fetchInfo) => {
+        try {
+            setLoading(true);
 
-                            to:
-                                fetchInfo.end.toISOString(),
+            const currentFilters = filtersRef.current;
 
-                            stageCode:
-                                filters.stageCode ||
-                                undefined,
+            const schedules =
+                await API.getProductionSchedules(
+                    sessionTokenRef.current,
+                    {
+                        from: fetchInfo.start.toISOString(),
+                        to: fetchInfo.end.toISOString(),
 
-                            assignedTeam:
-                                filters.assignedTeam ||
-                                undefined,
+                        stageCode:
+                            currentFilters.stageCode || undefined,
 
-                            status:
-                                filters.status ||
-                                undefined,
-                        }
-                    );
+                        assignedTeam:
+                            currentFilters.assignedTeam || undefined,
 
-
-                return schedules.map((schedule) => ({
-                    id: String(schedule.id),
-
-                    title:
-                        schedule.order_acceptance_id
-                            ? `${schedule.order_acceptance_id} · ${schedule.stage_code}`
-                            : schedule.stage_code,
-
-                    start:
-                        schedule.planned_start,
-
-                    end:
-                        schedule.planned_end,
-                    
-                    classNames: [
-                        `production-event-${String(schedule.status || "planned")
-                        .toLowerCase()
-                        .replaceAll("_", "-")}`,
-                    ],
-                    extendedProps: {
-                        schedule,
-                    },
-                }));
-
-            } catch (error) {
-                showErrorModal(
-                    "Production Calendar",
-                    error.message
+                        status:
+                            currentFilters.status || undefined,
+                    }
                 );
 
-                return [];
+            return schedules.map((schedule) => ({
+                id: String(schedule.id),
 
-            }
-        },
-        [
-            sessionToken,
-            filters.stageCode,
-            filters.assignedTeam,
-            filters.status,
-            showErrorModal,
-        ]
-    );
+                title: schedule.order_acceptance_id
+                    ? `${schedule.order_acceptance_id} · ${schedule.stage_code}`
+                    : schedule.stage_code,
 
+                start: schedule.planned_start,
+                end: schedule.planned_end,
 
-    /*
-     * ---------------------------------------------------------
-     * Refresh
-     * ---------------------------------------------------------
-     */
+                classNames: [
+                    `production-event-${String(
+                        schedule.status || "PLANNED"
+                    )
+                        .toLowerCase()
+                        .replaceAll("_", "-")}`,
+                ],
 
-    const refresh = useCallback(() => {
-        const calendar =
-            calendarRef.current?.getApi();
+                extendedProps: {
+                    schedule,
+                },
+            }));
+        } catch (error) {
+            showErrorModalRef.current?.(
+                "Production Calendar",
+                error.message
+            );
 
-        if (!calendar) {
-            return;
+            return [];
+        } finally {
+            setLoading(false);
         }
-
-        calendar.refetchEvents();
-
-        setLastRefresh(new Date());
     }, []);
-
-
-    /*
-     * ---------------------------------------------------------
-     * Refetch when filters change
-     * ---------------------------------------------------------
-     */
-
-    useEffect(() => {
-        const calendar = calendarRef.current?.getApi();
-
-        if (!calendar) {
-            return;
-        }
-
-        calendar.refetchEvents();
-
-    }, [
-        filters.stageCode,
-        filters.assignedTeam,
-        filters.status,
-    ]);
-
 
     /*
      * ---------------------------------------------------------
@@ -297,17 +323,25 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
 
     const handleDateSelect = useCallback(
         (selection) => {
-            onCreateSchedule({
+            onCreateSchedule?.({
                 planned_start:
                     selection.start.toISOString(),
 
                 planned_end:
                     selection.end.toISOString(),
+
+                stage_code:
+                    filtersRef.current.stageCode || "",
+
+                assigned_team:
+                    filtersRef.current.assignedTeam || "",
+
+                status: "PLANNED",
+                priority: 0,
             });
         },
         [onCreateSchedule]
     );
-
 
     /*
      * ---------------------------------------------------------
@@ -383,6 +417,6 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
 
     return {calendarRef, calendarOptions, filters, loading, lastRefresh, updateFilter, clearFilters, refresh,
         handleDateSelect, handleEventDrop, handleEventResize, handleEventClick, stageOptions: STAGE_OPTIONS,
-        teamOptions: TEAM_OPTIONS, onCreateSchedule,
+        teamOptions: TEAM_OPTIONS, onCreateSchedule, createProductionSchedule, handleCreateSchedule,
     };
 }

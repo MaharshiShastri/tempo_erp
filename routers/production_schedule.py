@@ -61,7 +61,7 @@ def create_schedule(
 
             return create_production_schedule(
                 session=session,
-                order_id=payload.order_id,
+                order_acceptance_id=payload.order_acceptance_id,
                 stage_code=payload.stage_code,
                 planned_start=payload.planned_start,
                 planned_end=payload.planned_end,

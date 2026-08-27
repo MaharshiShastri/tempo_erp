@@ -4,7 +4,7 @@ import API from "../../api/api";
 export default function useOrderLookup({sessionToken, companiesMaster, itemsMaster, setAlertMessage, setIsAlertOpen, setActiveTab,
     orders, setOrders, orderHeader, setOrderHeader, orderItems, setOrderItems, billItems, setBillItems, isBillingSameAsCustomer, setIsBillingSameAsCustomer,
     appendOrderItemRow, popOrderItemRow, updateOrderItemField, handleCustomerMasterSelection, handleItemMasterSelection, showErrorModal,
-    isPendingTallyOrder, setIsPendingTallyOrder,
+    isPendingTallyOrder, setIsPendingTallyOrder, productionScheduleForm, setProductionScheduleForm,
 }){
     const [isOcrLoading, setIsOcrLoading] = useState(false);
     
@@ -15,6 +15,9 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
     const [isNewClient, setIsNewClient] = useState(false);
     const [temporaryClientName, setTemporaryClientName] = useState("");
     
+    const [productionScheduleOaSuggestions, setProductionScheduleOaSuggestions] = useState([]);
+    const [showProductionScheduleOaSuggestions, setShowProductionScheduleOaSuggestions] = useState(false);
+    const productionScheduleOaInputRef = useRef(null);
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (oaInputRef.current && !oaInputRef.current.contains(event.target)) {setShowOaSuggestions(false);}
@@ -30,17 +33,21 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
         if (query.length >= 2) {
             try {
                 const data = await API.searchOAAutocomplete(query, sessionToken);
-                const sortedData = data.sort((a, b) => {
-                    const queryLower = query.toLowerCase();
-                    const aLower = a.toLowerCase();
-                    const bLower = b.toLowerCase();
-                    const aIncludes = aLower.includes(queryLower);
-                    const bIncludes = bLower.includes(queryLower);
-                    
-                    if (aIncludes && !bIncludes) return -1;
-                    if (!aIncludes && bIncludes) return 1;
-                    return a.localeCompare(b);
-                });
+                const sortedData = [...data].sort((a, b) => {
+                        const aId = String(a?.order_acceptance_id || "");
+                        const bId = String(b?.order_acceptance_id || "");
+
+                        const aLower = aId.toLowerCase();
+                        const bLower = bId.toLowerCase();
+
+                        const aIncludes = aLower.includes(query.toLowerCase());
+                        const bIncludes = bLower.includes(query.toLowerCase());
+
+                        if (aIncludes && !bIncludes) return -1;
+                        if (!aIncludes && bIncludes) return 1;
+
+                        return aLower.localeCompare(bLower);
+                    });
                 
                 setOaSuggestions(sortedData);
                 setShowOaSuggestions(true);
@@ -56,6 +63,74 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
     const handleOaSelect = (selectedOa) => {
         setOrderHeader({...orderHeader, order_acceptance_id: selectedOa});
         setShowOaSuggestions(false);
+        handleOaSearch(selectedOa);
+    };
+
+    const handleProductionScheduleOaInputChange = async (e) => {
+        const query = e.target.value.toUpperCase();
+
+        setProductionScheduleForm((prev) => ({
+            ...(prev || {}),
+            order_acceptance_id: query,
+        }));
+
+        if (query.length < 2) {
+            setOaSuggestions([]);
+            setShowOaSuggestions(false);
+            return;
+        }
+
+        try {
+            const data = await API.searchOAAutocomplete(
+                query,
+                sessionToken
+            );
+
+            console.log("OA autocomplete response:", data);
+
+            const suggestions = Array.isArray(data) ? data : [];
+
+            const queryLower = query.toLowerCase();
+
+            const sortedData = [...suggestions].sort((a, b) => {
+                const aId = String(a?.order_acceptance_id || "");
+                const bId = String(b?.order_acceptance_id || "");
+
+                const aLower = aId.toLowerCase();
+                const bLower = bId.toLowerCase();
+
+                const aIncludes = aLower.includes(queryLower);
+                const bIncludes = bLower.includes(queryLower);
+
+                if (aIncludes && !bIncludes) return -1;
+                if (!aIncludes && bIncludes) return 1;
+
+                return aLower.localeCompare(bLower);
+            });
+
+            console.log("Sorted OA suggestions:", sortedData);
+
+            setOaSuggestions(sortedData);
+            setShowOaSuggestions(sortedData.length > 0);
+        } catch (err) {
+            console.error(
+                "Production Schedule OA autocomplete error:",
+                err
+            );
+
+            setOaSuggestions([]);
+            setShowOaSuggestions(false);
+        }
+    };
+
+    const handleProductionScheduleOaSelect = (selectedOa) => {
+        setProductionScheduleForm((prev) => ({
+            ...(prev || {}),
+            order_acceptance_id: selectedOa,
+        }));
+
+        setShowOaSuggestions(false);
+
         handleOaSearch(selectedOa);
     };
 
@@ -158,5 +233,7 @@ export default function useOrderLookup({sessionToken, companiesMaster, itemsMast
     };
     return {isOcrLoading, setIsOcrLoading, oaSuggestions, setOaSuggestions, showOaSuggestions, setShowOaSuggestions, oaInputRef,
         isNewClient, setIsNewClient, temporaryClientName, setTemporaryClientName, handleOaInputChange, handleOaSelect, handleOaSearch,
+        handleProductionScheduleOaInputChange, handleProductionScheduleOaSelect,
+
     };
 }

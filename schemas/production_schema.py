@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class ProductionScheduleCreate(BaseModel):
 
-    order_id: int
+    order_acceptance_id: str 
 
     stage_code: str
 
@@ -22,7 +22,7 @@ class ProductionScheduleCreate(BaseModel):
 
 class ProductionScheduleUpdate(BaseModel):
 
-    order_id: int | None = None
+    order_acceptance_id: int | None = None
 
     stage_code: str | None = None
 

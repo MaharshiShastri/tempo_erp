@@ -116,6 +116,7 @@ import QuotationListView from "./views/QuotationListView";
 
 import ExerciseGenerator from "./views/ExerciseGeneratorView";
 import ProductionCalendar from "./components/production/ProductionCalendar";
+import ProductionScheduleModal from "./components/production/ProductionScheduleModal";
 import PromptGeneratorView from "./views/PromptGenerator";
 
 function App() {
@@ -1410,7 +1411,7 @@ function App() {
                                     state={state}
                                 />
                             )}
-
+                            {state.isProductionScheduleModalOpen === true && <ProductionScheduleModal state={state} />}
                             {state.activeTab ===
                                 "global-pulse" && (
                                 <GlobalProductionPulseView

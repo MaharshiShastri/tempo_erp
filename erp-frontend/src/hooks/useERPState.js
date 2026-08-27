@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, act } from "react";
+import { useState, useEffect, useCallback } from "react";
 import API from "../api/api";
 import useTasks from "./tasks/useTasks";
 import useDispatchCalculator from "./dispatch/useDispatchCalculatorHub";
@@ -47,13 +47,31 @@ export default function useERPState() {
         setIsEditingProductionSchedule(false);
 
         setProductionScheduleForm({
-            order_id: "",
-            stage_code: "",
-            planned_start: defaults.planned_start || "",
-            planned_end: defaults.planned_end || "",
-            priority: 0,
-            assigned_team: "",
-            status: "PLANNED",
+            id: null,
+
+            order_acceptance_id: defaults.order_acceptance_id || "",
+
+            stage_code:
+                defaults.stage_code || "",
+
+            planned_start:
+                defaults.planned_start || "",
+
+            planned_end:
+                defaults.planned_end || "",
+
+            actual_start: "",
+
+            actual_end: "",
+
+            priority:
+                defaults.priority ?? 0,
+
+            assigned_team:
+                defaults.assigned_team || "",
+
+            status:
+                defaults.status || "PLANNED",
         });
 
         setIsProductionScheduleModalOpen(true);
@@ -69,7 +87,7 @@ export default function useERPState() {
         setProductionScheduleForm({
             id: schedule.id,
 
-            order_id: schedule.order_id || "",
+            order_acceptance_id: schedule.order_acceptance_id || "",
             stage_code: schedule.stage_code || "",
 
             planned_start:
@@ -126,7 +144,7 @@ export default function useERPState() {
     //Global business state independent
     const items = useItemMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const indiaMap = useGeo({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal, itemsMaster: items.itemsMaster});
-    const productionCalendar = useProductionCalendar({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, onCreateSchedule: onCreateSchedule, onEditSchedule: onEditSchedule});
+    const productionCalendar = useProductionCalendar({sessionToken: core.sessionToken, showErrorModal: core.showErrorModal, onCreateSchedule: onCreateSchedule, onEditSchedule: onEditSchedule, });
     const promptGenerator = usePromptGenerator({sessionToken: core.sessionToken});
 
     //All admin business states
@@ -140,7 +158,7 @@ export default function useERPState() {
 
     //all the sales business state
     const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab});
-    const orders = useOrders({sessionToken: core.sessionToken, user: core.user, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, showErrorModal: core.showErrorModal, setCompanyForm: companies.setCompanyForm, setIsEditingCompany: companies.setIsEditingCompany});
+    const orders = useOrders({sessionToken: core.sessionToken, user: core.user, companiesMaster: companies.companiesMaster, itemsMaster: items.itemsMaster, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, showErrorModal: core.showErrorModal, setCompanyForm: companies.setCompanyForm, setIsEditingCompany: companies.setIsEditingCompany, productionScheduleForm, setProductionScheduleForm,});
     const billing = useBilling({sessionToken: core.sessionToken, orders: orders.orders, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, setActiveTab: core.setActiveTab, setIsBillingSameAsCustomer: orders.setIsBillingSameAsCustomer});
     const crm = useCRMHub({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.isAlertOpen});
     const leadTargets = useLeadGenerator({user: core.user, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, showErrorModal: core.showErrorModal});
@@ -241,6 +259,93 @@ export default function useERPState() {
         };
     }, [core.sessionToken]);
 
+    const saveProductionSchedule = useCallback(
+        async (scheduleData) => {
+            if (!scheduleData) {
+                return;
+            }
+
+            try {
+                if (isEditingProductionSchedule) {
+                    await API.updateProductionSchedule(
+                        core.sessionToken,
+                        scheduleData.id,
+                        {
+                            order_acceptance_id: scheduleData.order_acceptance_id,
+                            stage_code: scheduleData.stage_code,
+                            planned_start:
+                                scheduleData.planned_start,
+                            planned_end:
+                                scheduleData.planned_end,
+                            actual_start:
+                                scheduleData.actual_start || null,
+                            actual_end:
+                                scheduleData.actual_end || null,
+                            priority:
+                                scheduleData.priority ?? 0,
+                            assigned_team:
+                                scheduleData.assigned_team,
+                            status:
+                                scheduleData.status,
+                        }
+                    );
+
+                    core.addToast?.(
+                        "Production schedule updated successfully",
+                        "success"
+                    );
+                } else {
+                    await API.createProductionSchedule(
+                        core.sessionToken,
+                        {
+                            order_acceptance_id: scheduleData.order_acceptance_id,
+                            stage_code: scheduleData.stage_code,
+                            planned_start:
+                                scheduleData.planned_start,
+                            planned_end:
+                                scheduleData.planned_end,
+                            priority:
+                                scheduleData.priority ?? 0,
+                            assigned_team:
+                                scheduleData.assigned_team,
+                            status:
+                                scheduleData.status || "PLANNED",
+                        }
+                    );
+
+                    core.addToast?.(
+                        "Production schedule created successfully",
+                        "success"
+                    );
+                }
+
+                productionCalendar.refresh?.();
+
+                closeProductionScheduleModal();
+
+            } catch (error) {
+                core.showErrorModal?.(
+                    isEditingProductionSchedule
+                        ? "Update Production Schedule"
+                        : "Create Production Schedule",
+
+                    error.message ||
+                        "Failed to save production schedule."
+                );
+
+                throw error;
+            }
+        },
+        [
+            core.sessionToken,
+            core.addToast,
+            core.showErrorModal,
+            isEditingProductionSchedule,
+            productionCalendar,
+            closeProductionScheduleModal,
+        ]
+    );
+
     const markAllNotifsRead = () => {
         setUnreadNotifCount(0);
         setNotifications(prev => prev.map(n => ({...n, read: true})));
@@ -252,6 +357,8 @@ export default function useERPState() {
         ...tasks, ...activity, ...grn, //Shop floor business states
         ...admin, ...indiaMap, ...exerciseGenerator,//Admin business states
         ...faq, ...items, ...production, ...login, ...analytics, ...core, ...productionCalendar, ...promptGenerator, //Global business states
-        notifications, unreadNotifCount, markAllNotifsRead, isServerLive
+        isProductionScheduleModalOpen, productionScheduleForm, setProductionScheduleForm, isEditingProductionSchedule,
+        onCreateSchedule, onEditSchedule, closeProductionScheduleModal, saveProductionSchedule, notifications, 
+        unreadNotifCount, markAllNotifsRead, isServerLive, 
     };
 }
