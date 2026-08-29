@@ -1,137 +1,468 @@
-import useLogisticsHub from "../hooks/logistics/useLogisticsHub";
-import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Input } from "@/components/ui/input";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
 export default function LogisticsPartnerReadOnlyView({ state }) {
+  const hasSelectedPartner = Boolean(state.selectedPartnerId);
 
-    return (
-        <div className="frappe-card" style={{ maxWidth: 1200, margin: "0 auto", padding: 25 }}>
-            <div className="system-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3>🚚 Logistics Configuration</h3>
-                
-                <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-                    
-                    <select className="form-select-native" value={state.selectedPartnerId} onChange={state.handlePartnerSelection}>
-                        <option value="">No partner selected</option>
-                        {state.availablePartners.map(p => <option key={p.id} value={p.id}>✏️ {p.name}</option>)}
-                    </select>
-                </div>
+  return (
+    <div className="mx-auto w-full max-w-[1200px] p-4 md:p-6">
+      <Card>
+        <CardHeader className="flex flex-col gap-4 border-b sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <span>🚚</span>
+            <span>Logistics Configuration</span>
+          </CardTitle>
+
+          <div className="w-full sm:w-[280px]">
+            <Select
+              value={state.selectedPartnerId || ""}
+              onValueChange={(value) => {
+                // shadcn Select does not emit a normal event,
+                // so adapt the value to the existing handler.
+                state.handlePartnerSelection({
+                  target: {
+                    value,
+                  },
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No partner selected" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="__none__">
+                  No partner selected
+                </SelectItem>
+
+                {state.availablePartners.map((partner) => (
+                  <SelectItem
+                    key={partner.id}
+                    value={String(partner.id)}
+                  >
+                    ✏️ {partner.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-8 pt-6">
+          {!hasSelectedPartner && (
+            <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
+              <p className="text-sm text-muted-foreground">
+                Select a transporter to view its logistics configuration.
+              </p>
             </div>
+          )}
 
-            {!state.selectedPartnerId && (
-                <div style={{padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
-                    Select a transporter to view its logistics configuration.
-                </div>
-            )}
+          {hasSelectedPartner && (
+            <div className="space-y-8">
+              {/* Core Contract Parameters */}
+              <section className="space-y-4">
+                <SectionHeading>
+                  Core Contract Parameters
+                </SectionHeading>
 
-            {state.selectedPartnerId && (
-            <form onSubmit={state.handlePartnerSave}>
-                <h4 style={{ color: "var(--brand-accent)", marginTop: "20px" }}>Core Contract Parameters</h4>
-                <div className="form-grid-layout" style={{ gap: "15px", display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
-                    <div className="form-group"><label className="input-label">Transporter Name</label><input required className="form-input" value={state.partner.name} onChange={e => state.setPartner({ ...state.partner, name: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">Distance Calculator Link</label><input type="url" className="form-input" value={state.partner.partner_link || ""} onChange={e => state.setPartner({ ...state.partner, partner_link: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">Mobile Number</label><input type="text" className="form-input" value={state.partner.mobile_number || ""} onChange={e=> state.setPartner({...state.partner, mobile_number: e.target.value})} readOnly/></div>
-                    <div className="form-group"><label className="input-label">CFT Factor</label><input required type="number" step="0.01" className="form-input" value={state.partner.cft_factor} onChange={e => state.setPartner({ ...state.partner, cft_factor: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">Min Weight (KG)</label><input required type="number" className="form-input" value={state.partner.minimum_weight} onChange={e => state.setPartner({ ...state.partner, minimum_weight: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">Min Freight Value (₹)</label><input required type="number" className="form-input" value={state.partner.minimum_freight_value} onChange={e => state.setPartner({ ...state.partner, minimum_freight_value: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">Docs/GC Charge</label><input required type="number" className="form-input" value={state.partner.documentation_charge} onChange={e => state.setPartner({ ...state.partner, documentation_charge: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">FOV Risk (%)</label><input required type="number" step="0.01" className="form-input" value={state.partner.fov_percentage} onChange={e => state.setPartner({ ...state.partner, fov_percentage: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label" style={{ color: 'var(--brand-success)'}}>Local Loading cost (₹)</label><input required type="number" step="1" className="form-input" value={state.partner.local_loading_cost} onChange={e => state.setPartner({ ...state.partner, local_loading_cost: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label" style={{ color: 'var(--brand-danger)'}}>Max Hub Loading Cap (₹)</label><input required type="number" step="1" className="form-input" value={state.partner.hub_loading_max_cost} onChange={e => state.setPartner({ ...state.partner, hub_loading_max_cost: e.target.value })} readOnly/></div>
-                    <div className="form-group"><label className="input-label">GST Rate (%)</label><input required type="number" className="form-input" value={state.partner.gst_percentage} onChange={e => state.setPartner({ ...state.partner, gst_percentage: e.target.value })} readOnly/></div>
-                </div>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ReadOnlyField
+                    label="Transporter Name"
+                    value={state.partner?.name}
+                  />
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>Zone Definitions & Freight Rates</h4>
+                  <ReadOnlyField
+                    label="Distance Calculator Link"
+                    value={state.partner?.partner_link}
+                  />
+
+                  <ReadOnlyField
+                    label="Mobile Number"
+                    value={state.partner?.mobile_number}
+                  />
+
+                  <ReadOnlyField
+                    label="CFT Factor"
+                    value={state.partner?.cft_factor}
+                    type="number"
+                  />
+
+                  <ReadOnlyField
+                    label="Min Weight (KG)"
+                    value={state.partner?.minimum_weight}
+                    type="number"
+                  />
+
+                  <ReadOnlyField
+                    label="Min Freight Value (₹)"
+                    value={state.partner?.minimum_freight_value}
+                    type="number"
+                  />
+
+                  <ReadOnlyField
+                    label="Docs/GC Charge"
+                    value={state.partner?.documentation_charge}
+                    type="number"
+                  />
+
+                  <ReadOnlyField
+                    label="FOV Risk (%)"
+                    value={state.partner?.fov_percentage}
+                    type="number"
+                  />
+
+                  <ReadOnlyField
+                    label="Local Loading Cost (₹)"
+                    value={state.partner?.local_loading_cost}
+                    type="number"
+                    labelClassName="text-emerald-600"
+                  />
+
+                  <ReadOnlyField
+                    label="Max Hub Loading Cap (₹)"
+                    value={state.partner?.hub_loading_max_cost}
+                    type="number"
+                    labelClassName="text-red-600"
+                  />
+
+                  <ReadOnlyField
+                    label="GST Rate (%)"
+                    value={state.partner?.gst_percentage}
+                    type="number"
+                  />
                 </div>
-                <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead><tr style={{ textAlign: "left" }}>
-                        <th>Zone Code</th>
-                        <th>Regions Served</th>
-                        <th>States (Comma Separated)</th>
-                        <th>Rate (₹/kg)</th>
-                        <th></th>
-                    </tr></thead>
-                    <tbody>
-                        {state.zones.map((z, i) => (
-                            <tr key={i}>
-                                <td><input className="form-input" readOnly style={{ textTransform: "uppercase" }} value={z.zone_code} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "zone_code", e.target.value)} /></td>
-                                <td><input className="form-input" readOnly value={z.zone_name} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "zone_name", e.target.value)} /></td>
-                                <td><input className="form-input" readOnly value={z.states_raw} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "states_raw", e.target.value)} /></td>
-                                <td><input className="form-input" readOnly type="number" step="0.01" placeholder="0.00" value={z.rate_per_kg} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "rate_per_kg", e.target.value)} /></td>
-                            </tr>
+              </section>
+
+              {/* Zone Definitions */}
+              <section className="space-y-4">
+                <SectionHeading>
+                  Zone Definitions & Freight Rates
+                </SectionHeading>
+
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Zone Code</TableHead>
+                        <TableHead>Regions Served</TableHead>
+                        <TableHead>States (Comma Separated)</TableHead>
+                        <TableHead>Rate (₹/kg)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {state.zones?.length > 0 ? (
+                        state.zones.map((zone, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={zone.zone_code}
+                                className="uppercase"
+                              />
+                            </TableCell>
+
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={zone.zone_name}
+                              />
+                            </TableCell>
+
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={zone.states_raw}
+                              />
+                            </TableCell>
+
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={zone.rate_per_kg}
+                                type="number"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <EmptyTableRow
+                          colSpan={4}
+                          message="No zone rates configured."
+                        />
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+
+              {/* Fuel Escalation */}
+              <section className="space-y-4">
+                <SectionHeading>
+                  Fuel Escalation (FSC)
+                </SectionHeading>
+
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          Diesel Price From (₹)
+                        </TableHead>
+
+                        <TableHead>
+                          Diesel Price To (₹)
+                        </TableHead>
+
+                        <TableHead>
+                          FSC Applicable (%)
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {state.fuelMatrix?.length > 0 ? (
+                        state.fuelMatrix.map((fuel, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={fuel.fuel_price_from}
+                                type="number"
+                              />
+                            </TableCell>
+
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={fuel.fuel_price_to}
+                                type="number"
+                              />
+                            </TableCell>
+
+                            <TableCell>
+                              <ReadOnlyTableInput
+                                value={fuel.surcharge_percentage}
+                                type="number"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <EmptyTableRow
+                          colSpan={3}
+                          message="No fuel escalation slabs configured."
+                        />
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+
+              {/* ODA Matrix */}
+              <section className="space-y-4">
+                <SectionHeading>
+                  ODA Delivery Matrix
+                </SectionHeading>
+
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table className="min-w-[800px]">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[150px] bg-muted/50">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-right text-[11px] font-medium text-muted-foreground">
+                              Weights (KG) →
+                            </span>
+
+                            <span className="text-left text-[11px] font-medium text-muted-foreground">
+                              Distances (KM) ↓
+                            </span>
+                          </div>
+                        </TableHead>
+
+                        {state.odaWeights?.map((weight) => (
+                          <TableHead
+                            key={weight.id}
+                            className="bg-muted/50 text-center"
+                          >
+                            <div className="flex items-center justify-center gap-2">
+                              <Input
+                                readOnly
+                                placeholder="Min"
+                                value={weight.from ?? ""}
+                                className="h-8 w-[60px] px-2 text-center text-xs"
+                              />
+
+                              <span className="text-muted-foreground">
+                                -
+                              </span>
+
+                              <Input
+                                readOnly
+                                placeholder="Max"
+                                value={weight.to ?? ""}
+                                className="h-8 w-[60px] px-2 text-center text-xs"
+                              />
+                            </div>
+                          </TableHead>
                         ))}
-                    </tbody>
-                </table>
+                      </TableRow>
+                    </TableHeader>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>Fuel Escalation (FSC)</h4>
-                </div>
-                <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead>
-                        <tr style={{ textAlign: "left" }}>
-                            <th>Diesel Price From (₹)</th>
-                            <th>Diesel Price To (₹)</th>
-                            <th>FSC Applicable (%)</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {state.fuelMatrix.map((f, i) => (
-                            <tr key={i}>
-                                <td><input className="form-input" type="number" step="0.01" readOnly value={f.fuel_price_from} onChange={e => state.handleTableChange(state.fuelMatrix, state.setFuelMatrix, i, "fuel_price_from", e.target.value)} /></td>
-                                <td><input className="form-input" type="number" step="0.01" readOnly value={f.fuel_price_to} onChange={e => state.handleTableChange(state.fuelMatrix, state.setFuelMatrix, i, "fuel_price_to", e.target.value)} /></td>
-                                <td><input className="form-input" type="number" step="0.01" readOnly value={f.surcharge_percentage} onChange={e => state.handleTableChange(state.fuelMatrix, state.setFuelMatrix, i, "surcharge_percentage", e.target.value)} /></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                    <TableBody>
+                      {state.odaDistances?.length > 0 ? (
+                        state.odaDistances.map((distance) => (
+                          <TableRow key={distance.id}>
+                            <TableCell className="bg-muted/30">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  readOnly
+                                  placeholder="Min"
+                                  value={distance.from ?? ""}
+                                  className="h-8 w-[60px] px-2 text-center text-xs"
+                                />
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px", marginBottom: "15px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>ODA Delivery Matrix</h4>
-                </div>
+                                <span className="text-muted-foreground">
+                                  -
+                                </span>
 
-                <div style={{ overflowX: "auto", border: "1px solid var(--border-light)", borderRadius: "var(--radius-sm)", marginBottom: "30px" }}>
-                    <table style={{ width: "100%", minWidth: "800px", borderCollapse: "collapse" }}>
-                        <thead>
-                            <tr>
-                                <th style={{ background: "var(--bg-surface)", padding: "10px", borderBottom: "2px solid var(--border-light)", borderRight: "2px solid var(--border-light)" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "right" }}>Weights (KG) &rarr;</div>
-                                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "left" }}>Distances (KM) &darr;</div>
-                                </th>
-                                {state.odaWeights.map(wt => (
-                                    <th key={wt.id} style={{ background: "var(--bg-surface)", padding: "10px", borderBottom: "2px solid var(--border-light)", borderRight: "1px solid var(--border-light)" }}>
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} readOnly placeholder="Min" value={wt.from} onChange={e => state.updateOdaAxis(state.setOdaWeights, state.odaWeights, wt.id, 'from', e.target.value)} />
-                                            <span style={{ color: "var(--text-muted)" }}>-</span>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} readOnly placeholder="Max" value={wt.to} onChange={e => state.updateOdaAxis(state.setOdaWeights, state.odaWeights, wt.id, 'to', e.target.value)} />
-                                        </div>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {state.odaDistances.map(dist => (
-                                <tr key={dist.id}>
-                                    <td style={{ background: "var(--bg-surface)", padding: "10px", borderBottom: "1px solid var(--border-light)", borderRight: "2px solid var(--border-light)" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} placeholder="Min" value={dist.from} onChange={e => state.updateOdaAxis(state.setOdaDistances, state.odaDistances, dist.id, 'from', e.target.value)} readOnly />
-                                            <span style={{ color: "var(--text-muted)" }}>-</span>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} placeholder="Max" value={dist.to} onChange={e => state.updateOdaAxis(state.setOdaDistances, state.odaDistances, dist.id, 'to', e.target.value)} readOnly />
-                                        </div>
-                                    </td>
-                                    {state.odaWeights.map(wt => {
-                                        const cellKey = `${dist.id}_${wt.id}`;
-                                        return (
-                                            <td key={cellKey} style={{ padding: "10px", borderBottom: "1px solid var(--border-light)", borderRight: "1px solid var(--border-light)" }}>
-                                                <input className="form-input" type="number" placeholder="₹" style={{ width: "100%", boxSizing: "border-box", textAlign: "center" }} value={state.odaCharges[cellKey] ?? ""} onChange={e => state.updateOdaCharge(dist.id, wt.id, e.target.value)} readOnly/>
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                <Input
+                                  readOnly
+                                  placeholder="Max"
+                                  value={distance.to ?? ""}
+                                  className="h-8 w-[60px] px-2 text-center text-xs"
+                                />
+                              </div>
+                            </TableCell>
+
+                            {state.odaWeights?.map((weight) => {
+                              const cellKey = `${distance.id}_${weight.id}`;
+
+                              return (
+                                <TableCell
+                                  key={cellKey}
+                                  className="min-w-[110px]"
+                                >
+                                  <Input
+                                    readOnly
+                                    type="number"
+                                    placeholder="₹"
+                                    value={
+                                      state.odaCharges?.[cellKey] ?? ""
+                                    }
+                                    className="h-9 text-center"
+                                  />
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={
+                              (state.odaWeights?.length || 0) + 1
+                            }
+                            className="h-24 text-center text-sm text-muted-foreground"
+                          >
+                            No ODA delivery matrix configured.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-            </form>)}
-        </div>
-    );
+              </section>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function SectionHeading({ children }) {
+  return (
+    <div className="flex items-center gap-3">
+      <h4 className="text-base font-semibold text-primary">
+        {children}
+      </h4>
+
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+function ReadOnlyField({
+  label,
+  value,
+  type = "text",
+  labelClassName = "",
+}) {
+  return (
+    <div className="space-y-2">
+      <label
+        className={`text-sm font-medium ${labelClassName}`}
+      >
+        {label}
+      </label>
+
+      <Input
+        readOnly
+        type={type}
+        value={value ?? ""}
+        className="bg-muted/30"
+      />
+    </div>
+  );
+}
+
+function ReadOnlyTableInput({
+  value,
+  type = "text",
+  className = "",
+}) {
+  return (
+    <Input
+      readOnly
+      type={type}
+      value={value ?? ""}
+      className={`h-9 bg-muted/30 ${className}`}
+    />
+  );
+}
+
+function EmptyTableRow({ colSpan, message }) {
+  return (
+    <TableRow>
+      <TableCell
+        colSpan={colSpan}
+        className="h-24 text-center text-sm text-muted-foreground"
+      >
+        {message}
+      </TableCell>
+    </TableRow>
+  );
 }
