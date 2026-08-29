@@ -1,451 +1,1313 @@
-import{useRef} from "react";
+import { useRef } from "react";
 import API from "../api/api";
-import { FiTrendingUp, FiActivity, FiTruck, FiMapPin, FiPrinter, FiPieChart, FiAlertOctagon, FiTarget, FiDownload, FiUsers, FiPackage, FiMessageSquare  } from "react-icons/fi";
+import {
+  FiTrendingUp,
+  FiActivity,
+  FiTruck,
+  FiMapPin,
+  FiPrinter,
+  FiPieChart,
+  FiAlertOctagon,
+  FiTarget,
+  FiDownload,
+  FiUsers,
+  FiPackage,
+  FiMessageSquare,
+} from "react-icons/fi";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { Bar, Pie, Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
+import { Bar, Pie, Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+} from "chart.js";
 import TransportAnalyticsView from "./TransportAnalyticsView";
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
 
 export default function SalesAnalyticsView({ state }) {
-    const{salesKpis, rndKpis, transportKpis, gtmKpis, errorLogs, email,
-        prodKpis, isLoading, selectedAnalytics, setSelectedAnalytics, isExporting, setIsExporting,
-        quarterlyTargets, setQuarterlyTargets, salesPerformanceChart, transportChart, faqAskedChart, faqAnswerChart,
-        completionChart, productionPieChart,totalQueued, conversionRatio, total_completed, totalCRM, totalErrors,
-        totalFaqAnswered, pendingFaqs, setAlertMessage, setIsAlertOpen, showErrorModal, user, fromDate, setFromDate, 
-        toDate, setToDate, fetchAnalytics,
-    } = state;
-    
-    const reportTabs = ["overview", "faq", "performance", "transport", "gtm", "production", "health"];
-    
-    const dashboardRef = useRef(null);
-    const reportRef = useRef(null);
-    const wait = (ms) => new Promise(resolve=>setTimeout(resolve, ms));
+  const {
+    salesKpis,
+    rndKpis,
+    transportKpis,
+    gtmKpis,
+    errorLogs,
+    email,
+    prodKpis,
+    isLoading,
+    selectedAnalytics,
+    setSelectedAnalytics,
+    isExporting,
+    setIsExporting,
+    quarterlyTargets,
+    setQuarterlyTargets,
+    salesPerformanceChart,
+    transportChart,
+    faqAskedChart,
+    faqAnswerChart,
+    completionChart,
+    productionPieChart,
+    totalQueued,
+    conversionRatio,
+    total_completed,
+    totalCRM,
+    totalErrors,
+    totalFaqAnswered,
+    pendingFaqs,
+    setAlertMessage,
+    setIsAlertOpen,
+    showErrorModal,
+    user,
+    fromDate,
+    setFromDate,
+    toDate,
+    fetchAnalytics,
+  } = state;
 
-    const handleExportPDF = async () => {
-        if (!dashboardRef.current) return;
-        setIsExporting(true);
-        setAlertMessage("📸 Capturing high-resolution snapshot for PDF...");
-        setIsAlertOpen(true);
+  const reportTabs = [
+    "overview",
+    "faq",
+    "performance",
+    "transport",
+    "gtm",
+    "production",
+    "health",
+  ];
 
-        try {
-            const element = dashboardRef.current;
-            const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            
-            let heightLeft = pdfHeight;
-            let position = 0;
-            const pageHeight = pdf.internal.pageSize.getHeight();
+  const dashboardRef = useRef(null);
+  const reportRef = useRef(null);
 
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-            heightLeft -= pageHeight;
+  const wait = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
-            while (heightLeft > 0) {
-                position = heightLeft - pdfHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-                heightLeft -= pageHeight;
-            }
+  const handleExportPDF = async () => {
+    if (!dashboardRef.current) return;
 
-            pdf.save(`Executive_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-            setAlertMessage("✅ PDF Downloaded Successfully.");
-        } catch (error) {
-            showErrorModal("PDF Generation Failed", error.message);
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
-    const exportAllReports = async() =>{
-        const previousTab = selectedAnalytics;
-        try{
-            const pdf = new jsPDF("p", "mm", "a4");
-            let firstPage = true;
-            for(const tab of reportTabs){
-                setSelectedAnalytics(tab);
-                await new Promise(requestAnimationFrame);
-                await wait(100);
-                const canvas = await html2canvas(reportRef.current, {scale: 2, useCORS: true});
-
-                const img = canvas.toDataURL("image/png");
-
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-                if(!firstPage)  pdf.addPage();
-                let heightLeft = pdfHeight;
-                let position = 0;
-                const pageHeight = pdf.internal.pageSize.getHeight();
-
-                pdf.addImage(img, 'PNG', 0, position, pdfWidth, pdfHeight);
-                heightLeft -= pageHeight;
-
-                while (heightLeft >= 0) {
-                    position = heightLeft - pdfHeight;
-                    pdf.addPage();
-                    pdf.addImage(img, 'PNG', 0, position, pdfWidth, pdfHeight);
-                    heightLeft -= pageHeight;
-                }
-
-                firstPage=false;
-            }
-            
-            pdf.save(`Executive Master report_${new Date().toISOString().split('T')[0]}.pdf`)
-        }catch(err){
-            showErrorModal("export failed", err.message);
-        }finally{
-            setSelectedAnalytics(previousTab);
-        }
-    }
-    
-    if (isLoading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Command Center Data...</div>;
-    
-    const handleUpdateTarget = async (email) => {
-        const targetValue = quarterlyTargets[email];
-        if (!targetValue || isNaN(targetValue)) {
-            showErrorModal("Validation Error", "Please enter a valid target amount.");
-            return;
-        }
-
-        try {
-            // Note: Make sure API.updateQuarterlyTarget is defined in your api.js
-            await API.updateQuarterlyTarget(state.sessionToken, email, parseFloat(targetValue));
-            await state.fetchAnalytics?.();
-            setAlertMessage(`✅ QTR Target set to ₹${targetValue} for ${email}`);
-            setIsAlertOpen(true);
-        } catch (error) {
-            state.showErrorModal("Update Failed", error.message);
-        }
-    };
-
-    return (
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "15px" }}>
-                <button className="btn btn-primary" disabled={isExporting} onClick={exportAllReports}><FiDownload />Export Master Data</button>
-                <span>or</span>
-                <button className="btn btn-primary" onClick={handleExportPDF} disabled={isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FiDownload /> {isExporting ? "Generating PDF..." : "Export to PDF"}
-                </button>
-            </div>
-
-            <div ref={dashboardRef} className="frappe-card" style={{ padding: 30, borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-main)' }}>
-                
-                <style>{`
-                    @media print {
-                        body * { visibility: hidden; }
-                        .frappe-card, .frappe-card * { visibility: visible; }
-                        .frappe-card { position: absolute; left: 0; top: 0; width: 100%; padding: 0px; background: white !important;}
-                        .no-print { display: none !important; }
-                        table { border-collapse: collapse; width: 100%; }
-                        th, td { border: 1px solid #ccc !important; padding: 8px !important; }
-                        .print-section { page-break-inside: avoid; margin-bottom: 30px; }
-                    }
-                `}</style>
-
-                <div className="system-header no-print" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                        <h2 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '24px' }}><FiPieChart /> Executive Command Center</h2>
-                        <p style={{ margin: '6px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>Financial data, GTM Evaluation, and System Health</p>
-                    </div>
-                </div>
-                <div style={{display: "flex", gap: "15px", alignItems: "center", marginBottom: "20px"}}>
-                    <div className="form-group">
-                        <label>From</label>
-                        
-                        <input type="date" className="form-input" value={fromDate} onChange={(e)=>setFromDate(e.target.value)}/>
-                    </div>
-                    <div className="form-group">
-                        <label>To</label>
-                        
-                        <input type="date" className="form-input" value={toDate} max={new Date().toISOString().split('T')[0]} onChange={(e)=>setToDate(e.target.value)}/>
-                    </div>
-                    <button className="btn btn-primary" onClick={() => fetchAnalytics(fromDate, toDate)}>Refresh Analytics</button>
-                </div>
-                <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "25px", overflowX: 'auto', paddingBottom: '10px' }}>
-                    <button className={`btn ${selectedAnalytics === 'overview' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('overview')}>Overview</button>
-                    <button className={`btn ${selectedAnalytics === 'faq' ? "btn-primary": "btn-text"}`} onClick={() => setSelectedAnalytics("faq")}><FiMessageSquare />F&Q Actions</button>
-                    <button className={`btn ${selectedAnalytics === 'performance' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('performance')}><FiUsers /> Team Matrix</button>
-                    <button className={`btn ${selectedAnalytics === 'transport' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('transport')}><FiTruck /> Transport</button>
-                    <button className={`btn ${selectedAnalytics === 'gtm' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('gtm')}><FiTarget /> GTM ROI</button>
-                    <button className={`btn ${selectedAnalytics === 'production' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('production')}><FiPackage /> Production Analytics</button>
-                    <button className={`btn ${selectedAnalytics === 'health' ? 'btn-primary' : 'btn-text'}`} onClick={() => setSelectedAnalytics('health')}><FiAlertOctagon /> System Health</button>
-                </div>
-                <div ref={reportRef}>
-                {/* --- TAB: OVERVIEW --- */}
-                {(selectedAnalytics === 'overview') && (
-                    <>
-                    <div className="print-section form-grid-layout" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '30px' }}>
-                        <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Total Targets Queued</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{totalQueued}</div>
-                        </div>
-                        <div style={{ background: 'rgba(75, 192, 192, 0.1)', padding: '25px 25px 0px 25px', borderRadius: '8px', border: '1px solid rgba(75, 192, 192, 0.3)' }}>
-                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Lead Harvest Ratio</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: conversionRatio > 50 ? 'rgba(75, 192, 192, 1)' : 'var(--brand-danger)' }}>{conversionRatio.toFixed(2)}%</div>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)'}}>{total_completed} out of {totalQueued}</div>
-                        </div>
-                        <div style={{ background: 'var(--bg-surface)', padding: '25px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Active CRM Deals</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-success)' }}>{totalCRM}</div>
-                        </div>
-                        <div style={{ background: 'rgba(255, 99, 132, 0.1)', padding: '25px', borderRadius: '8px', border: '1px solid rgba(255, 99, 132, 0.3)' }}>
-                            <div style={{ fontSize: '13px', color: 'var(--brand-danger)', marginBottom: '8px' }}>System Faults</div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--brand-danger)' }}>{totalErrors}</div>
-                        </div>
-                        <br/>
-                    </div>
-                    <div className="print-section" style={{overflowX: "auto"}}>
-                        <h3>GTM Completion Ratio</h3>
-                        <table style={{width:"100%", borderCollapse:"collapse" }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ whiteSpace: "nowrap" }}>Month</th>
-                                    <th style={{ whiteSpace: "nowrap" }}>GTM</th>
-                                    <th style={{ whiteSpace: "nowrap" }}>Queued</th>
-                                    <th style={{ whiteSpace: "nowrap" }}>Awaiting Review</th>
-                                    <th style={{ whiteSpace: "nowrap" }}>Completed</th>
-                                    <th style={{ whiteSpace: "nowrap" }}>Rejected</th>
-                                    <th style={{ whiteSpace: "nowrap" }}>Completion %</th>
-
-                                </tr>
-
-                            </thead>
-
-                            <tbody>
-
-                                {gtmKpis?.map(gtm=>{
-                                    const ratio = gtm?.total_targets ? ((gtm.completed/gtm.total_targets)*100).toFixed(1):0;
-
-                                    return(
-
-                                        <tr key={gtm.gtm_source}>
-                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.month}</td>
-                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.gtm_source}</td>
-                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.total_targets}</td>
-                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.awaiting_review}</td>
-                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.completed}</td>
-                                            <td style={{ whiteSpace: "nowrap" }}>{gtm.rejected}</td>
-                                            <td style={{ whiteSpace: "nowrap" }}>{ratio}%</td>
-                                        </tr>
-
-                                    );
-
-                                })}
-
-                            </tbody>
-
-                        </table>
-                    </div></>
-                )}
-
-                {/* --- TAB: TEAM PERFORMANCE --- */}
-                {(selectedAnalytics === 'performance') && (
-                    <div className="print-section">
-                        <div style={{ height: '300px', marginBottom: '30px' }}>
-                            <Bar data={salesPerformanceChart} options={{ responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Sales Team Activity Scores' } } }} />
-                        </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
-                                    <th style={{padding: '12px'}}>Serial number</th>
-                                    <th style={{ padding: '12px' }}>Executive Name</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Monthly Order Value</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Performance Score</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Quarterly Target</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Achievement %</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Set Quarterly Target</th>
-                                    <th style={{ padding: '12px', textAlign: 'center' }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[...salesKpis ?? []]?.map((kpi, idx) => (
-                                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                        <td style={{padding: '12px'}}>{idx+1}</td>
-                                        <td style={{ padding: '12px' }}><strong>{kpi.name}</strong></td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.monthly_order_value}</td>
-                                        <td style={{ padding: '12px', textAlign: 'center', color: 'var(--brand-success)' }}>{kpi.performance_score}</td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.quarterly_order_value_target}</td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}>{kpi.quarterly_order_value_target > 0 ? ((Number(kpi.monthly_order_value)/Number(kpi.quarterly_order_value_target))*100).toFixed(1) : 0}%</td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}><input type="number" min="0" placeholder="Total QTR Value" defaultValue={kpi.quarterly_target || ""} onChange={(e) => setQuarterlyTargets(prev => ({ ...prev, [kpi.email]: e.target.value }))} style={{  padding: '6px',  borderRadius: '4px',  border: '1px solid var(--border-light)',  width: '120px' }}/></td>
-                                        <td style={{ padding: '12px', textAlign: 'center' }}><button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}onClick={() => handleUpdateTarget(kpi.email)}>Save</button></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-                
-                {selectedAnalytics==="transport"&&(
-                    <TransportAnalyticsView state={state} />
-                )}
-                
-                {/* Tab: R&D Knowledge Base */}
-                {(selectedAnalytics === 'faq') && (
-                    <div className="print-section">
-                        <h4>Knowledge Base Performance</h4>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"30px",marginBottom:"30px"}}>
-                            <div style={{height:320}}>
-                                <Bar data={faqAskedChart} options={{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:"Sales Representatives - Questions Asked"}}}}/>
-                            </div>
-                            <div style={{height:320}}>
-                                <Bar data={faqAnswerChart} options={{ responsive:true, maintainAspectRatio:false, plugins:{title:{display:true,text:"R&D Knowledge Scores"}}}}/>
-                            </div>
-                        </div>
-                        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"20px"}}>
-                            <div className="frappe-card">
-                                <h4>Answered</h4>
-                                <h2>{totalFaqAnswered}</h2>
-                            </div>
-                            
-                            <div className="frappe-card">
-                                <h4>Pending</h4>
-                                <h2>{pendingFaqs}</h2>
-                            </div>
-                            <br/>
-                            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"30px"}}>
-                                <div>
-                                    <h3>Sales Representative Ranking</h3>
-                                    <table className="table">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Name</th>
-                                                <th>Questions</th>
-                                                <th>Score</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[...(salesKpis ?? [])].sort((a,b)=>b.activity_score-a.activity_score)?.map((k,i)=>
-                                            <tr key={k.email}>
-                                                <td>{i+1}</td>
-                                                <td>{k.name}</td>
-                                                <td>{k.faqs_asked}</td>
-                                                <td>{k.activity_score}</td>
-                                            </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div>
-                                    <h3>R&D Ranking</h3>
-                                    <table className="table">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Name</th>
-                                                <th>Answered</th>
-                                                <th>Knowledge Score</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[...(rndKpis ?? [])].sort((a,b)=>b.knowledge_score-a.knowledge_score)?.map((k,i)=>                                            
-                                                <tr key={k.email}>
-                                                    <td>{i+1}</td>
-                                                    <td>{k.name}</td>
-                                                    <td>{k.faqs_answered}</td>
-                                                    <td>{k.knowledge_score}</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- TAB: GTM ROI & COSTS --- */}
-                {(selectedAnalytics === 'gtm') && (
-                    <div className="print-section">
-                        
-                        {/* Cost Per Sales Rep Table */}
-                        <div style={{ marginBottom: '30px' }}>
-                            <h4 style={{ margin: '0 0 10px 0' }}>API Credit Burn Rate (By Sales Rep)</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                <thead>
-                                    <tr style={{ background: 'var(--bg-sidebar)', borderBottom: '2px solid var(--border-light)' }}>
-                                        <th style={{ padding: '10px', textAlign: 'left' }}>Sales Executive</th>
-                                        <th style={{ padding: '10px', textAlign: 'center' }}>Total Lookups Generated</th>
-                                        <th style={{ padding: '10px', textAlign: 'right' }}>Calculated Financial Cost</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[...(salesKpis ?? [])]?.map((kpi, idx) => {
-                                        return (
-                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                                <td style={{ padding: '10px', fontWeight: 'bold' }}>{kpi.name}</td>
-                                                <td style={{ padding: '10px', textAlign: 'center' }}>{kpi.targets_queued}</td>
-                                                <td style={{ padding: '10px', textAlign: 'right', color: Number(kpi.total_spend) > 500 ? 'var(--brand-danger)' : 'var(--text-primary)' }}>₹{Number(kpi.total_spend).toFixed(2)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div style={{ height: '350px', marginBottom: '30px' }}>
-                            <Bar data={completionChart} options={{ responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'GTM Performance Dashboard' }, legend:{position:"bottom"} } }} />
-                            <br/>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- TAB: PRODUCTION ANALYTICS --- */}
-                {(selectedAnalytics === 'production') && (
-                    <div className="print-section" style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
-                        <div style={{ flex: 1, height: '350px' }}>
-                            <Pie data={productionPieChart} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            <h4 style={{ marginBottom: '15px' }}>Active Order Staging</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                <tbody>
-                                    {prodKpis?.map((k, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                            <td style={{ padding: '12px', fontWeight: 'bold' }}>{k.stage.replace(/_/g, ' ')}</td>
-                                            <td style={{ padding: '12px', textAlign: 'right', fontSize: '16px', color: 'var(--brand-accent)' }}>{k.count}</td>
-                                        </tr>
-                                    ))}
-                                    {prodKpis?.length === 0 && <tr><td style={{padding: '20px'}}>No active orders on floor.</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- TAB: SYSTEM HEALTH --- */}
-                {(selectedAnalytics === 'health') && (
-                    <div className="print-section">
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--bg-sidebar)', textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
-                                    <th style={{ padding: '12px 15px' }}>Timestamp</th>
-                                    <th style={{ padding: '12px 15px' }}>API Route</th>
-                                    <th style={{ padding: '12px 15px' }}>Exception Details</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {errorLogs?.length === 0 ? (
-                                    <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px', color: 'var(--brand-success)'}}>✅ Server is operating perfectly.</td></tr>
-                                ) : (
-                                    errorLogs?.map((log, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255, 99, 132, 0.05)' }}>
-                                            <td style={{ padding: '12px 15px', color: 'var(--text-muted)' }}>{log.created_at?.split('.')?.[0]?.replace('T',' ')}</td>
-                                            <td style={{ padding: '12px 15px', fontFamily: 'monospace', fontWeight: 'bold' }}>{log.route_path}</td>
-                                            <td style={{ padding: '12px 15px', color: 'var(--brand-danger)' }}>{log.error_message}</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-                </div>
-            </div>
-        </div>
+    setIsExporting(true);
+    setAlertMessage(
+      "📸 Capturing high-resolution snapshot for PDF..."
     );
+    setIsAlertOpen(true);
+
+    try {
+      const element = dashboardRef.current;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight =
+        (canvas.height * pdfWidth) / canvas.width;
+
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      pdf.addImage(
+        imgData,
+        "PNG",
+        0,
+        position,
+        pdfWidth,
+        pdfHeight
+      );
+
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - pdfHeight;
+
+        pdf.addPage();
+
+        pdf.addImage(
+          imgData,
+          "PNG",
+          0,
+          position,
+          pdfWidth,
+          pdfHeight
+        );
+
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(
+        `Executive_Report_${
+          new Date().toISOString().split("T")[0]
+        }.pdf`
+      );
+
+      setAlertMessage("✅ PDF Downloaded Successfully.");
+    } catch (error) {
+      showErrorModal(
+        "PDF Generation Failed",
+        error.message
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportAllReports = async () => {
+    const previousTab = selectedAnalytics;
+
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      let firstPage = true;
+
+      for (const tab of reportTabs) {
+        setSelectedAnalytics(tab);
+
+        await new Promise(requestAnimationFrame);
+        await wait(100);
+
+        const canvas = await html2canvas(
+          reportRef.current,
+          {
+            scale: 2,
+            useCORS: true,
+          }
+        );
+
+        const img = canvas.toDataURL("image/png");
+
+        const pdfWidth =
+          pdf.internal.pageSize.getWidth();
+
+        const pdfHeight =
+          (canvas.height * pdfWidth) /
+          canvas.width;
+
+        if (!firstPage) {
+          pdf.addPage();
+        }
+
+        let heightLeft = pdfHeight;
+        let position = 0;
+
+        const pageHeight =
+          pdf.internal.pageSize.getHeight();
+
+        pdf.addImage(
+          img,
+          "PNG",
+          0,
+          position,
+          pdfWidth,
+          pdfHeight
+        );
+
+        heightLeft -= pageHeight;
+
+        while (heightLeft >= 0) {
+          position = heightLeft - pdfHeight;
+
+          pdf.addPage();
+
+          pdf.addImage(
+            img,
+            "PNG",
+            0,
+            position,
+            pdfWidth,
+            pdfHeight
+          );
+
+          heightLeft -= pageHeight;
+        }
+
+        firstPage = false;
+      }
+
+      pdf.save(
+        `Executive Master report_${
+          new Date().toISOString().split("T")[0]
+        }.pdf`
+      );
+    } catch (err) {
+      showErrorModal(
+        "export failed",
+        err.message
+      );
+    } finally {
+      setSelectedAnalytics(previousTab);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-[1200px] space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-7 w-72" />
+            <Skeleton className="h-4 w-96" />
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const handleUpdateTarget = async (email) => {
+    const targetValue = quarterlyTargets[email];
+
+    if (!targetValue || isNaN(targetValue)) {
+      showErrorModal(
+        "Validation Error",
+        "Please enter a valid target amount."
+      );
+      return;
+    }
+
+    try {
+      await API.updateQuarterlyTarget(
+        state.sessionToken,
+        email,
+        parseFloat(targetValue)
+      );
+
+      await state.fetchAnalytics?.();
+
+      setAlertMessage(
+        `✅ QTR Target set to ₹${targetValue} for ${email}`
+      );
+
+      setIsAlertOpen(true);
+    } catch (error) {
+      state.showErrorModal(
+        "Update Failed",
+        error.message
+      );
+    }
+  };
+
+  const tabConfig = [
+    {
+      value: "overview",
+      label: "Overview",
+      icon: FiPieChart,
+    },
+    {
+      value: "faq",
+      label: "F&Q Actions",
+      icon: FiMessageSquare,
+    },
+    {
+      value: "performance",
+      label: "Team Matrix",
+      icon: FiUsers,
+    },
+    {
+      value: "transport",
+      label: "Transport",
+      icon: FiTruck,
+    },
+    {
+      value: "gtm",
+      label: "GTM ROI",
+      icon: FiTarget,
+    },
+    {
+      value: "production",
+      label: "Production Analytics",
+      icon: FiPackage,
+    },
+    {
+      value: "health",
+      label: "System Health",
+      icon: FiAlertOctagon,
+    },
+  ];
+
+  return (
+    <div className="mx-auto w-full max-w-[1200px] space-y-4">
+      {/* EXPORT ACTIONS */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          disabled={isExporting}
+          onClick={exportAllReports}
+        >
+          <FiDownload className="mr-2 h-4 w-4" />
+          Export Master Data
+        </Button>
+
+        <span className="px-1 text-sm text-muted-foreground">
+          or
+        </span>
+
+        <Button
+          disabled={isExporting}
+          onClick={handleExportPDF}
+          variant="outline"
+        >
+          <FiDownload className="mr-2 h-4 w-4" />
+          {isExporting
+            ? "Generating PDF..."
+            : "Export to PDF"}
+        </Button>
+      </div>
+
+      {/* MAIN DASHBOARD */}
+      <Card
+        ref={dashboardRef}
+        className="overflow-hidden border-border"
+      >
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <FiPieChart className="h-6 w-6" />
+                Executive Command Center
+              </CardTitle>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Financial data, GTM Evaluation, and System
+                Health
+              </p>
+            </div>
+          </div>
+
+          {/* DATE FILTER */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                From
+              </label>
+
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) =>
+                  setFromDate(e.target.value)
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                To
+              </label>
+
+              <Input
+                type="date"
+                max={
+                  new Date()
+                    .toISOString()
+                    .split("T")[0]
+                }
+                value={toDate}
+                onChange={(e) =>
+                  setToDate(e.target.value)
+                }
+              />
+            </div>
+
+            <Button
+              onClick={() =>
+                fetchAnalytics(fromDate, toDate)
+              }
+            >
+              <FiActivity className="mr-2 h-4 w-4" />
+              Refresh Analytics
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* ANALYTICS TABS */}
+          <ScrollArea className="w-full whitespace-nowrap">
+            <Tabs
+              value={selectedAnalytics}
+              onValueChange={setSelectedAnalytics}
+            >
+              <TabsList className="inline-flex h-auto min-w-max gap-1">
+                {tabConfig.map(
+                  ({
+                    value,
+                    label,
+                    icon: Icon,
+                  }) => (
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="gap-2"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </TabsTrigger>
+                  )
+                )}
+              </TabsList>
+            </Tabs>
+
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </CardHeader>
+
+        <CardContent ref={reportRef} className="space-y-8">
+          {/* ===================================================== */}
+          {/* OVERVIEW */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "overview" && (
+            <div className="space-y-8">
+              {/* KPI CARDS */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Total Targets Queued
+                    </p>
+
+                    <p className="mt-2 text-3xl font-bold">
+                      {totalQueued}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20">
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Lead Harvest Ratio
+                    </p>
+
+                    <p
+                      className={`mt-2 text-3xl font-bold ${
+                        conversionRatio > 50
+                          ? "text-emerald-600"
+                          : "text-destructive"
+                      }`}
+                    >
+                      {conversionRatio.toFixed(2)}%
+                    </p>
+
+                    <p className="mt-1 text-xs font-medium">
+                      {total_completed} out of{" "}
+                      {totalQueued}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Active CRM Deals
+                    </p>
+
+                    <p className="mt-2 text-3xl font-bold text-emerald-600">
+                      {totalCRM}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20">
+                  <CardContent className="p-5">
+                    <p className="text-sm text-destructive">
+                      System Faults
+                    </p>
+
+                    <p className="mt-2 text-3xl font-bold text-destructive">
+                      {totalErrors}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* GTM COMPLETION */}
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    GTM Completion Ratio
+                  </h3>
+
+                  <p className="text-sm text-muted-foreground">
+                    Completion performance by month and GTM
+                    source.
+                  </p>
+                </div>
+
+                <div className="overflow-hidden rounded-lg border">
+                  <ScrollArea className="w-full">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="whitespace-nowrap">
+                            Month
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            GTM
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Queued
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Awaiting Review
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Completed
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Rejected
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
+                            Completion %
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {gtmKpis?.map((gtm) => {
+                          const ratio =
+                            gtm?.total_targets
+                              ? (
+                                  (gtm.completed /
+                                    gtm.total_targets) *
+                                  100
+                                ).toFixed(1)
+                              : 0;
+
+                          return (
+                            <TableRow
+                              key={gtm.gtm_source}
+                            >
+                              <TableCell className="whitespace-nowrap">
+                                {gtm.month}
+                              </TableCell>
+
+                              <TableCell className="whitespace-nowrap font-medium">
+                                {gtm.gtm_source}
+                              </TableCell>
+
+                              <TableCell>
+                                {gtm.total_targets}
+                              </TableCell>
+
+                              <TableCell>
+                                {gtm.awaiting_review}
+                              </TableCell>
+
+                              <TableCell>
+                                {gtm.completed}
+                              </TableCell>
+
+                              <TableCell>
+                                {gtm.rejected}
+                              </TableCell>
+
+                              <TableCell>
+                                <Badge variant="secondary">
+                                  {ratio}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* TEAM PERFORMANCE */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "performance" && (
+            <div className="space-y-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Sales Team Activity Scores
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="h-[300px]">
+                    <Bar
+                      data={salesPerformanceChart}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          title: {
+                            display: false,
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="overflow-hidden rounded-lg border">
+                <ScrollArea className="w-full">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Serial number</TableHead>
+                        <TableHead>
+                          Executive Name
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Monthly Order Value
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Performance Score
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Quarterly Target
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Achievement %
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Set Quarterly Target
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Action
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {[...(salesKpis ?? [])].map(
+                        (kpi, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>
+                              {idx + 1}
+                            </TableCell>
+
+                            <TableCell className="font-semibold">
+                              {kpi.name}
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              {kpi.monthly_order_value}
+                            </TableCell>
+
+                            <TableCell className="text-center font-semibold text-emerald-600">
+                              {kpi.performance_score}
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              {
+                                kpi.quarterly_order_value_target
+                              }
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              {kpi.quarterly_order_value_target >
+                              0
+                                ? (
+                                    (Number(
+                                      kpi.monthly_order_value
+                                    ) /
+                                      Number(
+                                        kpi.quarterly_order_value_target
+                                      )) *
+                                    100
+                                  ).toFixed(1)
+                                : 0}
+                              %
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="Total QTR Value"
+                                defaultValue={
+                                  kpi.quarterly_target ||
+                                  ""
+                                }
+                                className="mx-auto w-[140px]"
+                                onChange={(e) =>
+                                  setQuarterlyTargets(
+                                    (prev) => ({
+                                      ...prev,
+                                      [kpi.email]:
+                                        e.target.value,
+                                    })
+                                  )
+                                }
+                              />
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  handleUpdateTarget(
+                                    kpi.email
+                                  )
+                                }
+                              >
+                                Save
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      )}
+                    </TableBody>
+                  </Table>
+
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* TRANSPORT */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "transport" && (
+            <TransportAnalyticsView state={state} />
+          )}
+
+          {/* ===================================================== */}
+          {/* FAQ */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "faq" && (
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-lg font-semibold">
+                  Knowledge Base Performance
+                </h3>
+
+                <p className="text-sm text-muted-foreground">
+                  Sales representative questions and R&D
+                  knowledge performance.
+                </p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      Sales Representatives - Questions
+                      Asked
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="h-[320px]">
+                      <Bar
+                        data={faqAskedChart}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            title: {
+                              display: false,
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      R&D Knowledge Scores
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="h-[320px]">
+                      <Bar
+                        data={faqAnswerChart}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            title: {
+                              display: false,
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Card>
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Answered
+                    </p>
+
+                    <p className="mt-2 text-3xl font-bold">
+                      {totalFaqAnswered}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Pending
+                    </p>
+
+                    <p className="mt-2 text-3xl font-bold text-amber-600">
+                      {pendingFaqs}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* SALES RANKING */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      Sales Representative Ranking
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="overflow-hidden rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>
+                              Questions
+                            </TableHead>
+                            <TableHead>
+                              Score
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                          {[
+                            ...(salesKpis ?? []),
+                          ]
+                            .sort(
+                              (a, b) =>
+                                b.activity_score -
+                                a.activity_score
+                            )
+                            .map((k, i) => (
+                              <TableRow
+                                key={k.email}
+                              >
+                                <TableCell>
+                                  {i + 1}
+                                </TableCell>
+
+                                <TableCell className="font-medium">
+                                  {k.name}
+                                </TableCell>
+
+                                <TableCell>
+                                  {k.faqs_asked}
+                                </TableCell>
+
+                                <TableCell>
+                                  <Badge>
+                                    {k.activity_score}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* R&D RANKING */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      R&D Ranking
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="overflow-hidden rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>
+                              Answered
+                            </TableHead>
+                            <TableHead>
+                              Knowledge Score
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                          {[
+                            ...(rndKpis ?? []),
+                          ]
+                            .sort(
+                              (a, b) =>
+                                b.knowledge_score -
+                                a.knowledge_score
+                            )
+                            .map((k, i) => (
+                              <TableRow
+                                key={k.email}
+                              >
+                                <TableCell>
+                                  {i + 1}
+                                </TableCell>
+
+                                <TableCell className="font-medium">
+                                  {k.name}
+                                </TableCell>
+
+                                <TableCell>
+                                  {k.faqs_answered}
+                                </TableCell>
+
+                                <TableCell>
+                                  <Badge variant="secondary">
+                                    {
+                                      k.knowledge_score
+                                    }
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* GTM */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "gtm" && (
+            <div className="space-y-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    API Credit Burn Rate (By Sales Rep)
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="overflow-hidden rounded-lg border">
+                    <ScrollArea className="w-full">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>
+                              Sales Executive
+                            </TableHead>
+
+                            <TableHead className="text-center">
+                              Total Lookups Generated
+                            </TableHead>
+
+                            <TableHead className="text-right">
+                              Calculated Financial Cost
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                          {[
+                            ...(salesKpis ?? []),
+                          ].map((kpi, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-semibold">
+                                {kpi.name}
+                              </TableCell>
+
+                              <TableCell className="text-center">
+                                {kpi.targets_queued}
+                              </TableCell>
+
+                              <TableCell
+                                className={`text-right font-medium ${
+                                  Number(
+                                    kpi.total_spend
+                                  ) > 500
+                                    ? "text-destructive"
+                                    : ""
+                                }`}
+                              >
+                                ₹
+                                {Number(
+                                  kpi.total_spend
+                                ).toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    GTM Performance Dashboard
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="h-[350px]">
+                    <Bar
+                      data={completionChart}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                          },
+                        },
+                        plugins: {
+                          title: {
+                            display: false,
+                          },
+                          legend: {
+                            position: "bottom",
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* PRODUCTION */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "production" && (
+            <div className="grid gap-8 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Production Distribution
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="h-[350px]">
+                    <Pie
+                      data={productionPieChart}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: "bottom",
+                          },
+                        },
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Active Order Staging
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <Table>
+                    <TableBody>
+                      {prodKpis?.map((k, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-semibold capitalize">
+                            {k.stage.replace(
+                              /\_/g,
+                              " "
+                            )}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Badge>
+                              {k.count}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {prodKpis?.length === 0 && (
+                        <TableRow>
+                          <TableCell className="py-8 text-center text-muted-foreground">
+                            No active orders on floor.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* SYSTEM HEALTH */}
+          {/* ===================================================== */}
+
+          {selectedAnalytics === "health" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FiAlertOctagon className="h-5 w-5" />
+                  System Health
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent>
+                {errorLogs?.length === 0 ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-400">
+                    <div className="text-lg font-semibold">
+                      ✅ Server is operating perfectly.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border">
+                    <ScrollArea className="w-full">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>
+                              Timestamp
+                            </TableHead>
+
+                            <TableHead>
+                              API Route
+                            </TableHead>
+
+                            <TableHead>
+                              Exception Details
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                          {errorLogs?.map(
+                            (log, idx) => (
+                              <TableRow
+                                key={idx}
+                                className="bg-red-50/50 dark:bg-red-950/10"
+                              >
+                                <TableCell className="whitespace-nowrap text-muted-foreground">
+                                  {log.created_at
+                                    ?.split(".")?.[0]
+                                    ?.replace(
+                                      "T",
+                                      " "
+                                    )}
+                                </TableCell>
+
+                                <TableCell>
+                                  <code className="rounded bg-muted px-2 py-1 text-xs font-semibold">
+                                    {
+                                      log.route_path
+                                    }
+                                  </code>
+                                </TableCell>
+
+                                <TableCell className="text-destructive">
+                                  {
+                                    log.error_message
+                                  }
+                                </TableCell>
+                              </TableRow>
+                            )
+                          )}
+                        </TableBody>
+                      </Table>
+
+                      <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
