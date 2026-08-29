@@ -1,103 +1,174 @@
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Button } from "@/components/ui/button";
+
 export default function ExerciseGeneratorView({
-    state,
+  state,
 }) {
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="text-xl">
+          Exercise Explanation & Acknowledgement
+        </CardTitle>
+      </CardHeader>
 
-    return (
-        <div className="frappe-card">
+      <CardContent>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            console.log("[UI] FORM SUBMITTED");
+            state.generateExercise();
+          }}
+          className="space-y-6"
+        >
+          {/* Exercise / Role / Person */}
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
 
-            <div className="system-header">
+            {/* Exercise */}
+            <div className="space-y-2">
+              <Label htmlFor="exercise-name">
+                Exercise Name <span className="text-destructive">*</span>
+              </Label>
 
-                <h2>
-                    Exercise Explanation & Acknowledgement
-                </h2>
-
+              <Input
+                id="exercise-name"
+                type="text"
+                value={state.exerciseName}
+                onChange={(e) =>
+                  state.setExerciseName(e.target.value)
+                }
+                placeholder="Enter exercise name"
+                required
+              />
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); console.log("[UI] FORM SUBMITTED"); state.generateExercise();}}>
-                <div className="form-grid-layout" style={{gridTemplateColumns:"repeat(3, 1fr)",}}>
+            {/* Role */}
+            <div className="space-y-2">
+              <Label htmlFor="role-filter">
+                Filter by Role
+              </Label>
 
-                    {/* Exercise */}
+              <Select
+                value={state.roleFilter}
+                onValueChange={(value) =>
+                  state.setRoleFilter(value)
+                }
+              >
+                <SelectTrigger id="role-filter" className="w-full">
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
 
-                    <div className="form-group">
+                <SelectContent>
+                  <SelectItem value="">
+                    All Roles
+                  </SelectItem>
 
-                        <label className="input-label">
-                            Exercise Name *
-                        </label>
-                        <input type="text" className="form-input" value={state.exerciseName} onChange={(e) => state.setExerciseName(e.target.value)}  placeholder="Enter exercise name" required/>
+                  {state.roles.map((role) => (
+                    <SelectItem
+                      key={role}
+                      value={role}
+                    >
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                    </div>
+            {/* Person */}
+            <div className="space-y-2">
+              <Label htmlFor="person">
+                Person
+              </Label>
 
+              <Select
+                value={state.selectedPersonEmail}
+                onValueChange={(value) =>
+                  state.handlePersonChange(value)
+                }
+                disabled={state.isLoadingPeople}
+              >
+                <SelectTrigger id="person" className="w-full">
+                  <SelectValue
+                    placeholder={
+                      state.isLoadingPeople
+                        ? "Loading people..."
+                        : "All matching people"
+                    }
+                  />
+                </SelectTrigger>
 
-                    {/* Role */}
+                <SelectContent>
+                  <SelectItem value="">
+                    {state.isLoadingPeople
+                      ? "Loading people..."
+                      : "All matching people"}
+                  </SelectItem>
 
-                    <div className="form-group">
+                  {state.people.map((person) => (
+                    <SelectItem
+                      key={person.email}
+                      value={person.email}
+                    >
+                      {person.name}
+                      {person.role
+                        ? ` — ${person.role}`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-                        <label className="input-label">
-                            Filter by Role
-                        </label>
+          {/* Selected person */}
+          {state?.selectedPersonName && (
+            <div className="rounded-md border bg-muted/50 px-4 py-3 text-sm">
+              <strong>
+                Exercise will be generated for:
+              </strong>{" "}
+              {state?.selectedPersonName}
+            </div>
+          )}
 
-                        <select className="form-input" value={state.roleFilter} onChange={(e) => state.setRoleFilter(e.target.value)}>
-                            <option value="">All Roles</option>
-
-                            {state.roles.map((role) => (<option key={role} value={role}>{role}</option>))}
-                        </select>
-
-                    </div>
-
-
-                    {/* Person */}
-
-                    <div className="form-group">
-
-                        <label className="input-label">
-                            Person
-                        </label>
-
-                        <select className="form-input" value={state.selectedPersonEmail} onChange={e =>state.handlePersonChange(e.target.value)} disabled={state.isLoadingPeople}>
-                            <option value="">
-                                {state.isLoadingPeople ? "Loading people..." : "All matching people"}
-                            </option>
-
-                            {state.people.map((person) => (
-                                <option key={person.email} value={person.email}>
-                                    {person.name}
-                                    {person.role ? ` — ${person.role}` : ""}
-                                </option>
-                            ))}
-                        </select>
-
-                    </div>
-
-                </div>
-
-
-                {/* Selected person */}
-
-                {state?.selectedPersonName && (
-
-                    <div style={{marginTop: "15px", padding: "12px", background: "var(--bg-main)", borderRadius:"var(--radius-sm)", }}>
-
-                        <strong>
-                            Exercise will be generated for:
-                        </strong>{" "}
-
-                        {state?.selectedPersonName}
-
-                    </div>
-
-                )}
-
-
-                {/* Generate */}
-
-                <div style={{display: "flex", justifyContent: "flex-end", marginTop: "20px", gap: "10px",}}>
-
-                    <button type="submit" className={`${state.isExerciseGenerating ? "btn-text-danger" : "btn btn-success"}`} disabled={state.isExerciseGenerating || !state.exerciseName.trim()}>
-                        {state.isExerciseGenerating ? "Generating Document..." : "Generate Exercise Document"}
-                    </button>
-
-                </div>
-            </form>
-        </div>
-    );
+          {/* Generate */}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="submit"
+              variant={
+                state.isExerciseGenerating
+                  ? "destructive"
+                  : "default"
+              }
+              disabled={
+                state.isExerciseGenerating ||
+                !state.exerciseName.trim()
+              }
+            >
+              {state.isExerciseGenerating
+                ? "Generating Document..."
+                : "Generate Exercise Document"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
 }
