@@ -1,122 +1,288 @@
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function CRM_WorkspaceView({ state }) {
-    const {loadLeads, handleStatusChange, leads, loading} = state;
+    const {
+        loadLeads,
+        handleStatusChange,
+        leads,
+        loading,
+    } = state;
+
     // Helper to format the WPForms product query list into tags
     const renderProductTags = (queryStr) => {
-        if (!queryStr) return <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>No specific product</span>;
-        const products = queryStr.split(',').map(p => p.trim());
+        if (!queryStr) {
+            return (
+                <span className="text-xs text-muted-foreground">
+                    No specific product
+                </span>
+            );
+        }
+
+        const products = queryStr
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean);
+
         return (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            <div className="flex flex-wrap gap-1.5">
                 {products.map((prod, i) => (
-                    <span key={i} style={{ 
-                        background: "var(--bg-surface)", border: "1px solid var(--border-light)", 
-                        padding: "2px 8px", borderRadius: "4px", fontSize: "11px", color: "var(--brand-accent)" 
-                    }}>
+                    <Badge
+                        key={i}
+                        variant="outline"
+                        className="font-normal text-xs text-primary"
+                    >
                         {prod}
-                    </span>
+                    </Badge>
                 ))}
             </div>
         );
     };
 
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case "New":
+                return (
+                    <Badge variant="destructive">
+                        New
+                    </Badge>
+                );
+
+            case "Contacted":
+                return (
+                    <Badge className="bg-amber-500 text-white hover:bg-amber-500">
+                        Contacted
+                    </Badge>
+                );
+
+            case "Lost":
+                return (
+                    <Badge variant="secondary">
+                        Lost
+                    </Badge>
+                );
+
+            case "Converted":
+                return (
+                    <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                        Converted
+                    </Badge>
+                );
+
+            default:
+                return (
+                    <Badge variant="outline">
+                        {status}
+                    </Badge>
+                );
+        }
+    };
+
     return (
-        <div className="frappe-card">
-            <div className="system-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                    <h3>🎯 B2B Sales Pipeline</h3>
-                    <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>Direct GoDaddy Website Feed</p>
+        <Card>
+            {/* Header */}
+            <CardHeader className="flex flex-row items-center justify-between gap-4 border-b">
+                <div className="space-y-1">
+                    <CardTitle className="text-xl">
+                        🎯 B2B Sales Pipeline
+                    </CardTitle>
+
+                    <p className="text-sm text-muted-foreground">
+                        Direct GoDaddy Website Feed
+                    </p>
                 </div>
-                <button className="btn btn-secondary" onClick={loadLeads} disabled={loading}>
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={loadLeads}
+                    disabled={loading}
+                >
                     {loading ? "Syncing..." : "↻ Refresh Pipeline"}
-                </button>
-            </div>
+                </Button>
+            </CardHeader>
 
-            <div style={{ overflowX: "auto", marginTop: "20px" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-                    <thead>
-                        <tr style={{ background: "var(--bg-surface)", textAlign: "left", borderBottom: "2px solid var(--border-light)" }}>
-                            <th style={{ padding: "12px", width: "100px" }}>Date</th>
-                            <th style={{ padding: "12px", width: "25%" }}>Prospect Entity</th>
-                            <th style={{ padding: "12px", width: "20%" }}>Contact & Region</th>
-                            <th style={{ padding: "12px", width: "25%" }}>Expressed Interest</th>
-                            <th style={{ padding: "12px", width: "10%" }}>Status</th>
-                            <th style={{ padding: "12px", textAlign: "right" }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {leads.length === 0 && !loading ? (
-                            <tr><td colSpan="6" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>No pending inquiries in your territory.</td></tr>
-                        ) : leads.map((lead) => (
-                            <tr key={lead.id} style={{ borderBottom: "1px solid var(--border-light)", transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                                
-                                {/* 1. Date */}
-                                <td style={{ padding: "12px", color: "var(--text-muted)", fontSize: "12px", verticalAlign: "top" }}>
-                                    {new Date(lead.created_at).toLocaleDateString()}
-                                </td>
+            <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[100px]">
+                                    Date
+                                </TableHead>
 
-                                {/* 2. Prospect Entity (B2B Focus) */}
-                                <td style={{ padding: "12px", verticalAlign: "top" }}>
-                                    <div style={{ fontWeight: "600", color: "var(--text-main)", fontSize: "15px" }}>{lead.company_name || "Unknown Company"}</div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
-                                        <span style={{ fontSize: "13px", color: "#333" }}>{lead.full_name}</span>
-                                        {lead.designation && (
-                                            <span style={{ fontSize: "10px", background: "#eef2ff", color: "#4f46e5", padding: "2px 6px", borderRadius: "10px", fontWeight: "bold" }}>
-                                                {lead.designation}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {lead.gdpr_consent && <div style={{ fontSize: "10px", color: "var(--brand-success)", marginTop: "4px" }}>✓ GDPR Consented</div>}
-                                </td>
+                                <TableHead className="min-w-[260px]">
+                                    Prospect Entity
+                                </TableHead>
 
-                                {/* 3. Contact & Location */}
-                                <td style={{ padding: "12px", verticalAlign: "top" }}>
-                                    <div style={{ fontWeight: "500", fontSize: "13px" }}>{lead.city_state}</div>
-                                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>Zone: {lead.assigned_region}</div>
-                                    <div style={{ fontSize: "12px", color: "var(--brand-accent)" }}>✉ {lead.contact_email}</div>
-                                    <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>📞 {lead.phone_number}</div>
-                                </td>
+                                <TableHead className="min-w-[220px]">
+                                    Contact & Region
+                                </TableHead>
 
-                                {/* 4. Interest / Query */}
-                                <td style={{ padding: "12px", verticalAlign: "top" }}>
-                                    {renderProductTags(lead.product_query)}
-                                </td>
+                                <TableHead className="min-w-[260px]">
+                                    Expressed Interest
+                                </TableHead>
 
-                                {/* 5. Status */}
-                                <td style={{ padding: "12px", verticalAlign: "top" }}>
-                                    <span style={{ 
-                                        padding: "4px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: "bold",
-                                        background: lead.status === 'New' ? "var(--brand-danger)" : lead.status === 'Contacted' ? "var(--brand-warning)" : lead.status === 'Lost' ? "#eee" : "var(--brand-success)",
-                                        color: lead.status === 'Lost' ? "#666" : "#fff",
-                                        display: "inline-block"
-                                    }}>
-                                        {lead.status}
-                                    </span>
-                                </td>
+                                <TableHead className="w-[120px]">
+                                    Status
+                                </TableHead>
 
-                                {/* 6. Actions */}
-                                <td style={{ padding: "12px", textAlign: "right", verticalAlign: "top" }}>
-                                    {lead.status === 'New' && (
-                                        <button className="btn btn-secondary" style={{ fontSize: "11px", padding: "6px 12px", width: "100%", marginBottom: "5px" }} onClick={() => handleStatusChange(lead.id, 'Contacted')}>
-                                            Mark Contacted
-                                        </button>
-                                    )}
-                                    {lead.status === 'Contacted' && (
-                                        <>
-                                            <button className="btn btn-success" style={{ fontSize: "11px", padding: "6px 12px", width: "100%", marginBottom: "5px" }} onClick={() => handleStatusChange(lead.id, 'Converted')}>
-                                                Convert to Client
-                                            </button>
-                                            <button className="btn" style={{ fontSize: "11px", padding: "6px 12px", width: "100%", border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-muted)" }} onClick={() => handleStatusChange(lead.id, 'Lost')}>
-                                                Close / Lost
-                                            </button>
-                                        </>
-                                    )}
-                                </td>
+                                <TableHead className="w-[160px] text-right">
+                                    Actions
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
 
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                        <TableBody>
+                            {leads.length === 0 && !loading ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-32 text-center text-muted-foreground"
+                                    >
+                                        No pending inquiries in your territory.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                leads.map((lead) => (
+                                    <TableRow key={lead.id}>
+                                        {/* Date */}
+                                        <TableCell className="align-top text-xs text-muted-foreground">
+                                            {new Date(
+                                                lead.created_at
+                                            ).toLocaleDateString()}
+                                        </TableCell>
+
+                                        {/* Prospect Entity */}
+                                        <TableCell className="align-top">
+                                            <div className="font-semibold text-foreground">
+                                                {lead.company_name ||
+                                                    "Unknown Company"}
+                                            </div>
+
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                                <span className="text-sm text-foreground">
+                                                    {lead.full_name}
+                                                </span>
+
+                                                {lead.designation && (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="text-[10px]"
+                                                    >
+                                                        {lead.designation}
+                                                    </Badge>
+                                                )}
+                                            </div>
+
+                                            {lead.gdpr_consent && (
+                                                <div className="mt-1 text-[10px] font-medium text-emerald-600">
+                                                    ✓ GDPR Consented
+                                                </div>
+                                            )}
+                                        </TableCell>
+
+                                        {/* Contact & Location */}
+                                        <TableCell className="align-top">
+                                            <div className="font-medium text-sm">
+                                                {lead.city_state}
+                                            </div>
+
+                                            <div className="mt-0.5 text-[11px] text-muted-foreground">
+                                                Zone: {lead.assigned_region}
+                                            </div>
+
+                                            <div className="mt-1 text-xs text-primary">
+                                                ✉ {lead.contact_email}
+                                            </div>
+
+                                            <div className="text-xs text-muted-foreground">
+                                                📞 {lead.phone_number}
+                                            </div>
+                                        </TableCell>
+
+                                        {/* Interest */}
+                                        <TableCell className="align-top">
+                                            {renderProductTags(
+                                                lead.product_query
+                                            )}
+                                        </TableCell>
+
+                                        {/* Status */}
+                                        <TableCell className="align-top">
+                                            {getStatusBadge(lead.status)}
+                                        </TableCell>
+
+                                        {/* Actions */}
+                                        <TableCell className="align-top text-right">
+                                            <div className="flex flex-col items-end gap-1.5">
+                                                {lead.status === "New" && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full"
+                                                        onClick={() =>
+                                                            handleStatusChange(
+                                                                lead.id,
+                                                                "Contacted"
+                                                            )
+                                                        }
+                                                    >
+                                                        Mark Contacted
+                                                    </Button>
+                                                )}
+
+                                                {lead.status === "Contacted" && (
+                                                    <>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            className="w-full bg-emerald-600 hover:bg-emerald-700"
+                                                            onClick={() =>
+                                                                handleStatusChange(
+                                                                    lead.id,
+                                                                    "Converted"
+                                                                )
+                                                            }
+                                                        >
+                                                            Convert to Client
+                                                        </Button>
+
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="w-full text-muted-foreground"
+                                                            onClick={() =>
+                                                                handleStatusChange(
+                                                                    lead.id,
+                                                                    "Lost"
+                                                                )
+                                                            }
+                                                        >
+                                                            Close / Lost
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
