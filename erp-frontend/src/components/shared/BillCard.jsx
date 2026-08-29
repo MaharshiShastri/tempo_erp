@@ -1,46 +1,125 @@
-export default function BillCard({ bill, onPrint }) {
+import {
+    Card,
+    CardContent,
+    CardHeader,
+} from "@/components/ui/card";
+
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+
+import { Badge } from "@/components/ui/badge";
+
+export default function BillCard({ bill }) {
     return (
-        <div style={{marginBottom: '20px', border: '1px solid var(--border-light)', borderLeft: '4px solid var(--brand-success)', borderRadius: 'var(--radius-sm)', padding: '15px'}}>
-            
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
-                <span style={{fontFamily: 'monospace', fontSize: '12px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: 'var(--radius-sm)'}}>{bill.bill_num}</span>
+        <Card className="overflow-hidden border-l-4 border-l-emerald-500">
+            <CardHeader className="pb-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Badge
+                            variant="secondary"
+                            className="font-mono text-xs"
+                        >
+                            {bill.bill_num}
+                        </Badge>
 
-                <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>Invoice Date: {bill.bill_date}</h3>
+                        <span className="text-sm text-muted-foreground">
+                            Invoice Date:{" "}
+                            <span className="font-medium text-foreground">
+                                {bill.bill_date}
+                            </span>
+                        </span>
+                    </div>
 
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: '10px' }}>
-                        Source OA: <strong>{bill.order_acceptance_id || "—"}</strong>
-                    </span>
-
-                    <button className="btn btn-secondary" onClick={() => onPrint?.(bill, 'invoice')}>🖨️ Print Invoice</button>
+                    <div className="text-sm text-muted-foreground">
+                        Source OA:{" "}
+                        <span className="font-medium text-foreground">
+                            {bill.order_acceptance_id || "—"}
+                        </span>
+                    </div>
                 </div>
-            </div>
+            </CardHeader>
 
-            <div style={{ overflowX: 'auto' }}>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Billing Item Line ID</th>
-                            <th>Target Order Item Reference</th>
-                            <th>Resolved Item Code</th>
-                            <th style={{ textAlign: 'right' }}>Dispatched Quantity</th>
-                            <th style={{ textAlign: 'right' }}>Remaining to Bill</th>
-                        </tr>
-                    </thead>
+            <CardContent className="pt-0">
+                <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>
+                                    Billing Item Line ID
+                                </TableHead>
 
-                    <tbody>
-                        {bill.items?.map((it, idx) => (
-                            <tr key={idx}>
-                                <td># {it.bill_item_id || 'Pending'}</td>
-                                <td style={{ color: 'var(--text-muted)' }}>Row ID: {it.order_item_id}</td>
-                                <td><strong>{it.item_code}</strong></td>
-                                <td style={{textAlign: 'right', fontWeight: 'bold', color: 'var(--brand-success)'}}>{it.quantity_shipped} Units</td>
-                                <td style={{ textAlign: 'right', fontWeight: 'bold', color: Number(it.remaining_quantity || 0) > 0 ? 'var(--brand-danger)' : 'var(--brand-success)' }}>{it.remaining_quantity ?? "—"} Units</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                                <TableHead>
+                                    Target Order Item Reference
+                                </TableHead>
+
+                                <TableHead>
+                                    Resolved Item Code
+                                </TableHead>
+
+                                <TableHead className="text-right">
+                                    Dispatched Quantity
+                                </TableHead>
+
+                                <TableHead className="text-right">
+                                    Remaining to Bill
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+
+                        <TableBody>
+                            {(bill.items ?? []).map((item, index) => {
+                                const remainingQuantity =
+                                    Number(item.remaining_quantity || 0);
+
+                                const hasRemaining =
+                                    remainingQuantity > 0;
+
+                                return (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-mono text-xs">
+                                            # {item.bill_item_id || "Pending"}
+                                        </TableCell>
+
+                                        <TableCell className="text-muted-foreground">
+                                            Row ID: {item.order_item_id}
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <span className="font-semibold">
+                                                {item.item_code}
+                                            </span>
+                                        </TableCell>
+
+                                        <TableCell className="text-right">
+                                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                {item.quantity_shipped} Units
+                                            </span>
+                                        </TableCell>
+
+                                        <TableCell className="text-right">
+                                            <span
+                                                className={
+                                                    hasRemaining
+                                                        ? "font-semibold text-destructive"
+                                                        : "font-semibold text-emerald-600 dark:text-emerald-400"
+                                                }
+                                            >
+                                                {item.remaining_quantity ?? "—"} Units
+                                            </span>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
