@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { Label } from "@/components/ui/label";
+import { useMemo, useState } from "react";
+
+import { cn } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   Command,
   CommandEmpty,
@@ -11,114 +13,77 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
-export default function SearchableMultiselect({
+import { Label } from "@/components/ui/label";
+
+export default function SearchableMultiSelect({
   label,
   options = [],
   value = [],
   onChange,
-  compact = false,
 }) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
 
-  const normalizedOptions = useMemo(
-    () => (options ?? []).filter(Boolean),
-    [options]
-  );
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) return normalizedOptions;
-
-    return normalizedOptions.filter((option) =>
-      option.toLowerCase().includes(query)
-    );
-  }, [normalizedOptions, search]);
-
-  const allSelected =
-    normalizedOptions.length > 0 &&
-    value.length === normalizedOptions.length;
+  const selected = value || [];
 
   const toggleOption = (option) => {
-    if (value.includes(option)) {
-      onChange(value.filter((item) => item !== option));
+    if (selected.includes(option)) {
+      onChange(
+        selected.filter((item) => item !== option)
+      );
     } else {
-      onChange([...value, option]);
+      onChange([...selected, option]);
     }
   };
 
-  const toggleAll = () => {
-    onChange(allSelected ? [] : normalizedOptions);
-  };
+  const buttonText = useMemo(() => {
+    if (!selected.length) {
+      return `Select ${label.toLowerCase()}...`;
+    }
+
+    if (selected.length === 1) {
+      return selected[0];
+    }
+
+    return `${selected.length} selected`;
+  }, [selected, label]);
 
   return (
-    <div className={cn(compact ? "w-auto" : "w-full")}>
-      {!compact && (
-        <Label className="mb-2 block">
-          {label} ({normalizedOptions.length})
-        </Label>
-      )}
+    <div className="grid gap-2">
+      <Label>{label}</Label>
 
       <Popover
         open={open}
-        onOpenChange={(nextOpen) => {
-          setOpen(nextOpen);
-          if (!nextOpen) setSearch("");
-        }}
+        onOpenChange={setOpen}
       >
         <PopoverTrigger asChild>
           <Button
-            type="button"
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn(
-              "justify-between",
-              compact ? "h-9 text-xs" : "w-full",
-            )}
+            className="w-full justify-between font-normal"
           >
             <span className="truncate">
-              {compact ? label : (
-                value.length > 0
-                  ? `${value.length} selected`
-                  : `Select ${label}`
-              )}
+              {buttonText}
             </span>
 
-            {compact && value.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-2 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
-              >
-                {value.length}
-              </Badge>
-            )}
-
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
 
         <PopoverContent
+          className="w-[--radix-popover-trigger-width] p-0"
           align="start"
-          className={cn(
-            "p-0",
-            compact ? "w-[320px]" : "w-[320px]"
-          )}
         >
-          <Command shouldFilter={false}>
+          <Command>
             <CommandInput
-              placeholder={`Search ${label}`}
-              value={search}
-              onValueChange={setSearch}
+              placeholder={`Search ${label.toLowerCase()}...`}
             />
 
             <CommandList>
@@ -127,40 +92,28 @@ export default function SearchableMultiselect({
               </CommandEmpty>
 
               <CommandGroup>
-                <CommandItem
-                  value="__select_all__"
-                  onSelect={toggleAll}
-                  className="cursor-pointer"
-                >
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleAll}
-                    className="mr-2"
-                  />
-                  <span>Select All</span>
-                </CommandItem>
-
-                {filtered.map((option) => {
-                  const selected = value.includes(option);
+                {options.map((option) => {
+                  const isSelected =
+                    selected.includes(option);
 
                   return (
                     <CommandItem
                       key={option}
                       value={option}
-                      onSelect={() => toggleOption(option)}
-                      className="cursor-pointer"
+                      onSelect={() =>
+                        toggleOption(option)
+                      }
                     >
-                      <Checkbox
-                        checked={selected}
-                        onCheckedChange={() => toggleOption(option)}
-                        className="mr-2"
+                      <Check
+                        className={cn(
+                          "mr-2 size-4",
+                          isSelected
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
                       />
 
-                      <span className="truncate">{option}</span>
-
-                      {selected && (
-                        <Check className="ml-auto h-4 w-4" />
-                      )}
+                      {option}
                     </CommandItem>
                   );
                 })}

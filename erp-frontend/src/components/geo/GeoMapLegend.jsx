@@ -1,30 +1,52 @@
+import { Card } from "@/components/ui/card";
+
 export default function GeoMapLegend() {
+  const levels = [
+    {
+      color: "#08306b",
+      label: "> ₹5,00,000",
+    },
+    {
+      color: "#2171b5",
+      label: "₹2,50,000 - ₹5,00,000",
+    },
+    {
+      color: "#6baed6",
+      label: "₹1,00,000 - ₹2,50,000",
+    },
+    {
+      color: "#c6dbef",
+      label: "₹1 - ₹1,00,000",
+    },
+    {
+      color: "#f2f2f2",
+      label: "No sales",
+    },
+  ];
 
-    const levels = [
-        { color: "#08306b", label: "> ₹5,00,000" },
-        { color: "#2171b5", label: "₹2,50,000 - ₹5,00,000" },
-        { color: "#6baed6", label: "₹1,00,000 - ₹2,50,000" },
-        { color: "#c6dbef", label: "₹1 - ₹1,00,000" },
-        { color: "#f2f2f2", label: "No sales" }
-    ];
+  return (
+    <Card className="absolute bottom-4 right-4 z-10 w-56 bg-background/95 p-4 shadow-lg backdrop-blur">
+      <div className="mb-3 text-sm font-semibold">
+        Revenue
+      </div>
 
-    return (
-        <div
-            style={{position: "absolute", right: 20, bottom: 20, background: "var(--bg-surface)", padding: 12, borderRadius: 8, border: "1px solid var(--border-light)", boxShadow: "0 2px 8px rgba(0,0,0,.15)"}}>
- 
-            <b>Revenue</b>
+      <div className="space-y-2">
+        {levels.map((level) => (
+          <div
+            key={level.label}
+            className="flex items-center gap-2 text-xs"
+          >
+            <div
+              className="size-4 shrink-0 rounded-sm border"
+              style={{
+                backgroundColor: level.color,
+              }}
+            />
 
-            {levels.map(level => (
-
-                <div key={level.label} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8}}>
-
-                    <div style={{ width: 18, height: 18, background: level.color, border: "1px solid #aaa"}}/>
-
-                    {level.label}
-
-                </div>
-
-            ))}
-        </div>
-    );
+            <span>{level.label}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
 }

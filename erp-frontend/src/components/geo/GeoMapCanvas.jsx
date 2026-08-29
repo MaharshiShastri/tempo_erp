@@ -1,27 +1,50 @@
-import { useRef} from "react";
+import { useRef } from "react";
 import "ol/ol.css";
+
 import useOpenLayersMap from "../../hooks/geographic/useOpenLayersMap";
 import GeoMapLegend from "./GeoMapLegend";
 
-import { fromLonLat } from "ol/proj";
+export default function GeoMapCanvas({
+  visibleMap,
+  isDispatcher,
+}) {
+  const mapRef = useRef(null);
+  const toolTipRef = useRef(null);
 
-export default function GeoMapCanvas({visibleMap, isDispatcher}){
-    const mapRef = useRef(null);
-    const toolTipRef = useRef(null);
+  useOpenLayersMap(
+    mapRef,
+    toolTipRef,
+    visibleMap,
+    isDispatcher
+  );
 
-    useOpenLayersMap(mapRef, toolTipRef,  visibleMap, isDispatcher);
-    return(
-        <div style={{position:"relative"}}>
-            <div ref={mapRef} style={{width: "100%", height:"700px", borderRadius: "8px", background: "#fff"}} />
-            <div ref={toolTipRef} style={{
-                position: "absolute", pointerEvents: "none", display: "none",
-                background: "var(--bg-surface)", color: "var(--text-primary)",
-                padding: "10px 14px", borderRadius: 8,
-                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.2)", border: "1px solid var(--border-light)",
-                whiteSpace: "nowrap", zIndex: 1000
-                }} />
+  return (
+    <div className="relative overflow-hidden rounded-lg border bg-background">
+      <div
+        ref={mapRef}
+        className="h-[700px] w-full"
+      />
 
-            <GeoMapLegend />
-        </div>
-    );
+      <div
+        ref={toolTipRef}
+        className="
+          pointer-events-none
+          absolute
+          z-[1000]
+          hidden
+          whitespace-nowrap
+          rounded-md
+          border
+          bg-background
+          px-3
+          py-2
+          text-sm
+          text-foreground
+          shadow-lg
+        "
+      />
+
+      <GeoMapLegend />
+    </div>
+  );
 }

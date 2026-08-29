@@ -4,1566 +4,919 @@ import { Line, Bar, Pie } from "react-chartjs-2";
 import GeoMapCanvas from "../components/geo/GeoMapCanvas";
 import SearchableMultiSelect from "../components/shared/SearchableMultiselect";
 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import { Button } from "@/components/ui/button";
+
+import { Input } from "@/components/ui/input";
+
+import { Label } from "@/components/ui/label";
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { Badge } from "@/components/ui/badge";
+
+import { Separator } from "@/components/ui/separator";
+
 export default function ProductionAnalyticsView({ state }) {
+  const {
+    productionBarChart,
+    productionPieChart,
+    productionLineChart,
+    prodKpis,
+    fetchAnalytics,
+    fromDate,
+    toDate,
+    setFromDate,
+    setToDate,
+    downloadPendingOrdersExcel,
+    isDownloadingPendingOrders,
 
-    const {
-        productionBarChart,
-        productionPieChart,
-        productionLineChart,
-        prodKpis,
-        fetchAnalytics,
-        fromDate,
-        toDate,
-        setFromDate,
-        setToDate,
-        downloadPendingOrdersExcel,
-        isDownloadingPendingOrders,
+    indiaMap,
+    visibleMap,
+    isLoading,
 
-        // Existing geographic state
-        indiaMap,
-        visibleMap,
-        isLoading,
+    selectedStates,
+    setSelectedStates,
 
-        selectedStates,
-        setSelectedStates,
+    selectedItems,
+    setSelectedItems,
 
-        selectedItems,
-        setSelectedItems,
+    selectedGroups,
+    setSelectedGroups,
+  } = state;
 
-        selectedGroups,
-        setSelectedGroups,
-    } = state;
+  const [activeView, setActiveView] = useState("statistics");
 
-    const [activeView, setActiveView] = useState("statistics");
+  const orderSummary =
+    prodKpis?.order_quantity_summary || {
+      ordered: 0,
+      shipped: 0,
+      pending: 0,
+    };
 
-    const orderSummary =
-        prodKpis?.order_quantity_summary || {
-            ordered: 0,
-            shipped: 0,
-            pending: 0,
-        };
+  const fulfillmentPercentage =
+    orderSummary.ordered > 0
+      ? (
+          (orderSummary.shipped / orderSummary.ordered) *
+          100
+        ).toFixed(1)
+      : "0.0";
 
-    const fulfillmentPercentage =
-        orderSummary.ordered > 0
-            ? (
-                  (orderSummary.shipped / orderSummary.ordered) *
-                  100
-              ).toFixed(1)
-            : "0.0";
+  // ------------------------------------------------------------
+  // Geographic data
+  // ------------------------------------------------------------
 
-    // ============================================================
-    // Geographic data
-    // ============================================================
-
-    const stateList = useMemo(() => {
-
-        if (!Array.isArray(indiaMap?.features)) {
-            return [];
-        }
-
-        return indiaMap.features
-            .map(feature => feature?.properties?.ST_NM)
-            .filter(Boolean)
-            .sort();
-
-    }, [indiaMap]);
-
-    const itemsMaster = state?.itemsMaster ?? [];
-
-    const itemGroups = useMemo(() => {
-
-        return [
-            ...new Set(
-                itemsMaster
-                    .map(item => item?.item_group)
-                    .filter(Boolean)
-            ),
-        ].sort();
-
-    }, [itemsMaster]);
-
-    // item_code -> item_group
-    const itemGroupMap = useMemo(() => {
-
-        return Object.fromEntries(
-            itemsMaster.map(item => [
-                item.item_code,
-                item.item_group || "General",
-            ])
-        );
-
-    }, [itemsMaster]);
-
-    // item_code -> item data
-    const itemMap = useMemo(() => {
-
-        return Object.fromEntries(
-            itemsMaster.map(item => [
-                item.item_code,
-                item,
-            ])
-        );
-
-    }, [itemsMaster]);
-
-    // ============================================================
-    // Pending orders
-    // ============================================================
-
-    const pendingOrderItems =
-        prodKpis?.pending_order_items ?? [];
-
-    const filteredPendingOrderItems = useMemo(() => {
-
-        return pendingOrderItems.filter(row => {
-
-            const itemCode = row?.item_code || "";
-
-            const group =
-                itemGroupMap[itemCode] || "General";
-
-            const itemMatches =
-                !selectedItems?.length ||
-                selectedItems.includes(itemCode);
-
-            const groupMatches =
-                !selectedGroups?.length ||
-                selectedGroups.includes(group);
-
-            const stateMatches =
-                !selectedStates?.length ||
-                selectedStates.includes(row?.state_name);
-
-            return (
-                itemMatches &&
-                groupMatches &&
-                stateMatches
-            );
-
-        });
-
-    }, [
-        pendingOrderItems,
-        itemGroupMap,
-        selectedItems,
-        selectedGroups,
-        selectedStates,
-    ]);
-
-    // ============================================================
-    // Geo totals
-    // ============================================================
-
-    const geoSummary = useMemo(() => {
-
-        return filteredPendingOrderItems.reduce(
-            (summary, row) => {
-
-                summary.ordered += Number(
-                    row?.ordered_quantity || 0
-                );
-
-                summary.shipped += Number(
-                    row?.shipped_quantity || 0
-                );
-
-                summary.pending += Number(
-                    row?.pending_quantity || 0
-                );
-
-                return summary;
-
-            },
-            {
-                ordered: 0,
-                shipped: 0,
-                pending: 0,
-            }
-        );
-
-    }, [filteredPendingOrderItems]);
-
-    // ============================================================
-    // Geo fulfillment %
-    // ============================================================
-
-    const geoFulfillmentPercentage =
-        geoSummary.ordered > 0
-            ? (
-                  (geoSummary.shipped /
-                      geoSummary.ordered) *
-                  100
-              ).toFixed(1)
-            : "0.0";
-
-    // ============================================================
-    // Loading
-    // ============================================================
-
-    if (isLoading) {
-        return (
-            <div className="frappe-card">
-                <p>Loading analytics...</p>
-            </div>
-        );
+  const stateList = useMemo(() => {
+    if (!Array.isArray(indiaMap?.features)) {
+      return [];
     }
 
-    return (
-        <div className="print-section">
-
-            {/* =====================================================
-                HEADER
-            ====================================================== */}
-
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 25,
-                }}
-            >
-
-                <div>
-
-                    <h2>🏭 Production Dashboard</h2>
-
-                    <p className="text-muted">
-                        Shop Floor Performance Analytics
-                    </p>
-
-                </div>
-
-                <div
-                    style={{
-                        display: "flex",
-                        gap: 15,
-                        alignItems: "end",
-                    }}
-                >
-
-                    <div className="form-group">
-
-                        <label>From</label>
-
-                        <input
-                            className="form-input"
-                            type="date"
-                            value={fromDate}
-                            onChange={e =>
-                                setFromDate(e.target.value)
-                            }
-                        />
-
-                    </div>
-
-                    <div className="form-group">
-
-                        <label>To</label>
-
-                        <input
-                            className="form-input"
-                            type="date"
-                            value={toDate}
-                            onChange={e =>
-                                setToDate(e.target.value)
-                            }
-                        />
-
-                    </div>
-
-                    <button
-                        className="btn-primary"
-                        onClick={() =>
-                            fetchAnalytics(
-                                "Shop Floor Administrator",
-                                fromDate,
-                                toDate
-                            )
-                        }
-                    >
-                        Refresh
-                    </button>
-
-                </div>
-
-            </div>
-
-            {/* =====================================================
-                NAVIGATION
-            ====================================================== */}
-
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                        "repeat(4, minmax(0, 1fr))",
-                    marginBottom: 25,
-                    gap: 12,
-                }}
-            >
-
-                <button
-                    className={
-                        activeView === "statistics"
-                            ? "btn-primary"
-                            : "btn-text"
-                    }
-                    onClick={() =>
-                        setActiveView("statistics")
-                    }
-                >
-                    Statistics
-                </button>
-
-                <button
-                    className={
-                        activeView === "charts"
-                            ? "btn-primary"
-                            : "btn-text"
-                    }
-                    onClick={() =>
-                        setActiveView("charts")
-                    }
-                >
-                    Charts
-                </button>
-
-                <button
-                    className={
-                        activeView === "shopfloor"
-                            ? "btn-primary"
-                            : "btn-text"
-                    }
-                    onClick={() =>
-                        setActiveView("shopfloor")
-                    }
-                >
-                    Shop Floor
-                </button>
-
-                <button
-                    className={
-                        activeView === "geo"
-                            ? "btn-primary"
-                            : "btn-text"
-                    }
-                    onClick={() =>
-                        setActiveView("geo")
-                    }
-                >
-                    Geographic
-                </button>
-
-            </div>
-
-            {/* =====================================================
-                STATISTICS
-            ====================================================== */}
-
-            {activeView === "statistics" && (
-
-                <>
-
-                    <div className="frappe-card" style={{ marginBottom: 25, padding: "18px 22px", border: "1px solid var(--border-subtle)", background: "var(--bg-surface)",}}>
-                        <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, flexWrap: "wrap",}}>
-
-                            {/* Left */}
-                            <div style={{display: "flex", alignItems: "center", gap: 14,}}>
-
-                                <div
-                                    style={{
-                                        width: 46,
-                                        height: 46,
-                                        borderRadius: 10,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        background: "rgba(34,197,94,.10)",
-                                        color: "var(--brand-success)",
-                                        fontSize: 22,
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    📊
-                                </div>
-
-                                <div>
-
-                                    <h3
-                                        style={{
-                                            margin: 0,
-                                            fontSize: 16,
-                                        }}
-                                    >
-                                        Pending Orders Report
-                                    </h3>
-
-                                    <p
-                                        style={{
-                                            margin: "4px 0 0",
-                                            color: "var(--text-muted)",
-                                            fontSize: 13,
-                                        }}
-                                    >
-                                        Export all pending order quantities for the
-                                        selected date range to Excel.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-                            {/* Right */}
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 14,
-                                }}
-                            >
-
-                                <div
-                                    style={{
-                                        textAlign: "right",
-                                        minWidth: 90,
-                                    }}
-                                >
-
-                                    <strong
-                                        style={{
-                                            display: "block",
-                                            fontSize: 20,
-                                            color: "var(--brand-danger)",
-                                        }}
-                                    >
-                                        {orderSummary.pending}
-                                    </strong>
-
-                                    <span
-                                        style={{
-                                            fontSize: 11,
-                                            color: "var(--text-muted)",
-                                        }}
-                                    >
-                                        Pending quantity
-                                    </span>
-
-                                </div>
-
-                                <button
-
-                                    type="button"
-                                    className="btn-primary"
-                                    onClick={() => {downloadPendingOrdersExcel(fromDate, toDate)}}
-                                    disabled={
-                                        isDownloadingPendingOrders ||
-                                        !fromDate ||
-                                        !toDate
-                                    }
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        gap: 8,
-                                        minWidth: 180,
-                                        padding: "10px 16px",
-                                        opacity:
-                                            isDownloadingPendingOrders
-                                                ? 0.7
-                                                : 1,
-                                    }}
-                                >
-
-                                    {isDownloadingPendingOrders ? (
-                                        <>
-                                            <span>⏳</span>
-                                            Preparing Excel...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>⬇️</span>
-                                            Download Excel
-                                        </>
-                                    )}
-
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                        {/* Date context */}
-                        <div
-                            style={{
-                                marginTop: 14,
-                                paddingTop: 12,
-                                borderTop:
-                                    "1px solid var(--border-subtle)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                color: "var(--text-muted)",
-                                fontSize: 12,
-                            }}
-                        >
-                            <span>📅</span>
-
-                            <span>
-                                Report period:
-                            </span>
-
-                            <strong
-                                style={{
-                                    color: "var(--text-primary)",
-                                }}
-                            >
-                                {fromDate || "—"}
-                            </strong>
-
-                            <span>→</span>
-
-                            <strong
-                                style={{
-                                    color: "var(--text-primary)",
-                                }}
-                            >
-                                {toDate || "—"}
-                            </strong>
-
-                        </div>
-
-                    </div>
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                                "repeat(4, minmax(0, 1fr))",
-                            gap: 20,
-                            marginBottom: 25,
-                        }}
-                    >
-
-                        <div className="frappe-card">
-
-                            <h4>Products Ordered</h4>
-
-                            <h1>
-                                {orderSummary.ordered}
-                            </h1>
-
-                            <small
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
-                                Order quantity
-                            </small>
-
-                        </div>
-
-                        <div className="frappe-card">
-
-                            <h4>Products Shipped</h4>
-
-                            <h1
-                                style={{
-                                    color:
-                                        "var(--brand-success)",
-                                }}
-                            >
-                                {orderSummary.shipped}
-                            </h1>
-
-                            <small
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
-                                Delivered quantity
-                            </small>
-
-                        </div>
-
-                        <div className="frappe-card">
-
-                            <h4>Products Pending</h4>
-
-                            <h1
-                                style={{
-                                    color:
-                                        "var(--brand-danger)",
-                                }}
-                            >
-                                {orderSummary.pending}
-                            </h1>
-
-                            <small
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
-                                Remaining quantity
-                            </small>
-
-                        </div>
-
-                        <div className="frappe-card">
-
-                            <h4>Fulfillment</h4>
-
-                            <h1
-                                style={{
-                                    color:
-                                        "var(--brand-accent)",
-                                }}
-                            >
-                                {fulfillmentPercentage}%
-                            </h1>
-
-                            <small
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
-                                Shipped / ordered
-                            </small>
-
-                        </div>
-
-                    </div>
-
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                                "1fr 1fr",
-                            gap: 25,
-                        }}
-                    >
-
-                        {/* Pending */}
-
-                        <div className="frappe-card">
-
-                            <div className="system-header">
-
-                                <div>
-
-                                    <h3>
-                                        Pending Order Fulfillment
-                                    </h3>
-
-                                    <p
-                                        style={{
-                                            margin:
-                                                "4px 0 0",
-                                            color:
-                                                "var(--text-muted)",
-                                            fontSize: 13,
-                                        }}
-                                    >
-                                        Ordered quantity remaining
-                                        to be shipped
-                                    </p>
-
-                                </div>
-
-                                <strong
-                                    style={{
-                                        color:
-                                            "var(--brand-danger)",
-                                        fontSize: 18,
-                                    }}
-                                >
-                                    {orderSummary.pending}
-                                </strong>
-
-                            </div>
-
-                            <div
-                                style={{
-                                    overflowX: "auto",
-                                }}
-                            >
-
-                                <table>
-
-                                    <thead>
-
-                                        <tr>
-                                            <th>OA ID</th>
-                                            <th>Order Date</th>
-                                            <th>Item</th>
-
-                                            <th
-                                                style={{
-                                                    textAlign:
-                                                        "right",
-                                                }}
-                                            >
-                                                Ordered
-                                            </th>
-
-                                            <th
-                                                style={{
-                                                    textAlign:
-                                                        "right",
-                                                }}
-                                            >
-                                                Shipped
-                                            </th>
-
-                                            <th
-                                                style={{
-                                                    textAlign:
-                                                        "right",
-                                                }}
-                                            >
-                                                Pending
-                                            </th>
-
-                                        </tr>
-
-                                    </thead>
-
-                                    <tbody>
-
-                                        {(
-                                            prodKpis?.pending_order_items ||
-                                            []
-                                        ).map(row => (
-
-                                            <tr
-                                                key={
-                                                    row.order_item_id
-                                                }
-                                            >
-
-                                                <td>
-                                                    <strong
-                                                        style={{
-                                                            fontFamily:
-                                                                "monospace",
-                                                            color:
-                                                                "var(--brand-accent)",
-                                                        }}
-                                                    >
-                                                        {
-                                                            row.order_acceptance_id
-                                                        }
-                                                    </strong>
-                                                </td>
-
-                                                <td>
-                                                    {
-                                                        row.order_acceptance_date
-                                                    }
-                                                </td>
-
-                                                <td>
-                                                    {
-                                                        row.item_code
-                                                    }
-                                                </td>
-
-                                                <td
-                                                    style={{
-                                                        textAlign:
-                                                            "right",
-                                                    }}
-                                                >
-                                                    {
-                                                        row.ordered_quantity
-                                                    }
-                                                </td>
-
-                                                <td
-                                                    style={{
-                                                        textAlign:
-                                                            "right",
-                                                        color:
-                                                            "var(--brand-success)",
-                                                    }}
-                                                >
-                                                    {
-                                                        row.shipped_quantity
-                                                    }
-                                                </td>
-
-                                                <td
-                                                    style={{
-                                                        textAlign:
-                                                            "right",
-                                                        fontWeight:
-                                                            700,
-                                                        color:
-                                                            "var(--brand-danger)",
-                                                    }}
-                                                >
-                                                    {
-                                                        row.pending_quantity
-                                                    }
-                                                </td>
-
-                                            </tr>
-
-                                        ))}
-
-                                        {!prodKpis?.pending_order_items
-                                            ?.length && (
-
-                                            <tr>
-
-                                                <td
-                                                    colSpan="6"
-                                                    style={{
-                                                        textAlign:
-                                                            "center",
-                                                        padding:
-                                                            30,
-                                                        color:
-                                                            "var(--brand-success)",
-                                                    }}
-                                                >
-                                                    ✅ No pending order
-                                                    quantities
-                                                </td>
-
-                                            </tr>
-
-                                        )}
-
-                                    </tbody>
-
-                                </table>
-
-                            </div>
-
-                        </div>
-
-                        {/* Operator */}
-
-                        <div className="frappe-card">
-
-                            <h3>
-                                Operator Performance
-                            </h3>
-
-                            <table className="frappe-table">
-
-                                <thead>
-
-                                    <tr>
-                                        <th>
-                                            Operator
-                                        </th>
-                                        <th>
-                                            Production
-                                        </th>
-                                    </tr>
-
-                                </thead>
-
-                                <tbody>
-
-                                    {prodKpis?.operator_summary?.map(
-                                        operator => (
-
-                                            <tr
-                                                key={
-                                                    operator?.operator
-                                                }
-                                            >
-
-                                                <td>
-                                                    {
-                                                        operator?.operator
-                                                    }
-                                                </td>
-
-                                                <td>
-                                                    {
-                                                        operator?.production
-                                                    }
-                                                </td>
-
-                                            </tr>
-
-                                        )
-                                    )}
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-                    </div>
-
-                </>
-
-            )}
-
-            {/* =====================================================
-                CHARTS
-            ====================================================== */}
-
-            {activeView === "charts" && (
-
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                            "2fr 1fr",
-                        gap: 25,
-                    }}
-                >
-
-                    <div className="frappe-card">
-
-                        <Line
-                            data={productionLineChart}
-                            options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    title: {
-                                        display: true,
-                                        text:
-                                            "Tasks Completed Daily",
-                                    },
-                                },
-                            }}
-                        />
-
-                    </div>
-
-                    <div className="frappe-card">
-
-                        <Pie
-                            data={productionPieChart}
-                            options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: "bottom",
-                                    },
-                                },
-                            }}
-                        />
-
-                    </div>
-
-                    <div
-                        className="frappe-card"
-                        style={{
-                            gridColumn:
-                                "1 / span 2",
-                        }}
-                    >
-
-                        <Bar
-                            data={productionBarChart}
-                            options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    title: {
-                                        display: true,
-                                        text:
-                                            "Tasks Assigned vs Received",
-                                    },
-                                },
-                            }}
-                        />
-
-                    </div>
-
-                </div>
-
-            )}
-
-            {/* =====================================================
-                SHOP FLOOR
-            ====================================================== */}
-
-            {activeView === "shopfloor" && (
-
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                            "repeat(3, 1fr)",
-                        gap: 20,
-                    }}
-                >
-
-                    <div className="frappe-card">
-
-                        <h3>
-                            Machine Utilization
-                        </h3>
-
-                        <h1>92%</h1>
-
-                    </div>
-
-                    <div className="frappe-card">
-
-                        <h3>
-                            Downtime
-                        </h3>
-
-                        <h1>1.8%</h1>
-
-                    </div>
-
-                    <div className="frappe-card">
-
-                        <h3>
-                            Efficiency
-                        </h3>
-
-                        <h1>97%</h1>
-
-                    </div>
-
-                </div>
-
-            )}
-
-            {/* =====================================================
-                GEOGRAPHIC
-            ====================================================== */}
-
-            {activeView === "geo" && (
-
-                <div>
-
-                    {/* -------------------------------------------------
-                        Geo header
-                    -------------------------------------------------- */}
-
-                    <div
-                        className="system-header"
-                        style={{
-                            marginBottom: 20,
-                        }}
-                    >
-
-                        <div>
-
-                            <h3>
-                                🌎 Geographic & Fulfillment Analytics
-                            </h3>
-
-                            <p
-                                style={{
-                                    margin:
-                                        "4px 0 0",
-                                    color:
-                                        "var(--text-muted)",
-                                    fontSize: 13,
-                                }}
-                            >
-                                Filter pending orders by state,
-                                product group and product.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                    {/* -------------------------------------------------
-                        Geo filters
-
-                        Product Group deliberately appears BEFORE
-                        Products.
-                    -------------------------------------------------- */}
-
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                                "repeat(auto-fit, minmax(260px, 1fr))",
-                            gap: 16,
-                            marginBottom: 20,
-                        }}
-                    >
-
-                        <SearchableMultiSelect
-                            label="Product Group"
-                            options={itemGroups}
-                            value={
-                                selectedGroups || []
-                            }
-                            onChange={
-                                setSelectedGroups
-                            }
-                        />
-
-                        <SearchableMultiSelect
-                            label="Products"
-                            options={
-                                itemsMaster.map(
-                                    item =>
-                                        item.item_code
-                                )
-                            }
-                            value={
-                                selectedItems || []
-                            }
-                            onChange={
-                                setSelectedItems
-                            }
-                        />
-
-                        <SearchableMultiSelect
-                            label="States"
-                            options={stateList}
-                            value={
-                                selectedStates || []
-                            }
-                            onChange={
-                                setSelectedStates
-                            }
-                        />
-
-                    </div>
-
-                    {/* -------------------------------------------------
-                        Selected filters
-                    -------------------------------------------------- */}
-
-                    <div
-                        style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 24,
-                            padding:
-                                "12px 18px",
-                            background:
-                                "var(--bg-surface)",
-                            borderRadius: 10,
-                            marginBottom: 20,
-                            border:
-                                "1px solid var(--border-subtle)",
-                        }}
-                    >
-
-                        <span>
-                            <b>
-                                {
-                                    selectedGroups?.length ||
-                                    0
-                                }
-                            </b>{" "}
-                            Product Groups
-                        </span>
-
-                        <span>
-                            <b>
-                                {
-                                    selectedItems?.length ||
-                                    0
-                                }
-                            </b>{" "}
-                            Products
-                        </span>
-
-                        <span>
-                            <b>
-                                {
-                                    selectedStates?.length ||
-                                    0
-                                }
-                            </b>{" "}
-                            States
-                        </span>
-
-                    </div>
-
-                    {/* -------------------------------------------------
-                        Geo map
-                    -------------------------------------------------- */}
-
-                    <GeoMapCanvas
-                        visibleMap={visibleMap}
-                        isDispatcher={
-                            state?.user?.role ===
-                            "Dispatch Engineer"
-                        }
-                    />
-
-                    {/* -------------------------------------------------
-                        Geo fulfillment KPIs
-                    -------------------------------------------------- */}
-
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                                "repeat(4, minmax(0, 1fr))",
-                            gap: 16,
-                            marginTop: 25,
-                        }}
-                    >
-
-                        <div className="frappe-card">
-
-                            <h4>
-                                Filtered Ordered
-                            </h4>
-
-                            <h2>
-                                {
-                                    geoSummary.ordered
-                                }
-                            </h2>
-
-                        </div>
-
-                        <div className="frappe-card">
-
-                            <h4>
-                                Filtered Shipped
-                            </h4>
-
-                            <h2
-                                style={{
-                                    color:
-                                        "var(--brand-success)",
-                                }}
-                            >
-                                {
-                                    geoSummary.shipped
-                                }
-                            </h2>
-
-                        </div>
-
-                        <div className="frappe-card">
-
-                            <h4>
-                                Filtered Pending
-                            </h4>
-
-                            <h2
-                                style={{
-                                    color:
-                                        "var(--brand-danger)",
-                                }}
-                            >
-                                {
-                                    geoSummary.pending
-                                }
-                            </h2>
-
-                        </div>
-
-                        <div className="frappe-card">
-
-                            <h4>
-                                Fulfillment
-                            </h4>
-
-                            <h2
-                                style={{
-                                    color:
-                                        "var(--brand-accent)",
-                                }}
-                            >
-                                {
-                                    geoFulfillmentPercentage
-                                }%
-                            </h2>
-
-                        </div>
-
-                    </div>
-
-                    {/* -------------------------------------------------
-                        Filtered pending register
-                    -------------------------------------------------- */}
-
-                    <div
-                        className="frappe-card"
-                        style={{
-                            marginTop: 20,
-                        }}
-                    >
-
-                        <div className="system-header">
-
-                            <div>
-
-                                <h3>
-                                    Pending Order Register
-                                </h3>
-
-                                <p
-                                    style={{
-                                        margin:
-                                            "4px 0 0",
-                                        color:
-                                            "var(--text-muted)",
-                                        fontSize: 13,
-                                    }}
-                                >
-                                    Pending quantities matching
-                                    the selected filters.
-                                </p>
-
-                            </div>
-
-                            <strong
-                                style={{
-                                    color:
-                                        "var(--brand-danger)",
-                                    fontSize: 18,
-                                }}
-                            >
-                                {
-                                    geoSummary.pending
-                                }
-                            </strong>
-
-                        </div>
-
-                        <div
-                            style={{
-                                overflowX: "auto",
-                            }}
-                        >
-
-                            <table>
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th>
-                                            OA ID
-                                        </th>
-
-                                        <th>
-                                            Order Date
-                                        </th>
-
-                                        <th>
-                                            State
-                                        </th>
-
-                                        <th>
-                                            Product Group
-                                        </th>
-
-                                        <th>
-                                            Product
-                                        </th>
-
-                                        <th
-                                            style={{
-                                                textAlign:
-                                                    "right",
-                                            }}
-                                        >
-                                            Ordered
-                                        </th>
-
-                                        <th
-                                            style={{
-                                                textAlign:
-                                                    "right",
-                                            }}
-                                        >
-                                            Shipped
-                                        </th>
-
-                                        <th
-                                            style={{
-                                                textAlign:
-                                                    "right",
-                                            }}
-                                        >
-                                            Pending
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
-
-                                <tbody>
-
-                                    {filteredPendingOrderItems.length ? (
-
-                                        filteredPendingOrderItems.map(
-                                            row => {
-
-                                                const group =
-                                                    itemGroupMap[
-                                                        row.item_code
-                                                    ] ||
-                                                    "General";
-
-                                                return (
-                                                    <tr
-                                                        key={
-                                                            row.order_item_id
-                                                        }
-                                                    >
-
-                                                        <td>
-
-                                                            <strong
-                                                                style={{
-                                                                    fontFamily:
-                                                                        "monospace",
-                                                                    color:
-                                                                        "var(--brand-accent)",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    row.order_acceptance_id
-                                                                }
-                                                            </strong>
-
-                                                        </td>
-
-                                                        <td>
-                                                            {
-                                                                row.order_acceptance_date
-                                                            }
-                                                        </td>
-
-                                                        <td>
-                                                            {
-                                                                row.state_name ||
-                                                                "—"
-                                                            }
-                                                        </td>
-
-                                                        <td>
-
-                                                            <span
-                                                                style={{
-                                                                    background:
-                                                                        "var(--combobox-hover)",
-                                                                    padding:
-                                                                        "3px 8px",
-                                                                    borderRadius:
-                                                                        "999px",
-                                                                    fontSize:
-                                                                        11,
-                                                                }}
-                                                            >
-                                                                {group}
-                                                            </span>
-
-                                                        </td>
-
-                                                        <td>
-
-                                                            <div
-                                                                style={{
-                                                                    fontWeight:
-                                                                        600,
-                                                                }}
-                                                            >
-                                                                {
-                                                                    row.item_code
-                                                                }
-                                                            </div>
-
-                                                        </td>
-
-                                                        <td
-                                                            style={{
-                                                                textAlign:
-                                                                    "right",
-                                                            }}
-                                                        >
-                                                            {
-                                                                row.ordered_quantity
-                                                            }
-                                                        </td>
-
-                                                        <td
-                                                            style={{
-                                                                textAlign:
-                                                                    "right",
-                                                                color:
-                                                                    "var(--brand-success)",
-                                                            }}
-                                                        >
-                                                            {
-                                                                row.shipped_quantity
-                                                            }
-                                                        </td>
-
-                                                        <td
-                                                            style={{
-                                                                textAlign:
-                                                                    "right",
-                                                                color:
-                                                                    "var(--brand-danger)",
-                                                                fontWeight:
-                                                                    700,
-                                                            }}
-                                                        >
-                                                            {
-                                                                row.pending_quantity
-                                                            }
-                                                        </td>
-
-                                                    </tr>
-                                                );
-
-                                            }
-                                        )
-
-                                    ) : (
-
-                                        <tr>
-
-                                            <td
-                                                colSpan="8"
-                                                style={{
-                                                    textAlign:
-                                                        "center",
-                                                    padding:
-                                                        40,
-                                                    color:
-                                                        "var(--brand-success)",
-                                                }}
-                                            >
-                                                ✅ No pending orders
-                                                match the selected
-                                                filters.
-                                            </td>
-
-                                        </tr>
-
-                                    )}
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            )}
-
-        </div>
+    return indiaMap.features
+      .map((feature) => feature?.properties?.ST_NM)
+      .filter(Boolean)
+      .sort();
+  }, [indiaMap]);
+
+  const itemsMaster = state?.itemsMaster ?? [];
+
+  const itemGroups = useMemo(() => {
+    return [
+      ...new Set(
+        itemsMaster
+          .map((item) => item?.item_group)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [itemsMaster]);
+
+  const itemGroupMap = useMemo(() => {
+    return Object.fromEntries(
+      itemsMaster.map((item) => [
+        item.item_code,
+        item.item_group || "General",
+      ])
     );
+  }, [itemsMaster]);
+
+  // ------------------------------------------------------------
+  // Pending orders
+  // ------------------------------------------------------------
+
+  const pendingOrderItems =
+    prodKpis?.pending_order_items ?? [];
+
+  const filteredPendingOrderItems = useMemo(() => {
+    return pendingOrderItems.filter((row) => {
+      const itemCode = row?.item_code || "";
+
+      const group =
+        itemGroupMap[itemCode] || "General";
+
+      const itemMatches =
+        !selectedItems?.length ||
+        selectedItems.includes(itemCode);
+
+      const groupMatches =
+        !selectedGroups?.length ||
+        selectedGroups.includes(group);
+
+      const stateMatches =
+        !selectedStates?.length ||
+        selectedStates.includes(row?.state_name);
+
+      return (
+        itemMatches &&
+        groupMatches &&
+        stateMatches
+      );
+    });
+  }, [
+    pendingOrderItems,
+    itemGroupMap,
+    selectedItems,
+    selectedGroups,
+    selectedStates,
+  ]);
+
+  // ------------------------------------------------------------
+  // Geographic totals
+  // ------------------------------------------------------------
+
+  const geoSummary = useMemo(() => {
+    return filteredPendingOrderItems.reduce(
+      (summary, row) => {
+        summary.ordered += Number(
+          row?.ordered_quantity || 0
+        );
+
+        summary.shipped += Number(
+          row?.shipped_quantity || 0
+        );
+
+        summary.pending += Number(
+          row?.pending_quantity || 0
+        );
+
+        return summary;
+      },
+      {
+        ordered: 0,
+        shipped: 0,
+        pending: 0,
+      }
+    );
+  }, [filteredPendingOrderItems]);
+
+  const geoFulfillmentPercentage =
+    geoSummary.ordered > 0
+      ? (
+          (geoSummary.shipped /
+            geoSummary.ordered) *
+          100
+        ).toFixed(1)
+      : "0.0";
+
+  // ------------------------------------------------------------
+  // Loading
+  // ------------------------------------------------------------
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[300px] items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex items-center justify-center py-12">
+            <p className="text-sm text-muted-foreground">
+              Loading analytics...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="print-section space-y-6">
+
+      {/* ======================================================
+          HEADER
+      ======================================================= */}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            🏭 Production Dashboard
+          </h2>
+
+          <p className="text-sm text-muted-foreground">
+            Shop Floor Performance Analytics
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="grid gap-2">
+            <Label htmlFor="production-from">
+              From
+            </Label>
+
+            <Input
+              id="production-from"
+              type="date"
+              value={fromDate}
+              onChange={(e) =>
+                setFromDate(e.target.value)
+              }
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="production-to">
+              To
+            </Label>
+
+            <Input
+              id="production-to"
+              type="date"
+              value={toDate}
+              onChange={(e) =>
+                setToDate(e.target.value)
+              }
+            />
+          </div>
+
+          <Button
+            onClick={() =>
+              fetchAnalytics(
+                "Shop Floor Administrator",
+                fromDate,
+                toDate
+              )
+            }
+          >
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* ======================================================
+          NAVIGATION
+      ======================================================= */}
+
+      <Tabs
+        value={activeView}
+        onValueChange={setActiveView}
+        className="flex w-full flex-col"
+      >
+        <TabsList className="flex h-auto w-full flex-row items-stretch justify-start gap-1 overflow-x-auto">
+          <TabsTrigger value="statistics">
+            Statistics
+          </TabsTrigger>
+
+          <TabsTrigger value="charts">
+            Charts
+          </TabsTrigger>
+
+          <TabsTrigger value="shopfloor">
+            Shop Floor
+          </TabsTrigger>
+
+          <TabsTrigger value="geo">
+            Geographic
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ====================================================
+            STATISTICS
+        ===================================================== */}
+
+        <TabsContent
+          value="statistics"
+          className="space-y-6"
+        >
+
+          {/* Pending order export */}
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
+                <div className="flex items-center gap-4">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-xl">
+                    📊
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold">
+                      Pending Orders Report
+                    </h3>
+
+                    <p className="text-sm text-muted-foreground">
+                      Export all pending order quantities
+                      for the selected date range to Excel.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <strong className="block text-xl text-destructive">
+                      {orderSummary.pending}
+                    </strong>
+
+                    <span className="text-xs text-muted-foreground">
+                      Pending quantity
+                    </span>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      downloadPendingOrdersExcel(
+                        fromDate,
+                        toDate
+                      )
+                    }
+                    disabled={
+                      isDownloadingPendingOrders ||
+                      !fromDate ||
+                      !toDate
+                    }
+                  >
+                    {isDownloadingPendingOrders
+                      ? "⏳ Preparing Excel..."
+                      : "⬇️ Download Excel"}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>📅</span>
+
+                <span>Report period:</span>
+
+                <strong className="text-foreground">
+                  {fromDate || "—"}
+                </strong>
+
+                <span>→</span>
+
+                <strong className="text-foreground">
+                  {toDate || "—"}
+                </strong>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main KPIs */}
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="Products Ordered"
+              value={orderSummary.ordered}
+              description="Order quantity"
+            />
+
+            <KpiCard
+              title="Products Shipped"
+              value={orderSummary.shipped}
+              description="Delivered quantity"
+              valueClassName="text-emerald-600"
+            />
+
+            <KpiCard
+              title="Products Pending"
+              value={orderSummary.pending}
+              description="Remaining quantity"
+              valueClassName="text-destructive"
+            />
+
+            <KpiCard
+              title="Fulfillment"
+              value={`${fulfillmentPercentage}%`}
+              description="Shipped / ordered"
+              valueClassName="text-primary"
+            />
+          </div>
+
+          {/* Tables */}
+
+          <div className="grid gap-6 xl:grid-cols-2">
+
+            {/* Pending orders */}
+
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between">
+                <div>
+                  <CardTitle>
+                    Pending Order Fulfillment
+                  </CardTitle>
+
+                  <CardDescription>
+                    Ordered quantity remaining to be shipped
+                  </CardDescription>
+                </div>
+
+                <Badge variant="destructive">
+                  {orderSummary.pending}
+                </Badge>
+              </CardHeader>
+
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>OA ID</TableHead>
+                        <TableHead>Order Date</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="text-right">
+                          Ordered
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Shipped
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Pending
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {prodKpis?.pending_order_items?.length ? (
+                        prodKpis.pending_order_items.map(
+                          (row) => (
+                            <TableRow
+                              key={row.order_item_id}
+                            >
+                              <TableCell>
+                                <span className="font-mono text-sm font-semibold text-primary">
+                                  {
+                                    row.oa_id
+                                  }
+                                </span>
+                              </TableCell>
+
+                              <TableCell>
+                                {
+                                  row.oa_date
+                                }
+                              </TableCell>
+
+                              <TableCell>
+                                {row.item_code}
+                              </TableCell>
+
+                              <TableCell className="text-right">
+                                {row.ordered_quantity}
+                              </TableCell>
+
+                              <TableCell className="text-right text-emerald-600">
+                                {row.shipped_quantity}
+                              </TableCell>
+
+                              <TableCell className="text-right font-semibold text-destructive">
+                                {row.pending_quantity}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        )
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="py-10 text-center text-emerald-600"
+                          >
+                            ✅ No pending order quantities
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Operator */}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Operator Performance
+                </CardTitle>
+
+                <CardDescription>
+                  Production by operator
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Operator</TableHead>
+                      <TableHead>Production</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {prodKpis?.operator_summary?.map(
+                      (operator) => (
+                        <TableRow
+                          key={operator?.operator}
+                        >
+                          <TableCell>
+                            {operator?.operator}
+                          </TableCell>
+
+                          <TableCell>
+                            {operator?.production}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ====================================================
+            CHARTS
+        ===================================================== */}
+
+        <TabsContent
+          value="charts"
+          className="grid gap-6 lg:grid-cols-2"
+        >
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>
+                Tasks Completed Daily
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              <div className="h-[400px]">
+                <Line
+                  data={productionLineChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Production Distribution
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              <div className="h-[400px]">
+                <Pie
+                  data={productionPieChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: "bottom",
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Tasks Assigned vs Received
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              <div className="h-[400px]">
+                <Bar
+                  data={productionBarChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ====================================================
+            SHOP FLOOR
+        ===================================================== */}
+
+        <TabsContent
+          value="shopfloor"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          <KpiCard
+            title="Machine Utilization"
+            value="92%"
+          />
+
+          <KpiCard
+            title="Downtime"
+            value="1.8%"
+          />
+
+          <KpiCard
+            title="Efficiency"
+            value="97%"
+          />
+        </TabsContent>
+
+        {/* ====================================================
+            GEOGRAPHIC
+        ===================================================== */}
+
+        <TabsContent
+          value="geo"
+          className="space-y-6"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                🌎 Geographic & Fulfillment Analytics
+              </CardTitle>
+
+              <CardDescription>
+                Filter pending orders by state, product
+                group and product.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+
+              {/* Filters */}
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <SearchableMultiSelect
+                  label="Product Group"
+                  options={itemGroups}
+                  value={selectedGroups || []}
+                  onChange={setSelectedGroups}
+                />
+
+                <SearchableMultiSelect
+                  label="Products"
+                  options={itemsMaster.map(
+                    (item) => item.item_code
+                  )}
+                  value={selectedItems || []}
+                  onChange={setSelectedItems}
+                />
+
+                <SearchableMultiSelect
+                  label="States"
+                  options={stateList}
+                  value={selectedStates || []}
+                  onChange={setSelectedStates}
+                />
+              </div>
+
+              {/* Filter summary */}
+
+              <div className="flex flex-wrap gap-3 rounded-lg border bg-muted/30 p-3">
+                <Badge variant="secondary">
+                  {selectedGroups?.length || 0} Product Groups
+                </Badge>
+
+                <Badge variant="secondary">
+                  {selectedItems?.length || 0} Products
+                </Badge>
+
+                <Badge variant="secondary">
+                  {selectedStates?.length || 0} States
+                </Badge>
+              </div>
+
+              {/* Map */}
+
+              <GeoMapCanvas
+                visibleMap={visibleMap}
+                isDispatcher={
+                  state?.user?.role ===
+                  "Dispatch Engineer"
+                }
+              />
+
+              {/* Geographic KPIs */}
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard
+                  title="Filtered Ordered"
+                  value={geoSummary.ordered}
+                />
+
+                <KpiCard
+                  title="Filtered Shipped"
+                  value={geoSummary.shipped}
+                  valueClassName="text-emerald-600"
+                />
+
+                <KpiCard
+                  title="Filtered Pending"
+                  value={geoSummary.pending}
+                  valueClassName="text-destructive"
+                />
+
+                <KpiCard
+                  title="Fulfillment"
+                  value={`${geoFulfillmentPercentage}%`}
+                  valueClassName="text-primary"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pending register */}
+
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between">
+              <div>
+                <CardTitle>
+                  Pending Order Register
+                </CardTitle>
+
+                <CardDescription>
+                  Pending quantities matching the selected
+                  filters.
+                </CardDescription>
+              </div>
+
+              <Badge variant="destructive">
+                {geoSummary.pending}
+              </Badge>
+            </CardHeader>
+
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>OA ID</TableHead>
+                      <TableHead>Order Date</TableHead>
+                      <TableHead>State</TableHead>
+                      <TableHead>Product Group</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">
+                        Ordered
+                      </TableHead>
+                      <TableHead className="text-right">
+                        Shipped
+                      </TableHead>
+                      <TableHead className="text-right">
+                        Pending
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {filteredPendingOrderItems.length ? (
+                      filteredPendingOrderItems.map(
+                        (row) => {
+                          const group =
+                            itemGroupMap[
+                              row.item_code
+                            ] || "General";
+
+                          return (
+                            <TableRow
+                              key={row.order_item_id}
+                            >
+                              <TableCell>
+                                <span className="font-mono text-sm font-semibold text-primary">
+                                  {
+                                    row.oa_id
+                                  }
+                                </span>
+                              </TableCell>
+
+                              <TableCell>
+                                {
+                                  row.oa_date
+                                }
+                              </TableCell>
+
+                              <TableCell>
+                                {row.state_name || "—"}
+                              </TableCell>
+
+                              <TableCell>
+                                <Badge variant="secondary">
+                                  {group}
+                                </Badge>
+                              </TableCell>
+
+                              <TableCell className="font-medium">
+                                {row.item_code}
+                              </TableCell>
+
+                              <TableCell className="text-right">
+                                {row.ordered_quantity}
+                              </TableCell>
+
+                              <TableCell className="text-right text-emerald-600">
+                                {row.shipped_quantity}
+                              </TableCell>
+
+                              <TableCell className="text-right font-semibold text-destructive">
+                                {row.pending_quantity}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                      )
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="py-12 text-center text-emerald-600"
+                        >
+                          ✅ No pending orders match the
+                          selected filters.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/**
+ * Reusable KPI card
+ */
+function KpiCard({
+  title,
+  value,
+  description,
+  valueClassName,
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <div
+          className={`text-3xl font-bold tracking-tight ${
+            valueClassName || ""
+          }`}
+        >
+          {value}
+        </div>
+
+        {description && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
