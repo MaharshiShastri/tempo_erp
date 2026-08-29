@@ -170,32 +170,31 @@ export default function PromptGeneratorView({ state }) {
                     CONFIGURATION CARD
                 ===================================================== */}
 
-                <Card className="overflow-hidden border-border/70 shadow-sm">
+                <Card className="gap-0 py-0 overflow-hidden border-border/70 shadow-sm">
 
-                    <CardHeader className="border-b bg-gradient-to-r from-violet-500/10 via-background to-blue-500/10">
-
-                        <div className="flex items-start gap-3">
-
+                    <CardHeader
+                        className="
+                            border-b
+                            bg-gradient-to-r from-violet-500/10 via-background to-blue-500/10
+                            px-5 py-4 md:px-6
+                            space-y-0
+                        "
+                        >
+                        <div className="flex items-center gap-3">
                             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                                <Settings2 className="size-4.5" />
+                            <Settings2 className="size-4" />
                             </div>
 
-                            <div>
+                            <div className="min-w-0 flex-1">
+                            <CardTitle className="m-0 text-base font-semibold leading-tight">
+                                Prompt Configuration
+                            </CardTitle>
 
-                                <CardTitle className="text-lg">
-                                    Prompt Configuration
-                                </CardTitle>
-
-                                <CardDescription className="mt-1">
-                                    Describe what you want the prompt
-                                    to accomplish and choose the target
-                                    model.
-                                </CardDescription>
-
+                            <CardDescription className="m-0 mt-1 text-xs leading-5">
+                                Describe what the prompt should accomplish and select the target model.
+                            </CardDescription>
                             </div>
-
                         </div>
-
                     </CardHeader>
 
 
@@ -415,35 +414,33 @@ export default function PromptGeneratorView({ state }) {
                     OUTPUT CARD
                 ===================================================== */}
 
-                <Card className="overflow-hidden border-border/70 shadow-sm">
+                <Card className="gap-0 py-0 overflow-hidden border-border/70 shadow-sm">
 
-                    <CardHeader className="border-b bg-gradient-to-r from-emerald-500/10 via-background to-cyan-500/10">
-
-                        <div className="flex items-start justify-between gap-4">
-
-                            <div className="flex items-start gap-3">
-
+                    <CardHeader
+                        className="
+                            border-b
+                            bg-gradient-to-r from-emerald-500/10 via-background to-cyan-500/10
+                            px-5 py-4 md:px-6
+                            space-y-0
+                        "
+                        >
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
                                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                    <Sparkles className="size-4.5" />
+                                    <Sparkles className="size-4" />
                                 </div>
 
-                                <div>
-
-                                    <CardTitle className="text-lg">
-                                        Generated Prompt
+                                <div className="min-w-0">
+                                    <CardTitle className="m-0 text-base font-semibold leading-tight">
+                                    Generated Prompt
                                     </CardTitle>
 
-                                    <CardDescription className="mt-1">
-                                        Your model-specific prompt will
-                                        appear here.
+                                    <CardDescription className="m-0 mt-1 text-xs leading-5">
+                                    Your model-specific prompt will appear here.
                                     </CardDescription>
-
                                 </div>
-
                             </div>
 
-
-                            {/* COPY BUTTON */}
 
                             {generatedPrompt && (
                                 <Button
@@ -451,38 +448,22 @@ export default function PromptGeneratorView({ state }) {
                                     variant="outline"
                                     size="icon"
                                     onClick={handleCopy}
-                                    title={
+                                    title={copied ? "Copied" : "Copy prompt"}
+                                    aria-label={copied ? "Copied" : "Copy prompt"}
+                                    className={
                                         copied
-                                            ? "Copied"
-                                            : "Copy prompt"
+                                            ? "shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15"
+                                            : "shrink-0 hover:bg-muted"
                                     }
-                                    aria-label={
-                                        copied
-                                            ? "Copied"
-                                            : "Copy prompt"
-                                    }
-                                    className={`
-                                        shrink-0
-                                        transition-all
-                                        ${
-                                            copied
-                                                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15"
-                                                : "hover:bg-muted"
-                                        }
-                                    `}
                                 >
-
                                     {copied ? (
                                         <Check className="size-4" />
                                     ) : (
                                         <Copy className="size-4" />
                                     )}
-
                                 </Button>
                             )}
-
                         </div>
-
                     </CardHeader>
 
 
