@@ -1,343 +1,1368 @@
-import React, { useState, useEffect } from "react";
-import API from "../api/api";
-import { FiMail, FiRefreshCw, FiSend, FiPaperclip, FiFilter, FiCheck, FiPlus, FiTrash2, FiUserCheck } from "react-icons/fi";
+import React from "react";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
+
+import {
+    FiMail,
+    FiRefreshCw,
+    FiSend,
+    FiPaperclip,
+    FiFilter,
+    FiTrash2,
+    FiUserCheck,
+    FiPlus,
+    FiEdit2,
+    FiX,
+    FiUpload,
+    FiDatabase,
+    FiClock,
+    FiCheckCircle,
+    FiAlertCircle,
+} from "react-icons/fi";
+
+const STATUS_CONFIG = {
+    Pending: {
+        label: "Pending Sync",
+        icon: FiClock,
+        className:
+            "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    },
+    "Awaiting Review": {
+        label: "Awaiting Review",
+        icon: FiEdit2,
+        className:
+            "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400",
+    },
+    Completed: {
+        label: "Completed",
+        icon: FiCheckCircle,
+        className:
+            "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    },
+    Failed: {
+        label: "Failed",
+        icon: FiAlertCircle,
+        className:
+            "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
+    },
+    Rejected: {
+        label: "Rejected",
+        icon: FiX,
+        className:
+            "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
+    },
+};
+
+function StatusBadge({ status }) {
+    const config = STATUS_CONFIG[status] || {
+        label: status || "Unknown",
+        icon: FiClock,
+        className: "border-border bg-muted text-muted-foreground",
+    };
+
+    const Icon = config.icon;
+
+    return (
+        <Badge
+            variant="outline"
+            className={`gap-1.5 px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
+        >
+            <Icon className="size-3" />
+            {config.label}
+        </Badge>
+    );
+}
+
+function ProductTags({ query }) {
+    if (!query) {
+        return (
+            <span className="text-xs text-muted-foreground">
+                No specific product
+            </span>
+        );
+    }
+
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {query
+                .split(",")
+                .map((product) => product.trim())
+                .filter(Boolean)
+                .map((product, index) => (
+                    <Badge
+                        key={`${product}-${index}`}
+                        variant="secondary"
+                        className="border border-primary/15 bg-primary/5 text-[10px] text-primary"
+                    >
+                        {product}
+                    </Badge>
+                ))}
+        </div>
+    );
+}
 
 export default function LeadGeneratorView({ state }) {
-    const {companyName, setCompanyName, domain, setDomain, targets, expandedTargetId, 
-        contactsCache, statusFilter, setStatusFilter, file, setFile, editingTargetId, editForm, setEditForm,
-        isLoading, uploading, handleTargetSubmit, handleBulkUpload, downloadSampleFile, handleAccordionToggle,
-        startEditing, saveEdit, handleDelete, handleMockSync, stagedContacts, updateStagedContactField, addStagedContactRow,
-        removeStagedContactRow, handleApproveStaging, handleRejectStaging, emailModal, selectedProductCode, setSelectedProductCode,
-        draftSubject, setDraftSubject, draftBody, setDraftBody, feedback, setFeedback, attachments, isGenerating,
-        openEmailModal, closeEmailModal, handleFileChange, removeAttachment, generateEmail, handleSendYahoo
+    const {
+        companyName,
+        setCompanyName,
+        domain,
+        setDomain,
+        targets,
+        expandedTargetId,
+        contactsCache,
+        statusFilter,
+        setStatusFilter,
+        file,
+        setFile,
+        editingTargetId,
+        editForm,
+        setEditForm,
+        isLoading,
+        uploading,
+        handleTargetSubmit,
+        handleBulkUpload,
+        downloadSampleFile,
+        handleAccordionToggle,
+        startEditing,
+        saveEdit,
+        handleDelete,
+        handleMockSync,
+        stagedContacts,
+        updateStagedContactField,
+        addStagedContactRow,
+        removeStagedContactRow,
+        handleApproveStaging,
+        handleRejectStaging,
+        emailModal,
+        selectedProductCode,
+        setSelectedProductCode,
+        draftSubject,
+        setDraftSubject,
+        draftBody,
+        setDraftBody,
+        feedback,
+        setFeedback,
+        attachments,
+        isGenerating,
+        openEmailModal,
+        closeEmailModal,
+        handleFileChange,
+        removeAttachment,
+        generateEmail,
+        handleSendYahoo,
     } = state;
-    
-    const isBulkMode = !!file;
-    
-        
-    // Filter pipeline list dynamically by state selection
-    const filteredTargets = targets.filter(target => {
+
+    const isBulkMode = Boolean(file);
+
+    const filteredTargets = (targets ?? []).filter((target) => {
         if (statusFilter === "all") return true;
         return target.status === statusFilter;
     });
 
     return (
-        <div className="frappe-card" style={{ maxWidth: 1000, margin: "0 auto", padding: 25 }}>
-            {emailModal.isOpen && (
-                <div className="modal-overlay" onClick={closeEmailModal}>
-                    <div className="modal-box" style={{ maxWidth: '800px', width: '90%', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
-                        
-                        <div style={{ background: 'var(--brand-accent)', color: '#fff', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><FiMail /> AI Cold Outreach Drafter</h3>
-                            <button className="btn-text" style={{ color: '#fff', fontSize: '18px', padding: 0 }} onClick={closeEmailModal}>✕</button>
-                        </div>
+        <div className="mx-auto w-full max-w-6xl space-y-4">
+            {/* ========================================================= */}
+            {/* PAGE HEADER */}
+            {/* ========================================================= */}
 
-                        <div style={{ padding: '20px', overflowY: 'auto', flexGrow: 1 }}>
-                            
-                            {/* Contact Context */}
-                            <div style={{ background: 'var(--bg-main)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '20px' }}>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Target Context</div>
-                                <strong>{emailModal.contact.full_name}</strong> - {emailModal.contact.designation} @ {emailModal.target.company_name}
-                                <div style={{ color: 'var(--brand-accent)', fontSize: '13px', marginTop: '4px' }}>{emailModal.contact.email}</div>
+            <Card className="overflow-hidden border-primary/15 shadow-sm">
+                <div className="bg-gradient-to-r from-primary/10 via-background to-blue-500/10">
+                    <CardHeader className="p-5 md:p-6">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                    CRM / Prospecting
+                                </div>
+
+                                <CardTitle className="text-xl tracking-tight">
+                                    Lead Generator Engine
+                                </CardTitle>
+
+                                <CardDescription className="mt-1 max-w-2xl">
+                                    Target enterprise domains during the day;
+                                    harvest prioritized contacts overnight.
+                                </CardDescription>
                             </div>
 
-                            {/* Catalog Selection & Attachments */}
-                            <div className="form-grid-layout" style={{ gridTemplateColumns: '2fr 1fr', marginBottom: '20px' }}>
-                                <div className="form-group">
-                                    <label className="input-label">Feature Product from Catalog</label>
-                                    <select className="form-select-native" value={selectedProductCode} onChange={e => setSelectedProductCode(e.target.value)}>
-                                        <option value="">-- Select Product Context --</option>
-                                        {(state.itemsMaster || [])?.map(item => (
-                                            <option key={item.item_code} value={item.item_code}>{item.item_code} - {item.item_name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="input-label">Attachments ({attachments.length}/5)</label>
-                                    <label className="btn btn-secondary" style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
-                                        <FiPaperclip style={{ marginRight: '6px' }}/> Add Files
-                                        <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png" style={{ display: 'none' }} onChange={handleFileChange} />
-                                    </label>
-                                </div>
+                            <Badge
+                                variant="outline"
+                                className="w-fit gap-1.5 border-primary/20 bg-background/70 px-3 py-1.5 text-primary"
+                            >
+                                <FiDatabase className="size-3.5" />
+                                Automated prospecting
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                </div>
+            </Card>
+
+            {/* ========================================================= */}
+            {/* TARGET QUEUE */}
+            {/* ========================================================= */}
+
+            <Card className="border-border/70 shadow-sm">
+                <CardHeader className="pb-4">
+                    <CardTitle className="text-base">
+                        Queue New Corporate Target
+                    </CardTitle>
+
+                    <CardDescription>
+                        Add an individual company or upload a spreadsheet for
+                        bulk prospecting.
+                    </CardDescription>
+                </CardHeader>
+
+                <CardContent>
+                    <form
+                        onSubmit={handleTargetSubmit}
+                        className="space-y-4"
+                    >
+                        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.2fr]">
+                            {/* COMPANY */}
+                            <div className="space-y-2">
+                                <Label htmlFor="company-name">
+                                    Company Name
+                                </Label>
+
+                                <Input
+                                    id="company-name"
+                                    required
+                                    placeholder="e.g. Tata Motors"
+                                    value={companyName}
+                                    onChange={(event) =>
+                                        setCompanyName(event.target.value)
+                                    }
+                                    disabled={isBulkMode}
+                                />
                             </div>
 
-                            {/* Display Attachment Names */}
-                            {attachments?.length > 0 && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-                                    {attachments?.map((file, idx) => (
-                                        <span key={idx} style={{ fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {file.name}
-                                            <span style={{ color: 'var(--brand-danger)', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => removeAttachment(idx)}>✕</span>
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
+                            {/* DOMAIN */}
+                            <div className="space-y-2">
+                                <Label htmlFor="corporate-domain">
+                                    Corporate Domain
+                                </Label>
 
-                            {/* Generate Button (Initial) */}
-                            {!draftBody && (
-                                <button className="btn btn-primary" onClick={() => generateEmail(false)} disabled={isGenerating || !selectedProductCode} style={{ width: '100%', padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                                    {isGenerating ? "🧠 AI is drafting..." : "✨ Generate Intelligent Draft"}
-                                </button>
-                            )}
+                                <Input
+                                    id="corporate-domain"
+                                    required
+                                    placeholder="e.g. tatamotors.com"
+                                    value={domain}
+                                    onChange={(event) =>
+                                        setDomain(event.target.value)
+                                    }
+                                    disabled={isBulkMode}
+                                />
+                            </div>
 
-                            {/* Draft Editor & Rewrite Feedback */}
-                            {draftBody && (
-                                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: '10px' }}>
-                                    <div className="form-group">
-                                        <label className="input-label">Subject Line</label>
-                                        <input className="form-input" value={draftSubject} onChange={e => setDraftSubject(e.target.value)} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="input-label">Email Body (Human Edits Allowed)</label>
-                                        <textarea className="form-input" rows={8} value={draftBody} onChange={e => setDraftBody(e.target.value)} style={{ lineHeight: '1.5', fontFamily: 'sans-serif' }} />
-                                    </div>
-                                    
-                                    <div style={{ background: '#f8f4ff', border: '1px solid #dcd0ff', padding: '15px', borderRadius: '8px', marginTop: '20px' }}>
-                                        <label className="input-label" style={{ color: '#5e35b1' }}>AI Human-in-the-loop Rewrite</label>
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            <input 
-                                                className="form-input" 
-                                                placeholder="e.g. Make it shorter, change tone to highly formal, remove the question at the end..." 
-                                                value={feedback} 
-                                                onChange={e => setFeedback(e.target.value)} 
-                                                style={{ background: '#fff' }}
-                                            />
-                                            <button className="btn btn-secondary" onClick={() => generateEmail(true)} disabled={isGenerating || !feedback} style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <FiRefreshCw /> {isGenerating ? "Rewriting..." : "Rewrite"}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {/* BULK FILE */}
+                            <div className="space-y-2">
+                                <Label htmlFor="bulk-target-file">
+                                    Upload Excel / CSV
+                                </Label>
+
+                                <Input
+                                    id="bulk-target-file"
+                                    type="file"
+                                    accept=".xlsx,.xls,.csv"
+                                    onChange={(event) => {
+                                        const selectedFile =
+                                            event.target.files?.[0] ?? null;
+
+                                        setFile(selectedFile);
+                                        setCompanyName("");
+                                        setDomain("");
+                                    }}
+                                    className="cursor-pointer"
+                                />
+                            </div>
                         </div>
 
-                        {/* Footer / Send Action */}
-                        <div style={{ padding: '15px 20px', background: 'var(--bg-main)', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                            <button className="btn btn-secondary" onClick={closeEmailModal}>Discard</button>
-                            <button className="btn btn-success" onClick={handleSendYahoo} disabled={!draftBody || isGenerating} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 20px' }}>
-                                <FiSend /> Open in Yahoo Business
-                            </button>
+                        <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleBulkUpload}
+                                disabled={uploading || !file}
+                                className="gap-2"
+                            >
+                                <FiUpload className="size-3.5" />
+
+                                {uploading
+                                    ? "Uploading..."
+                                    : "Upload Excel"}
+                            </Button>
+
+                            <Button
+                                type="submit"
+                                disabled={isLoading || isBulkMode}
+                                className="gap-2"
+                            >
+                                <FiPlus className="size-3.5" />
+
+                                {isLoading
+                                    ? "Queueing..."
+                                    : "Add to Night Queue"}
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={downloadSampleFile}
+                                className="text-xs text-muted-foreground"
+                            >
+                                ↓ Download Sample
+                            </Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
+
+            {/* ========================================================= */}
+            {/* PIPELINE */}
+            {/* ========================================================= */}
+
+            <Card className="border-border/70 shadow-sm">
+                <CardHeader className="pb-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <CardTitle className="text-base">
+                                Scraping Pipeline
+                            </CardTitle>
+
+                            <CardDescription className="mt-1">
+                                Corporate domains queued for contact
+                                discovery.
+                            </CardDescription>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <FiFilter className="size-3.5 text-muted-foreground" />
+
+                            <Select
+                                value={statusFilter}
+                                onValueChange={setStatusFilter}
+                            >
+                                <SelectTrigger className="h-9 w-[190px] text-xs">
+                                    <SelectValue placeholder="Filter status" />
+                                </SelectTrigger>
+
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        Show All Statuses
+                                    </SelectItem>
+
+                                    <SelectItem value="Pending">
+                                        Pending Sync
+                                    </SelectItem>
+
+                                    <SelectItem value="Awaiting Review">
+                                        Awaiting Review
+                                    </SelectItem>
+
+                                    <SelectItem value="Completed">
+                                        Completed
+                                    </SelectItem>
+
+                                    <SelectItem value="Failed">
+                                        Failed
+                                    </SelectItem>
+
+                                    <SelectItem value="Rejected">
+                                        Rejected
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
-                </div>
-            )}
+                </CardHeader>
 
-            <div className="system-header" style={{ marginBottom: "20px" }}>
-                <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Lead Generator Engine</h2>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                    Target enterprise domains during the day; harvest prioritized contacts overnight.
-                </p>
-            </div>
+                <CardContent>
+                    {filteredTargets.length === 0 ? (
+                        <div className="rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center">
+                            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <FiDatabase className="size-5" />
+                            </div>
 
-            <form onSubmit={handleTargetSubmit} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "30px", border: "1px solid var(--border-light)" }}>
-                <h4 style={{ margin: "0 0 15px 0", fontSize: "14px" }}>Queue New Corporate Target</h4>
-                <div className="form-grid-layout" style={{ gridTemplateColumns: "2fr 2fr auto", alignItems: "end" }}>
-                    <div className="form-group">
-                        <label className="input-label">Company Name *</label>
-                        <input type="text" required className="form-input" placeholder="e.g. Tata Motors" value={companyName} onChange={e => setCompanyName(e.target.value)} disabled={isBulkMode}/>
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Corporate Domain *</label>
-                        <input type="text" required className="form-input" placeholder="e.g. tatamotors.com" value={domain} onChange={e => setDomain(e.target.value)} disabled={isBulkMode}/>
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Upload Excel (Bulk Targets)</label>
-                        <input type="file" accept=".xlsx,.xls,.csv" className="form-input" onChange={(e) => {setFile(e.target.files[0]); setCompanyName(""); setDomain("");}}/>
-                    </div>
-                    <button type="button" onClick={handleBulkUpload} className="btn btn-secondary" disabled={uploading || !file} style={{background: "var(--bg-main)", justifyContent: "center", alignItems: "center"}}>
-                        {uploading ? "Uploading..." : "Upload Excel"}
-                    </button>
-                    <button type="submit" disabled={isLoading || isBulkMode} className="btn btn-primary" style={{ padding: "10px 20px", justifyContent: "center", alignItems: "center"}}>
-                        {isLoading ? "Queueing..." : "Add to Night Queue"}
-                    </button>
-                    <button type="button" onClick={downloadSampleFile} className="btn btn-text" style={{fontSize: "12px", whiteSpace: "nowrap"}}>⬇ Download Sample</button>
-                </div>
-            </form>
+                            <h3 className="text-sm font-semibold">
+                                No matching targets
+                            </h3>
 
-            <div>
-                {/* PIPELINE FILTER COMPONENT */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "15px", borderBottom: "1px solid var(--border-light)", paddingBottom: "10px" }}>
-                    <h4 style={{ margin: 0 }}>Scraping Pipeline</h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <FiFilter style={{ color: 'var(--text-muted)' }} />
-                        <select className="form-select-native" style={{ fontSize: '12px', padding: '4px 8px' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                            <option value="all">🔍 Show All Statuses</option>
-                            <option value="Pending">⏳ Pending Sync</option>
-                            <option value="Awaiting Review">✍️ Awaiting Review</option>
-                            <option value="Completed">✅ Completed</option>
-                            <option value="Failed">❌ Failed</option>
-                            <option value="Rejected">🚫 Rejected</option>
-                        </select>
-                    </div>
-                </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                No targets match the selected status filter.
+                            </p>
+                        </div>
+                    ) : (
+                        <Accordion
+                            type="single"
+                            collapsible
+                            value={
+                                expandedTargetId
+                                    ? String(expandedTargetId)
+                                    : undefined
+                            }
+                            onValueChange={(value) => {
+                                const target = filteredTargets.find(
+                                    (item) =>
+                                        String(item.id) === String(value)
+                                );
 
-                {(filteredTargets ?? []).length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px dashed var(--border-light)' }}>
-                        No targets match the selected status filter.
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {filteredTargets?.map(target => {
-                            const isExpanded = expandedTargetId === target.id;
-                            const isEditing = editingTargetId === target.id;
-                            const contacts = contactsCache[target.id] || [];
-                            const rawEmails = target.snovio_raw_data?.raw_emails || [];
+                                if (target) {
+                                    handleAccordionToggle(target);
+                                }
+                            }}
+                            className="space-y-2"
+                        >
+                            {filteredTargets.map((target) => {
+                                const targetId = String(target.id);
+                                const contacts =
+                                    contactsCache?.[target.id] ?? [];
+                                const rawEmails =
+                                    target.snovio_raw_data?.raw_emails ?? [];
 
-                            return (
-                                <div key={target.id} style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
-                                    
-                                    {/* Accordion Header */}
-                                    <div onClick={() => handleAccordionToggle(target)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', cursor: isEditing ? 'default' : 'pointer', background: isExpanded ? 'var(--bg-main)' : 'transparent' }}>
-                                        <div style={{ flexGrow: 1, marginRight: '20px' }}>
-                                            {isEditing ? (
-                                                <div style={{ display: 'flex', gap: '10px' }} onClick={e => e.stopPropagation()}>
-                                                    <input className="form-input" style={{ padding: '4px 8px', fontSize: '13px' }} value={editForm.company_name} onChange={e => setEditForm({...editForm, company_name: e.target.value})} />
-                                                    <input className="form-input" style={{ padding: '4px 8px', fontSize: '13px' }} value={editForm.domain} onChange={e => setEditForm({...editForm, domain: e.target.value})} />
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <strong style={{ fontSize: '15px', color: 'var(--brand-accent)' }}>{target.company_name}</strong>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                        {target.domain} | Queued: {target.created_at?.split('T')[0]} | By: {target.requested_by?.split('@')[0]}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                        
-                                        {/* Right Side Status & Controls */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                            <span style={{ 
-                                                fontSize: '11px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold', 
-                                                background: target.status === 'Completed' ? '#eaffea' : (target.status === 'Awaiting Review' ? '#fff8f0' : (target.status === "Rejected" ? '#ffe8e8' : 'var(--bg-main)')), 
-                                                color: target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#e67e22' : (target.status === 'Rejected' ? '#c62828' : 'var(--text-muted)')),
-                                                border: `1px solid ${target.status === 'Completed' ? 'var(--brand-success)' : (target.status === 'Awaiting Review' ? '#ffebcc' : 'var(--border-light)')}`
-                                            }}>
-                                                {target.status === 'Completed' ? '✅ Completed' : (target.status === 'Awaiting Review' ? '✍️ Awaiting Review' : (target.status === 'Rejected' ? '🚫 Rejected' : '⏳ Pending'))}
-                                            </span>
-                                            
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button onClick={(e)=>handleRejectStaging(target.id)} className="btn-text" style={{fontSize: '12px', padding: 0}}>🚫</button>
-                                                <button onClick={(e) => startEditing(e, target)} className="btn-text" style={{ fontSize: '12px', padding: 0 }}>✏️</button>
-                                                <button onClick={(e) => handleDelete(e, target.id)} className="btn-text-danger" style={{ fontSize: '12px', padding: 0 }}>🗑️</button>
-                                            </div>
+                                const isEditing =
+                                    editingTargetId === target.id;
 
-                                            {target.status === 'Pending' && (
-                                                <button onClick={(e) => handleMockSync(e, target.id)} className="btn-text" style={{ fontSize: '11px' }}>[Force Sync]</button>
-                                            )}
-                                            
-                                            <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>▼</span>
-                                        </div>
-                                    </div>
+                                return (
+                                    <AccordionItem
+                                        key={target.id}
+                                        value={targetId}
+                                        className="overflow-hidden rounded-xl border border-border/70 bg-card px-4"
+                                    >
+                                        {/* ================================================= */}
+                                        {/* ACCORDION HEADER */}
+                                        {/* ================================================= */}
 
-                                    {/* AWAITING MANUAL REVIEW WORKSPACE */}
-                                    {isExpanded && target.status === 'Awaiting Review' && (
-                                        <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)', background: '#fffcf5' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                                <h4 style={{ margin: 0, color: '#b25900' }}>Review & Map Harvested Leads</h4>
-                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                    <button className="btn btn-secondary" onClick={addStagedContactRow}>+ Add Contact Row</button>
-                                                    <button className="btn btn-success" onClick={() => handleApproveStaging(target.id)}><FiUserCheck /> Approve & Import</button>
-                                                    <button className="btn btn-text-danger" onClick={() => handleRejectStaging(target.id)}>Reject</button>
-                                                </div>
-                                            </div>
-                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                                <thead>
-                                                    <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border-light)' }}>
-                                                        <th style={{ padding: '8px' }}>Name</th>
-                                                        <th style={{ padding: '8px' }}>Designation</th>
-                                                        <th style={{ padding: '8px' }}>Matched Email (Dropdown / Custom Override)</th>
-                                                        <th style={{ padding: '8px', textAlign: 'center' }}>Priority</th>
-                                                        <th style={{ padding: '8px', textAlign: 'center' }}>Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {stagedContacts?.map((c, idx) => (
-                                                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                                            <td style={{ padding: '8px' }}>
-                                                                <input type="text" className="form-input" style={{ padding: '4px', fontSize: '13px' }} value={c.full_name} onChange={e => updateStagedContactField(idx, 'full_name', e.target.value)} />
-                                                            </td>
-                                                            <td style={{ padding: '8px' }}>
-                                                                <input type="text" className="form-input" style={{ padding: '4px', fontSize: '13px' }} value={c.designation} onChange={e => updateStagedContactField(idx, 'designation', e.target.value)} />
-                                                            </td>
-                                                            <td style={{ padding: '8px' }}>
-                                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                                    <select className="form-select-native" style={{ fontSize: '12px', padding: '4px' }} value={c.email || ""} onChange={e => updateStagedContactField(idx, 'email', e.target.value)}>
-                                                                        <option value="">-- No Email --</option>
-                                                                        {rawEmails?.map((email, i) => (
-                                                                            <option key={i} value={email}>{email}</option>
-                                                                        ))}
-                                                                    </select>
-                                                                    <input type="text" className="form-input" placeholder="Or type manually..." style={{ padding: '4px', fontSize: '12px' }} value={c.email} onChange={e => updateStagedContactField(idx, 'email', e.target.value)} />
-                                                                </div>
-                                                            </td>
-                                                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                                                                <input type="checkbox" checked={c.is_priority} onChange={e => updateStagedContactField(idx, 'is_priority', e.target.checked)} />
-                                                            </td>
-                                                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                                                                <button className="btn-text-danger" onClick={() => removeStagedContactRow(idx)}><FiTrash2 /></button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                    
-                                                    {(stagedContacts ?? []).length === 0 && (
-                                                        <tr>
-                                                            <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                                                                No contacts loaded. Use "Add Contact Row" to populate details manually.
-                                                            </td>
-                                                        </tr>
+                                        <div className="flex items-center gap-3">
+                                            <AccordionTrigger className="min-w-0 flex-1 py-4 hover:no-underline">
+                                                <div className="min-w-0 text-left">
+                                                    {isEditing ? (
+                                                        <div
+                                                            className="flex flex-col gap-2 sm:flex-row"
+                                                            onClick={(event) =>
+                                                                event.stopPropagation()
+                                                            }
+                                                        >
+                                                            <Input
+                                                                value={
+                                                                    editForm.company_name
+                                                                }
+                                                                onChange={(
+                                                                    event
+                                                                ) =>
+                                                                    setEditForm(
+                                                                        {
+                                                                            ...editForm,
+                                                                            company_name:
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                        }
+                                                                    )
+                                                                }
+                                                                className="h-8 text-xs"
+                                                            />
+
+                                                            <Input
+                                                                value={
+                                                                    editForm.domain
+                                                                }
+                                                                onChange={(
+                                                                    event
+                                                                ) =>
+                                                                    setEditForm(
+                                                                        {
+                                                                            ...editForm,
+                                                                            domain:
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                        }
+                                                                    )
+                                                                }
+                                                                className="h-8 text-xs"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="truncate text-sm font-semibold text-primary">
+                                                                {
+                                                                    target.company_name
+                                                                }
+                                                            </div>
+
+                                                            <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                                                                {
+                                                                    target.domain
+                                                                }
+
+                                                                {" · "}
+
+                                                                Queued:{" "}
+                                                                {target.created_at?.split(
+                                                                    "T"
+                                                                )[0] ?? "—"}
+
+                                                                {" · "}
+
+                                                                By:{" "}
+                                                                {target.requested_by?.split(
+                                                                    "@"
+                                                                )[0] ?? "—"}
+                                                            </div>
+                                                        </>
                                                     )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                                                </div>
+                                            </AccordionTrigger>
 
-                                    {/* COMPLETED VIEW */}
-                                    {isExpanded && target.status === 'Completed' && (
-                                        <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)' }}>
-                                            {contacts.length === 0 ? (
-                                                <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No contacts found for this domain.</div>
-                                            ) : (
-                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                                    <thead>
-                                                        <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border-light)', color: 'var(--text-muted)' }}>
-                                                            <th style={{ padding: '8px' }}>Executive Name</th>
-                                                            <th style={{ padding: '8px' }}>Designation</th>
-                                                            <th style={{ padding: '8px' }}>Contact Email</th>
-                                                            <th style={{ padding: '8px', textAlign: 'right' }}>Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {contacts?.map((c, idx) => (
-                                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)'}}>
-                                                                <td style={{ padding: '10px' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                        <strong>{c.full_name}</strong>
-                                                                        {c.is_priority && <span style={{ fontSize: '10px', background: 'var(--brand-accent)', color: 'var(--text-primary)', padding: '2px 6px', borderRadius: '4px' }}>HIGH PRIORITY</span>}
-                                                                    </div>
-                                                                </td>
-                                                                <td style={{ padding: '10px' }}>{c.designation}</td>
-                                                                <td style={{ padding: '10px', color: 'var(--brand-accent)' }}>{c.email}</td>
-                                                                <td style={{ padding: '10px', textAlign: 'right' }}><button className="btn btn-secondary" onClick={() => openEmailModal(c, target)} style={{ fontSize: '11px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FiMail /> Draft Email</button></td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                            <div
+                                                className="flex shrink-0 items-center gap-2"
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
+                                                }
+                                            >
+                                                <StatusBadge
+                                                    status={target.status}
+                                                />
+
+                                                <div className="hidden items-center gap-1 sm:flex">
+                                                    {isEditing ? (
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="size-8"
+                                                            onClick={() =>
+                                                                saveEdit(
+                                                                    target.id
+                                                                )
+                                                            }
+                                                        >
+                                                            <FiCheckCircle className="size-3.5" />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="size-8"
+                                                            onClick={(event) =>
+                                                                startEditing(
+                                                                    event,
+                                                                    target
+                                                                )
+                                                            }
+                                                        >
+                                                            <FiEdit2 className="size-3.5" />
+                                                        </Button>
+                                                    )}
+
+                                                    <Button
+                                                        type="button"
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="size-8 text-destructive hover:text-destructive"
+                                                        onClick={(event) =>
+                                                            handleDelete(
+                                                                event,
+                                                                target.id
+                                                            )
+                                                        }
+                                                    >
+                                                        <FiTrash2 className="size-3.5" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ================================================= */}
+                                        {/* EXPANDED CONTENT */}
+                                        {/* ================================================= */}
+
+                                        <AccordionContent className="pb-4">
+                                            {/* PENDING */}
+                                            {target.status === "Pending" && (
+                                                <div className="rounded-lg border bg-muted/30 p-5 text-center">
+                                                    <FiClock className="mx-auto mb-2 size-5 text-muted-foreground" />
+
+                                                    <p className="text-sm text-muted-foreground">
+                                                        The scraper engine will
+                                                        search for contacts
+                                                        matching this domain
+                                                        during the overnight
+                                                        batch process.
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        Check back tomorrow
+                                                        morning.
+                                                    </p>
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="mt-3 text-xs"
+                                                        onClick={(event) =>
+                                                            handleMockSync(
+                                                                event,
+                                                                target.id
+                                                            )
+                                                        }
+                                                    >
+                                                        Force Sync
+                                                    </Button>
+                                                </div>
                                             )}
-                                        </div>
-                                    )}
 
-                                    {/* PENDING VIEW */}
-                                    {isExpanded && target.status === 'Pending' && (
-                                        <div style={{ padding: '20px', borderTop: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>
-                                            The scraper engine will search for contacts matching this domain during the overnight batch process. Check back tomorrow morning.
-                                        </div>
-                                    )}
+                                            {/* AWAITING REVIEW */}
+                                            {target.status ===
+                                                "Awaiting Review" && (
+                                                <div className="rounded-xl border border-orange-500/20 bg-orange-500/[0.03]">
+                                                    <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                                                                Review & Map
+                                                                Harvested Leads
+                                                            </h4>
+
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                Verify harvested
+                                                                contacts before
+                                                                importing them
+                                                                into CRM.
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={
+                                                                    addStagedContactRow
+                                                                }
+                                                                className="gap-1.5"
+                                                            >
+                                                                <FiPlus className="size-3.5" />
+                                                                Add Contact
+                                                            </Button>
+
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleApproveStaging(
+                                                                        target.id
+                                                                    )
+                                                                }
+                                                                className="gap-1.5"
+                                                            >
+                                                                <FiUserCheck className="size-3.5" />
+                                                                Approve &
+                                                                Import
+                                                            </Button>
+
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="text-destructive hover:text-destructive"
+                                                                onClick={() =>
+                                                                    handleRejectStaging(
+                                                                        target.id
+                                                                    )
+                                                                }
+                                                            >
+                                                                Reject
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="overflow-x-auto">
+                                                        <Table>
+                                                            <TableHeader>
+                                                                <TableRow>
+                                                                    <TableHead>
+                                                                        Name
+                                                                    </TableHead>
+                                                                    <TableHead>
+                                                                        Designation
+                                                                    </TableHead>
+                                                                    <TableHead className="min-w-[330px]">
+                                                                        Matched
+                                                                        Email
+                                                                    </TableHead>
+                                                                    <TableHead className="text-center">
+                                                                        Priority
+                                                                    </TableHead>
+                                                                    <TableHead className="text-center">
+                                                                        Action
+                                                                    </TableHead>
+                                                                </TableRow>
+                                                            </TableHeader>
+
+                                                            <TableBody>
+                                                                {(
+                                                                    stagedContacts ??
+                                                                    []
+                                                                ).map(
+                                                                    (
+                                                                        contact,
+                                                                        index
+                                                                    ) => (
+                                                                        <TableRow
+                                                                            key={
+                                                                                index
+                                                                            }
+                                                                        >
+                                                                            <TableCell>
+                                                                                <Input
+                                                                                    value={
+                                                                                        contact.full_name ??
+                                                                                        ""
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        event
+                                                                                    ) =>
+                                                                                        updateStagedContactField(
+                                                                                            index,
+                                                                                            "full_name",
+                                                                                            event
+                                                                                                .target
+                                                                                                .value
+                                                                                        )
+                                                                                    }
+                                                                                    className="h-8 min-w-[150px] text-xs"
+                                                                                />
+                                                                            </TableCell>
+
+                                                                            <TableCell>
+                                                                                <Input
+                                                                                    value={
+                                                                                        contact.designation ??
+                                                                                        ""
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        event
+                                                                                    ) =>
+                                                                                        updateStagedContactField(
+                                                                                            index,
+                                                                                            "designation",
+                                                                                            event
+                                                                                                .target
+                                                                                                .value
+                                                                                        )
+                                                                                    }
+                                                                                    className="h-8 min-w-[140px] text-xs"
+                                                                                />
+                                                                            </TableCell>
+
+                                                                            <TableCell>
+                                                                                <div className="flex min-w-[300px] flex-col gap-2 sm:flex-row">
+                                                                                    <Select
+                                                                                        value={
+                                                                                            contact.email ||
+                                                                                            undefined
+                                                                                        }
+                                                                                        onValueChange={(
+                                                                                            value
+                                                                                        ) =>
+                                                                                            updateStagedContactField(
+                                                                                                index,
+                                                                                                "email",
+                                                                                                value
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        <SelectTrigger className="h-8 text-xs">
+                                                                                            <SelectValue placeholder="Select email" />
+                                                                                        </SelectTrigger>
+
+                                                                                        <SelectContent>
+                                                                                            <SelectItem value="__none__">
+                                                                                                No
+                                                                                                Email
+                                                                                            </SelectItem>
+
+                                                                                            {rawEmails.map(
+                                                                                                (
+                                                                                                    email,
+                                                                                                    emailIndex
+                                                                                                ) => (
+                                                                                                    <SelectItem
+                                                                                                        key={
+                                                                                                            emailIndex
+                                                                                                        }
+                                                                                                        value={
+                                                                                                            email
+                                                                                                        }
+                                                                                                    >
+                                                                                                        {
+                                                                                                            email
+                                                                                                        }
+                                                                                                    </SelectItem>
+                                                                                                )
+                                                                                            )}
+                                                                                        </SelectContent>
+                                                                                    </Select>
+
+                                                                                    <Input
+                                                                                        value={
+                                                                                            contact.email ??
+                                                                                            ""
+                                                                                        }
+                                                                                        placeholder="Or type manually..."
+                                                                                        onChange={(
+                                                                                            event
+                                                                                        ) =>
+                                                                                            updateStagedContactField(
+                                                                                                index,
+                                                                                                "email",
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value
+                                                                                            )
+                                                                                        }
+                                                                                        className="h-8 text-xs"
+                                                                                    />
+                                                                                </div>
+                                                                            </TableCell>
+
+                                                                            <TableCell className="text-center">
+                                                                                <Checkbox
+                                                                                    checked={Boolean(
+                                                                                        contact.is_priority
+                                                                                    )}
+                                                                                    onCheckedChange={(
+                                                                                        checked
+                                                                                    ) =>
+                                                                                        updateStagedContactField(
+                                                                                            index,
+                                                                                            "is_priority",
+                                                                                            Boolean(
+                                                                                                checked
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                            </TableCell>
+
+                                                                            <TableCell className="text-center">
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    size="icon"
+                                                                                    variant="ghost"
+                                                                                    className="size-8 text-destructive hover:text-destructive"
+                                                                                    onClick={() =>
+                                                                                        removeStagedContactRow(
+                                                                                            index
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <FiTrash2 className="size-3.5" />
+                                                                                </Button>
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    )
+                                                                )}
+
+                                                                {(
+                                                                    stagedContacts ??
+                                                                    []
+                                                                ).length ===
+                                                                    0 && (
+                                                                    <TableRow>
+                                                                        <TableCell
+                                                                            colSpan={
+                                                                                5
+                                                                            }
+                                                                            className="h-24 text-center text-xs text-muted-foreground"
+                                                                        >
+                                                                            No
+                                                                            contacts
+                                                                            loaded.
+                                                                            Use
+                                                                            "Add
+                                                                            Contact"
+                                                                            to
+                                                                            populate
+                                                                            details
+                                                                            manually.
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                )}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* COMPLETED */}
+                                            {target.status === "Completed" && (
+                                                <div>
+                                                    {contacts.length === 0 ? (
+                                                        <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-center">
+                                                            <FiUserCheck className="mx-auto mb-2 size-5 text-muted-foreground" />
+
+                                                            <p className="text-sm text-muted-foreground">
+                                                                No contacts found
+                                                                for this domain.
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="overflow-x-auto rounded-xl border">
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead>
+                                                                            Executive
+                                                                        </TableHead>
+                                                                        <TableHead>
+                                                                            Designation
+                                                                        </TableHead>
+                                                                        <TableHead>
+                                                                            Contact
+                                                                            Email
+                                                                        </TableHead>
+                                                                        <TableHead className="text-right">
+                                                                            Actions
+                                                                        </TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+
+                                                                <TableBody>
+                                                                    {contacts.map(
+                                                                        (
+                                                                            contact,
+                                                                            index
+                                                                        ) => (
+                                                                            <TableRow
+                                                                                key={
+                                                                                    index
+                                                                                }
+                                                                            >
+                                                                                <TableCell>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="font-medium">
+                                                                                            {
+                                                                                                contact.full_name
+                                                                                            }
+                                                                                        </span>
+
+                                                                                        {contact.is_priority && (
+                                                                                            <Badge
+                                                                                                variant="secondary"
+                                                                                                className="bg-primary/10 text-[9px] text-primary"
+                                                                                            >
+                                                                                                HIGH
+                                                                                                PRIORITY
+                                                                                            </Badge>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </TableCell>
+
+                                                                                <TableCell className="text-muted-foreground">
+                                                                                    {
+                                                                                        contact.designation
+                                                                                    }
+                                                                                </TableCell>
+
+                                                                                <TableCell className="text-primary">
+                                                                                    {
+                                                                                        contact.email
+                                                                                    }
+                                                                                </TableCell>
+
+                                                                                <TableCell className="text-right">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        onClick={() =>
+                                                                                            openEmailModal(
+                                                                                                contact,
+                                                                                                target
+                                                                                            )
+                                                                                        }
+                                                                                        className="gap-1.5 text-xs"
+                                                                                    >
+                                                                                        <FiMail className="size-3.5" />
+                                                                                        Draft
+                                                                                        Email
+                                                                                    </Button>
+                                                                                </TableCell>
+                                                                            </TableRow>
+                                                                        )
+                                                                    )}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                );
+                            })}
+                        </Accordion>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* ========================================================= */}
+            {/* EMAIL DRAFT DIALOG */}
+            {/* ========================================================= */}
+
+            <Dialog
+                open={Boolean(emailModal?.isOpen)}
+                onOpenChange={(open) => {
+                    if (!open) closeEmailModal();
+                }}
+            >
+                <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+                    <DialogHeader className="border-b bg-primary px-5 py-4 text-primary-foreground">
+                        <DialogTitle className="flex items-center gap-2 text-base">
+                            <FiMail className="size-4" />
+                            AI Cold Outreach Drafter
+                        </DialogTitle>
+
+                        <DialogDescription className="text-primary-foreground/70">
+                            Generate, edit and review the outbound message
+                            before opening Yahoo Business.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                        {emailModal?.contact && emailModal?.target && (
+                            <div className="space-y-5">
+                                {/* CONTACT CONTEXT */}
+
+                                <div className="rounded-xl border bg-muted/30 p-4">
+                                    <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                        Target Context
+                                    </div>
+
+                                    <div className="text-sm">
+                                        <strong>
+                                            {
+                                                emailModal.contact
+                                                    .full_name
+                                            }
+                                        </strong>
+
+                                        {" — "}
+
+                                        {
+                                            emailModal.contact
+                                                .designation
+                                        }
+
+                                        {" @ "}
+
+                                        {
+                                            emailModal.target
+                                                .company_name
+                                        }
+                                    </div>
+
+                                    <div className="mt-1 text-xs text-primary">
+                                        {emailModal.contact.email}
+                                    </div>
                                 </div>
-                            );
-                        })}
+
+                                {/* PRODUCT + ATTACHMENTS */}
+
+                                <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+                                    <div className="space-y-2">
+                                        <Label>
+                                            Feature Product from Catalog
+                                        </Label>
+
+                                        <Select
+                                            value={
+                                                selectedProductCode ||
+                                                undefined
+                                            }
+                                            onValueChange={
+                                                setSelectedProductCode
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select Product Context" />
+                                            </SelectTrigger>
+
+                                            <SelectContent>
+                                                {(
+                                                    state.itemsMaster ??
+                                                    []
+                                                ).map((item) => (
+                                                    <SelectItem
+                                                        key={
+                                                            item.item_code
+                                                        }
+                                                        value={
+                                                            item.item_code
+                                                        }
+                                                    >
+                                                        {item.item_code} —{" "}
+                                                        {
+                                                            item.item_name
+                                                        }
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>
+                                            Attachments (
+                                            {attachments?.length ?? 0}/5)
+                                        </Label>
+
+                                        <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground">
+                                            <FiPaperclip className="size-3.5" />
+                                            Add Files
+
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
+                                                className="hidden"
+                                                onChange={
+                                                    handleFileChange
+                                                }
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* ATTACHMENTS */}
+
+                                {attachments?.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {attachments.map(
+                                            (attachment, index) => (
+                                                <Badge
+                                                    key={index}
+                                                    variant="secondary"
+                                                    className="gap-1.5 py-1"
+                                                >
+                                                    {attachment.name}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            removeAttachment(
+                                                                index
+                                                            )
+                                                        }
+                                                        className="text-muted-foreground transition-colors hover:text-destructive"
+                                                    >
+                                                        <FiX className="size-3" />
+                                                    </button>
+                                                </Badge>
+                                            )
+                                        )}
+                                    </div>
+                                )}
+
+                                <Separator />
+
+                                {/* INITIAL GENERATION */}
+
+                                {!draftBody && (
+                                    <Button
+                                        type="button"
+                                        className="w-full gap-2"
+                                        onClick={() =>
+                                            generateEmail(false)
+                                        }
+                                        disabled={
+                                            isGenerating ||
+                                            !selectedProductCode
+                                        }
+                                    >
+                                        {isGenerating ? (
+                                            <>
+                                                <FiRefreshCw className="size-4 animate-spin" />
+                                                AI is drafting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                ✨ Generate Intelligent
+                                                Draft
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+
+                                {/* DRAFT */}
+
+                                {draftBody && (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="draft-subject">
+                                                Subject Line
+                                            </Label>
+
+                                            <Input
+                                                id="draft-subject"
+                                                value={draftSubject}
+                                                onChange={(event) =>
+                                                    setDraftSubject(
+                                                        event.target
+                                                            .value
+                                                    )
+                                                }
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="draft-body">
+                                                Email Body
+                                            </Label>
+
+                                            <Textarea
+                                                id="draft-body"
+                                                rows={10}
+                                                value={draftBody}
+                                                onChange={(event) =>
+                                                    setDraftBody(
+                                                        event.target
+                                                            .value
+                                                    )
+                                                }
+                                                className="min-h-[220px] resize-y leading-6"
+                                            />
+                                        </div>
+
+                                        {/* AI REWRITE */}
+
+                                        <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-4">
+                                            <div className="mb-3">
+                                                <div className="flex items-center gap-2 text-sm font-semibold text-violet-700 dark:text-violet-300">
+                                                    <FiRefreshCw className="size-3.5" />
+                                                    AI Human-in-the-loop
+                                                    Rewrite
+                                                </div>
+
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    Give the AI an editing
+                                                    instruction while keeping
+                                                    the final message under
+                                                    your control.
+                                                </p>
+                                            </div>
+
+                                            <div className="flex flex-col gap-2 sm:flex-row">
+                                                <Input
+                                                    placeholder="e.g. Make it shorter, more formal, remove the question..."
+                                                    value={feedback}
+                                                    onChange={(event) =>
+                                                        setFeedback(
+                                                            event.target
+                                                                .value
+                                                        )
+                                                    }
+                                                    className="bg-background"
+                                                />
+
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        generateEmail(
+                                                            true
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        isGenerating ||
+                                                        !feedback
+                                                    }
+                                                    className="shrink-0 gap-1.5"
+                                                >
+                                                    <FiRefreshCw
+                                                        className={
+                                                            isGenerating
+                                                                ? "animate-spin"
+                                                                : ""
+                                                        }
+                                                    />
+                                                    {isGenerating
+                                                        ? "Rewriting..."
+                                                        : "Rewrite"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+
+                    <DialogFooter className="border-t bg-muted/30 px-5 py-3">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={closeEmailModal}
+                        >
+                            Discard
+                        </Button>
+
+                        <Button
+                            type="button"
+                            onClick={handleSendYahoo}
+                            disabled={!draftBody || isGenerating}
+                            className="gap-2"
+                        >
+                            <FiSend className="size-3.5" />
+                            Open in Yahoo Business
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

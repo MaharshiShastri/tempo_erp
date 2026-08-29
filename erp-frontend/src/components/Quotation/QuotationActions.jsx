@@ -1,30 +1,65 @@
-export default function QuotationActions({quotation, onView, onEdit, onOrder, onReject, onChanged,}) {
+import { Button } from "@/components/ui/button";
 
-    const isGenerated = (quotation.status || "GENERATED") === "GENERATED";
+export default function QuotationActions({
+    quotation,
+    onView,
+    onEdit,
+    onOrder,
+    onReject,
+    onChanged,
+}) {
+    const isGenerated =
+        (quotation?.status || "GENERATED") === "GENERATED";
 
     return (
-        <div style={{display: "inline-flex", gap: 4, justifyContent: "flex-end",}}>
-            <button className="btn-text" onClick={() =>onView?.(quotation)}>
+        <div className="flex items-center justify-end gap-1">
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onView?.(quotation)}
+            >
                 View
-            </button>
+            </Button>
 
-            <button className="btn-text" onClick={() => onEdit?.(quotation)}>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onEdit?.(quotation)}
+            >
                 Edit
-            </button>
+            </Button>
 
             {isGenerated && (
                 <>
-                    <button className="btn-text" onClick={() => onOrder?.(quotation)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onOrder?.(quotation)}
+                    >
                         ✓ Order
-                    </button>
+                    </Button>
 
-                    <button className="btn-text" onClick={() =>onChanged?.(quotation)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onChanged?.(quotation)}
+                    >
                         ↔ Changed
-                    </button>
+                    </Button>
 
-                    <button className="btn-text-danger" onClick={() => onReject?.(quotation)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => onReject?.(quotation)}
+                    >
                         Reject
-                    </button>
+                    </Button>
                 </>
             )}
         </div>

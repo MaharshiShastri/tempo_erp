@@ -18,6 +18,7 @@
     "@rtcamp/frappe-ui-react": "^1.2.0",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.33.0",

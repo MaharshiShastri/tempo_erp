@@ -1,224 +1,333 @@
-import SearchableMultiselect from "../components/shared/SearchableMultiselect";
 import { useMemo } from "react";
-export default function QuoteGenerationView({state}){
-    const productGroups = useMemo(() => [
-            ...new Set(
-                (state?.itemsMaster ?? [])
-                    .map(item => item.item_group)
-                    .filter(Boolean)
-            )
-        ].sort(),
-        [state?.itemsMaster]
-    );
+import SearchableMultiselect from "../components/shared/SearchableMultiselect";
 
-    const productItems = useMemo(()=>{
-        const selectedProduct = state?.quoteSelectedGroup?.[0];
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-        if(!selectedProduct) {return [];}
+export default function QuoteGenerationView({ state }) {
+  const productGroups = useMemo(
+    () =>
+      [
+        ...new Set(
+          (state?.itemsMaster ?? [])
+            .map((item) => item.item_group)
+            .filter(Boolean)
+        ),
+      ].sort(),
+    [state?.itemsMaster]
+  );
 
-        return (state?.itemsMaster ?? [])
-        .filter(item => item.item_group === selectedProduct)
-        .filter(item => item.item_code)
-        .map(item=> item.item_code)
-        .sort();
-    }, [state?.itemsMaster, state?.quoteSelectedGroup]);
+  const productItems = useMemo(() => {
+    const selectedProduct = state?.quoteSelectedGroup?.[0];
 
-    return (
-        <div className="frappe-card">
+    if (!selectedProduct) return [];
 
-            <div className="system-header">
-                <div>
-                    <h2>Quotation Generator</h2>
+    return (state?.itemsMaster ?? [])
+      .filter((item) => item.item_group === selectedProduct)
+      .filter((item) => item.item_code)
+      .map((item) => item.item_code)
+      .sort();
+  }, [state?.itemsMaster, state?.quoteSelectedGroup]);
 
-                    <p style={{margin: 0, color: "var(--text-muted)"}}>
-                        Generate quotations from the current Ex-Works price list
-                    </p>
-                </div>
+  const field = (label, value, onChange, props = {}) => (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        {...props}
+      />
+    </div>
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Quotation Generator</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Generate quotations from the current Ex-Works price list
+        </p>
+      </CardHeader>
+
+      <CardContent>
+        <form onSubmit={state?.handleGenerateQuote} className="space-y-8">
+          {/* Product Selection */}
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold">
+                Product Selection
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Select the product group and item to quote.
+              </p>
             </div>
 
-            <form onSubmit={state?.handleGenerateQuote}>
+            <div className="grid gap-6 md:grid-cols-2">
+              <SearchableMultiselect
+                label="Product Group"
+                options={productGroups}
+                value={state?.quoteSelectedGroup}
+                onChange={state?.setQuoteSelectedGroup}
+              />
 
-                <h4>Product Selection</h4>
+              {state?.quoteSelectedGroup?.length === 1 && (
+                <SearchableMultiselect
+                  label="Item code"
+                  options={productItems}
+                  value={state?.quoteSelectedItemCode}
+                  onChange={state?.setQuoteSelectedItemCode}
+                />
+              )}
+            </div>
+          </section>
 
-                <div className="form-grid-layout" style={{gridTemplateColumns: "repeat(2, 1fr)"}}>
-                    <div><SearchableMultiselect label="Product Group" options={productGroups} value={state?.quoteSelectedGroup} onChange={state?.setQuoteSelectedGroup}/></div>
-                    
-                    {state?.quoteSelectedGroup?.length === 1 && (
-                        <div>
-                            <SearchableMultiselect label="Item code" options={productItems} value={state?.quoteSelectedItemCode} onChange={state?.setQuoteSelectedItemCode} />
-                        </div>
+          {/* Customer Details */}
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold">
+                Customer Details
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Enter the customer and quotation information.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {field(
+                "Quote Number: Tempo/Quote/",
+                state?.qouteNum,
+                state?.setQouteNum,
+                { required: true }
+              )}
+
+              {field(
+                "Company",
+                state?.clientQuoteCompany,
+                state?.setClientQuoteCompany,
+                { required: true }
+              )}
+
+              {field(
+                "Buyer / Contact Person",
+                state?.buyerQuoteName,
+                state?.setBuyerQuoteName,
+                { required: true }
+              )}
+
+              {field(
+                "Email",
+                state?.clientQuoteEmail,
+                state?.setClientQuoteEmail,
+                { required: true, type: "email" }
+              )}
+
+              {field(
+                "Phone",
+                state?.buyerQouteNum,
+                state?.setBuyerQouteNum,
+                { required: true }
+              )}
+
+              {field(
+                "Address",
+                state?.qouteAddress,
+                state?.setQouteAddress,
+                { required: true }
+              )}
+
+              {field(
+                "City",
+                state?.qouteCity,
+                state?.setQouteCity,
+                { required: true }
+              )}
+
+              {field(
+                "Postal Code",
+                state?.qoutePostalCode,
+                state?.setQoutePostalCode,
+                { required: true }
+              )}
+
+              {field(
+                "Supply",
+                state?.quoteSupply,
+                state?.setQuoteSupply,
+                { required: true }
+              )}
+
+              {field(
+                "Installation",
+                state?.quoteInstallation,
+                state?.setQuoteInstallation,
+                { required: true }
+              )}
+
+              {field(
+                "Freight",
+                state?.quoteFreight,
+                state?.setQuoteFreight,
+                { required: true }
+              )}
+
+              {field(
+                "Customer Enquiry Date",
+                state?.qouteDateInput,
+                state?.setQouteDateInput,
+                {
+                  required: true,
+                  type: "date",
+                  max: new Date().toISOString().split("T")[0],
+                }
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 pt-2 sm:flex-row">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Checkbox
+                  checked={!!state?.quoteDealer}
+                  onCheckedChange={state?.setQuoteDealer}
+                />
+                Dealer quotation
+              </label>
+
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Checkbox
+                  checked={!!state?.quoteSpecialModel}
+                  onCheckedChange={state?.handleSpecialModelChange}
+                />
+                Special Model
+              </label>
+            </div>
+          </section>
+
+          {/* Special Model */}
+          {state?.quoteSpecialModel && (
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold">
+                  Special Model Configuration
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure the special model parameters.
+                </p>
+              </div>
+
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {state?.quoteSpecialColumns?.map(
+                        (column, columnIndex) => (
+                          <TableHead key={columnIndex}>
+                            <Input
+                              value={column}
+                              onChange={(e) =>
+                                state?.updateSpecialColumn(
+                                  columnIndex,
+                                  e.target.value
+                                )
+                              }
+                              className="h-8"
+                            />
+                          </TableHead>
+                        )
+                      )}
+
+                      <TableHead className="w-[100px]">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {state?.quoteSpecialRows?.map(
+                      (row, rowIndex) => (
+                        <TableRow key={rowIndex}>
+                          {row.map((cell, columnIndex) => (
+                            <TableCell key={columnIndex}>
+                              <Input
+                                value={cell}
+                                placeholder={
+                                  columnIndex === 0
+                                    ? "Parameter"
+                                    : "Value"
+                                }
+                                onChange={(e) =>
+                                  state?.updateSpecialCell(
+                                    rowIndex,
+                                    columnIndex,
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </TableCell>
+                          ))}
+
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                state?.removeSpecialRow(rowIndex)
+                              }
+                              disabled={
+                                state?.quoteSpecialRows?.length === 1
+                              }
+                            >
+                              Remove
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
                     )}
-                </div>
-                <h4 style={{ marginTop: 25 }}>Customer Details</h4>
+                  </TableBody>
+                </Table>
+              </div>
 
-                <div className="form-grid-layout" style={{gridTemplateColumns:"repeat(2, 1fr)"}}>
-                    <div>
-                        <label className="input-label">
-                            Qoute Number: Tempo/Quote/
-                        </label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={state?.addSpecialRow}
+                >
+                  + Add Row
+                </Button>
 
-                        <input required className="form-input" value={state?.qouteNum} onChange={e=>state?.setQouteNum(e.target.value)} />
-                    </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={state?.addSpecialColumn}
+                >
+                  + Add Column
+                </Button>
+              </div>
+            </section>
+          )}
 
-                    <div>
-                        <label className="input-label">
-                            Company
-                        </label>
-
-                        <input required className="form-input" value={state?.clientQuoteCompany} onChange={e => state?.setClientQuoteCompany(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Buyer / Contact Person
-                        </label>
-
-                        <input required className="form-input" value={state?.buyerQuoteName} onChange={e => state?.setBuyerQuoteName(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Email
-                        </label>
-
-                        <input required type="email" className="form-input" value={state?.clientQuoteEmail} onChange={e => state?.setClientQuoteEmail(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Phone
-                        </label>
-
-                        <input required className="form-input" value={state?.buyerQouteNum} onChange={e => state?.setBuyerQouteNum(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Address
-                        </label>
-
-                        <input required className="form-input" value={state?.qouteAddress} onChange={e => state?.setQouteAddress(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            City
-                        </label>
-
-                        <input required className="form-input" value={state?.qouteCity} onChange={e =>state?.setQouteCity(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Postal Code
-                        </label>
-
-                        <input required className="form-input" value={state?.qoutePostalCode} onChange={e =>state?.setQoutePostalCode(e.target.value)}/>
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Supply
-                        </label>
-
-                        <input required className="form-input" value={state?.quoteSupply} onChange={e=>state?.setQuoteSupply(e.target.value)} />
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Installation
-                        </label>
-
-                        <input required className="form-input" value={state?.quoteInstallation} onChange={e=>state?.setQuoteInstallation(e.target.value)} />
-
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Freight
-                        </label>
-
-                        <input required className="form-input" value={state?.quoteFreight} onChange={e=>state?.setQuoteFreight(e.target.value)} />
-                    </div>
-
-                    <div>
-                        <label className="input-label">
-                            Customer Enquiry Date
-                        </label>
-
-                        <input required type="date" className="form-input" value={state?.qouteDateInput} max={new Date().toISOString().split("T")[0]} onChange={e =>state?.setQouteDateInput(e.target.value)}/>
-                    </div>
-
-                    <div style={{marginTop: 20}}>
-                        <label className="input-label">
-                            <input type="checkbox" checked={state?.quoteDealer} onChange={e=>state?.setQuoteDealer(e.target.checked)} />
-                            {" "}Dealer quotation
-                        </label>
-                    </div>
-                    
-                    <div style={{marginTop: 20}}>
-                        <label className="input-label">
-                            <input type="checkbox" checked={state?.quoteSpecialModel} onChange={e=>state?.handleSpecialModelChange(e.target.checked)} />
-                            {" "}Special Model
-                        </label>
-                    </div>
-
-                    {state?.quoteSpecialModel && (
-                        <div style={{ gridColumn: "1 / -1", marginTop: 20 }}>
-                            <h4>Special Model Configuration</h4>
-
-                            <table className="quotation-config-table">
-                                <thead>
-                                    <tr>
-                                        {state?.quoteSpecialColumns?.map((column, columnIndex) => (
-                                            <th key={columnIndex}>
-                                                <input className="form-input" value={column} onChange={(e) => state?.updateSpecialColumn( columnIndex, e.target.value)}/>
-                                            </th>
-                                        ))}
-
-                                        <th style={{ width: 100 }}>Action</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {state?.quoteSpecialRows?.map((row, rowIndex) => (
-                                        <tr key={rowIndex}>
-                                            {row.map((cell, columnIndex) => (
-                                                <td key={columnIndex}>
-                                                    <input className="form-input" value={cell} placeholder={columnIndex === 0 ? "Parameter" : "Value"} onChange={(e) => state?.updateSpecialCell(rowIndex, columnIndex, e.target.value)} />
-                                                </td>
-                                            ))}
-
-                                            <td>
-                                                <button type="button" className="btn btn-secondary" onClick={() =>state?.removeSpecialRow(rowIndex)} disabled={state?.quoteSpecialRows?.length === 1}>
-                                                    Remove
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-
-                            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                                <button type="button" className="btn btn-primary" onClick={state?.addSpecialRow}>
-                                    + Add Row
-                                </button>
-
-                                <button type="button" className="btn btn-secondary" onClick={state?.addSpecialColumn}>
-                                    + Add Column
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                </div>
-
-                <button className="btn btn-primary" type="submit" disabled={state?.qouteGenerating} style={{ marginTop: 25 }}>
-                    {state?.qouteGenerating ? "Generating..." : "Generate Quotation"}
-                </button>
-
-            </form>
-
-        </div>
-    );
+          <div className="flex justify-end border-t pt-6">
+            <Button
+              type="submit"
+              disabled={state?.qouteGenerating}
+            >
+              {state?.qouteGenerating
+                ? "Generating..."
+                : "Generate Quotation"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
 }

@@ -1,92 +1,69 @@
-export default function QuotationChangeModal({quotation, form, onChange, onCancel,onSubmit,}) {
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
-    if (!quotation) {
-        return null;
-    }
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-    const field = (name, label, type = "text") => (
-        <div className="form-group">
-
-            <label>
+export default function QuotationChangeModal({
+    quotation,
+    form,
+    onChange,
+    onCancel,
+    onSubmit,
+}) {
+    const field = (
+        name,
+        label,
+        type = "text"
+    ) => (
+        <div className="space-y-2">
+            <label className="text-sm font-medium">
                 {label}
             </label>
 
-            <input type={type} 
-                className="form-input"
-                value={form[name] ?? ""}
-                onChange={e =>
+            <Input
+                type={type}
+                value={form?.[name] ?? ""}
+                onChange={(e) =>
                     onChange(
                         name,
                         e.target.value
                     )
                 }
             />
-
         </div>
     );
 
     return (
-        <div className="modal-overlay">
+        <Dialog
+            open={Boolean(quotation)}
+            onOpenChange={(open) => {
+                if (!open) {
+                    onCancel?.();
+                }
+            }}
+        >
+            <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>
+                        Quotation Changed
+                    </DialogTitle>
 
-            <div
-                className="frappe-card"
-                style={{
-                    width:
-                        "min(800px, 95vw)",
-                    maxHeight: "90vh",
-                    overflowY: "auto",
-                }}
-            >
+                    <DialogDescription className="font-mono">
+                        {quotation?.quote_number}
+                    </DialogDescription>
+                </DialogHeader>
 
-                <div
-                    className="system-header"
-                >
-                    <div>
-                        <h3>
-                            Quotation Changed
-                        </h3>
-
-                        <small
-                            style={{
-                                color:
-                                    "var(--text-muted)",
-                            }}
-                        >
-                            {
-                                quotation.quote_number
-                            }
-                        </small>
-                    </div>
-
-                    <button
-                        className="btn-text"
-                        onClick={onCancel}
-                    >
-                        ✕ Close
-                    </button>
-                </div>
-
-
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                            "1fr 1fr",
-                        gap: 20,
-                    }}
-                >
-
-                    {/* QUOTED */}
-                    <div
-                        style={{
-                            border:
-                                "1px solid var(--border-light)",
-                            borderRadius: 10,
-                            padding: 16,
-                        }}
-                    >
-
-                        <h4>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    {/* Quoted */}
+                    <div className="space-y-4 rounded-lg border p-4">
+                        <h4 className="font-semibold">
                             Quoted
                         </h4>
 
@@ -111,23 +88,11 @@ export default function QuotationChangeModal({quotation, form, onChange, onCance
                             "Rate",
                             "number"
                         )}
-
                     </div>
 
-
-                    {/* ORDERED */}
-                    <div
-                        style={{
-                            border:
-                                "1px solid rgba(16,185,129,.25)",
-                            borderRadius: 10,
-                            padding: 16,
-                            background:
-                                "rgba(16,185,129,.03)",
-                        }}
-                    >
-
-                        <h4>
+                    {/* Ordered */}
+                    <div className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/30 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
+                        <h4 className="font-semibold">
                             Actually Ordered
                         </h4>
 
@@ -152,11 +117,8 @@ export default function QuotationChangeModal({quotation, form, onChange, onCance
                             "Rate",
                             "number"
                         )}
-
                     </div>
-
                 </div>
-
 
                 {field(
                     "order_id",
@@ -164,35 +126,23 @@ export default function QuotationChangeModal({quotation, form, onChange, onCance
                     "number"
                 )}
 
-
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent:
-                            "flex-end",
-                        gap: 10,
-                        marginTop: 20,
-                    }}
-                >
-
-                    <button
-                        className="btn-text"
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
                         onClick={onCancel}
                     >
                         Cancel
-                    </button>
+                    </Button>
 
-                    <button
-                        className="btn btn-primary"
+                    <Button
+                        type="button"
                         onClick={onSubmit}
                     >
                         Save Snapshot
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

@@ -1,53 +1,57 @@
-export default function QuotationDeleteModal({quotation, onCancel, onConfirm,}) {
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-    if (!quotation) {return null;}
-
+export default function QuotationDeleteModal({
+    quotation,
+    onCancel,
+    onConfirm,
+}) {
     return (
-        <div className="modal-overlay">
+        <AlertDialog
+            open={Boolean(quotation)}
+            onOpenChange={(open) => {
+                if (!open) {
+                    onCancel?.();
+                }
+            }}
+        >
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>
+                        Deactivate Quotation?
+                    </AlertDialogTitle>
 
-            <div className="frappe-card" style={{width: "min(450px, 90vw)",}}>
+                    <AlertDialogDescription>
+                        Quotation{" "}
+                        <strong>
+                            {quotation?.quote_number}
+                        </strong>{" "}
+                        will be removed from the active
+                        register.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
 
-                <h3>
-                    Deactivate Quotation?
-                </h3>
-
-                <p style={{ color: "var(--text-muted)",}}>
-                    Quotation{" "}
-                    <strong>
-                        {quotation.quote_number}
-                    </strong>{" "}
-                    will be removed from the active
-                    register.
-                </p>
-
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent:
-                            "flex-end",
-                        gap: 10,
-                        marginTop: 20,
-                    }}
-                >
-
-                    <button
-                        className="btn-text"
-                        onClick={onCancel}
-                    >
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={onCancel}>
                         Cancel
-                    </button>
+                    </AlertDialogCancel>
 
-                    <button
-                        className="btn-text-danger"
+                    <AlertDialogAction
                         onClick={onConfirm}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                         Delete
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }

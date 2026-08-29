@@ -1,267 +1,174 @@
 import { useMemo, useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function SearchableMultiselect({
-    label,
-    options = [],
-    value = [],
-    onChange,
-    compact = false,
+  label,
+  options = [],
+  value = [],
+  onChange,
+  compact = false,
 }) {
-    const [search, setSearch] = useState("");
-    const [isOpen, setIsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
-    const filtered = useMemo(
-        () =>
-            (options ?? []).filter((option) =>
-                option
-                    .toLowerCase()
-                    .includes(search.toLowerCase())
-            ),
-        [options, search]
+  const normalizedOptions = useMemo(
+    () => (options ?? []).filter(Boolean),
+    [options]
+  );
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return normalizedOptions;
+
+    return normalizedOptions.filter((option) =>
+      option.toLowerCase().includes(query)
     );
+  }, [normalizedOptions, search]);
 
-    if (compact) {
-        return (
-            <div style={{ position: "relative" }}>
-                <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setIsOpen((prev) => !prev)}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 12,
-                        padding: "6px 10px",
-                    }}
-                >
-                    {label}
+  const allSelected =
+    normalizedOptions.length > 0 &&
+    value.length === normalizedOptions.length;
 
-                    {value.length > 0 && (
-                        <span
-                            style={{
-                                background: "var(--brand-accent)",
-                                color: "#fff",
-                                borderRadius: 10,
-                                padding: "1px 6px",
-                                fontSize: 10,
-                            }}
-                        >
-                            {value.length}
-                        </span>
-                    )}
-                </button>
-
-                {isOpen && (
-                    <>
-                        <div
-                            onClick={() => setIsOpen(false)}
-                            style={{
-                                position: "fixed",
-                                inset: 0,
-                                zIndex: 99,
-                            }}
-                        />
-
-                        <div
-                            style={{
-                                position: "absolute",
-                                top: "calc(100% + 6px)",
-                                left: 0,
-                                zIndex: 100,
-                                width: 320,
-                                background: "var(--bg-surface)",
-                                border: "1px solid var(--border-light)",
-                                borderRadius: 8,
-                                padding: 12,
-                                boxShadow:
-                                    "0 8px 24px rgba(0,0,0,0.15)",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    display: "flex",
-                                    justifyContent:
-                                        "space-between",
-                                    alignItems: "center",
-                                    marginBottom: 8,
-                                }}
-                            >
-                                <b style={{ fontSize: 12 }}>
-                                    {label}
-                                </b>
-
-                                <span
-                                    style={{
-                                        fontSize: 10,
-                                        color: "var(--text-muted)",
-                                    }}
-                                >
-                                    {options.length} options
-                                </span>
-                            </div>
-
-                            <input
-                                className="form-input"
-                                placeholder={`Search ${label}`}
-                                value={search}
-                                onChange={(e) =>
-                                    setSearch(e.target.value)
-                                }
-                            />
-
-                            <div
-                                style={{
-                                    maxHeight: 220,
-                                    overflowY: "auto",
-                                    marginTop: 8,
-                                }}
-                            >
-                                <label
-                                    style={{
-                                        display: "block",
-                                        marginBottom: 8,
-                                        fontSize: 12,
-                                    }}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={
-                                            options.length > 0 &&
-                                            value.length ===
-                                                options.length
-                                        }
-                                        onChange={(e) =>
-                                            onChange(
-                                                e.target.checked
-                                                    ? options
-                                                    : []
-                                            )
-                                        }
-                                    />{" "}
-                                    Select All
-                                </label>
-
-                                <hr />
-
-                                {filtered.map((option) => (
-                                    <label
-                                        key={option}
-                                        style={{
-                                            display: "block",
-                                            marginBottom: 6,
-                                            fontSize: 12,
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={value.includes(
-                                                option
-                                            )}
-                                            onChange={(e) => {
-                                                if (
-                                                    e.target.checked
-                                                ) {
-                                                    onChange([
-                                                        ...value,
-                                                        option,
-                                                    ]);
-                                                } else {
-                                                    onChange(
-                                                        value.filter(
-                                                            (s) =>
-                                                                s !==
-                                                                option
-                                                        )
-                                                    );
-                                                }
-                                            }}
-                                        />{" "}
-                                        {option}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    </>
-                )}
-            </div>
-        );
+  const toggleOption = (option) => {
+    if (value.includes(option)) {
+      onChange(value.filter((item) => item !== option));
+    } else {
+      onChange([...value, option]);
     }
+  };
 
-    // Existing full-size implementation
-    return (
-        <div style={{ width: 320 }}>
-            <b>
-                {label} ({options?.length})
-            </b>
+  const toggleAll = () => {
+    onChange(allSelected ? [] : normalizedOptions);
+  };
 
-            <input
-                className="form-input"
-                placeholder={`Search ${label}`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+  return (
+    <div className={cn(compact ? "w-auto" : "w-full")}>
+      {!compact && (
+        <Label className="mb-2 block">
+          {label} ({normalizedOptions.length})
+        </Label>
+      )}
+
+      <Popover
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) setSearch("");
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              "justify-between",
+              compact ? "h-9 text-xs" : "w-full",
+            )}
+          >
+            <span className="truncate">
+              {compact ? label : (
+                value.length > 0
+                  ? `${value.length} selected`
+                  : `Select ${label}`
+              )}
+            </span>
+
+            {compact && value.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="ml-2 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
+              >
+                {value.length}
+              </Badge>
+            )}
+
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent
+          align="start"
+          className={cn(
+            "p-0",
+            compact ? "w-[320px]" : "w-[320px]"
+          )}
+        >
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder={`Search ${label}`}
+              value={search}
+              onValueChange={setSearch}
             />
 
-            <div
-                style={{
-                    maxHeight: 220,
-                    overflowY: "auto",
-                    border: "1px solid #ddd",
-                    borderRadius: 6,
-                    padding: 8,
-                    marginTop: 6,
-                }}
-            >
-                <label>
-                    <input
-                        type="checkbox"
-                        checked={
-                            value.length === options.length
-                        }
-                        onChange={(e) =>
-                            onChange(
-                                e.target.checked
-                                    ? options
-                                    : []
-                            )
-                        }
-                    />{" "}
-                    Select All
-                </label>
+            <CommandList>
+              <CommandEmpty>
+                No {label.toLowerCase()} found.
+              </CommandEmpty>
 
-                <hr />
+              <CommandGroup>
+                <CommandItem
+                  value="__select_all__"
+                  onSelect={toggleAll}
+                  className="cursor-pointer"
+                >
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                    className="mr-2"
+                  />
+                  <span>Select All</span>
+                </CommandItem>
 
-                {filtered.map((option) => (
-                    <label
-                        key={option}
-                        style={{
-                            display: "block",
-                            marginBottom: 6,
-                        }}
+                {filtered.map((option) => {
+                  const selected = value.includes(option);
+
+                  return (
+                    <CommandItem
+                      key={option}
+                      value={option}
+                      onSelect={() => toggleOption(option)}
+                      className="cursor-pointer"
                     >
-                        <input
-                            type="checkbox"
-                            checked={value.includes(option)}
-                            onChange={(e) => {
-                                if (e.target.checked) {
-                                    onChange([
-                                        ...value,
-                                        option,
-                                    ]);
-                                } else {
-                                    onChange(
-                                        value.filter(
-                                            (s) =>
-                                                s !== option
-                                        )
-                                    );
-                                }
-                            }}
-                        />{" "}
-                        {option}
-                    </label>
-                ))}
-            </div>
-        </div>
-    );
+                      <Checkbox
+                        checked={selected}
+                        onCheckedChange={() => toggleOption(option)}
+                        className="mr-2"
+                      />
+
+                      <span className="truncate">{option}</span>
+
+                      {selected && (
+                        <Check className="ml-auto h-4 w-4" />
+                      )}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }

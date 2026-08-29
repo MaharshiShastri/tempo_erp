@@ -1,3 +1,17 @@
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+
 export default function QuotationDetailsModal({
     quotation,
     editMode,
@@ -12,112 +26,6 @@ export default function QuotationDetailsModal({
         return null;
     }
 
-    const field = (
-        label,
-        key,
-        {
-            type = "text",
-            multiline = false,
-            rows = 3,
-        } = {}
-    ) => {
-        const value = editMode
-            ? (editForm?.[key] ?? "")
-            : (quotation?.[key] ?? "");
-
-        if (multiline) {
-            return (
-                <div className="form-group">
-                    <label>{label}</label>
-
-                    {editMode ? (
-                        <textarea
-                            className="form-input"
-                            rows={rows}
-                            value={value}
-                            onChange={(e) =>
-                                onChange(
-                                    key,
-                                    e.target.value
-                                )
-                            }
-                        />
-                    ) : (
-                        <div
-                            className="form-input"
-                            style={{
-                                minHeight: 70,
-                                whiteSpace: "pre-wrap",
-                            }}
-                        >
-                            {value || "—"}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        return (
-            <div className="form-group">
-                <label>{label}</label>
-
-                {editMode ? (
-                    <input
-                        type={type}
-                        className="form-input"
-                        value={value}
-                        onChange={(e) =>
-                            onChange(
-                                key,
-                                e.target.value
-                            )
-                        }
-                    />
-                ) : (
-                    <div className="form-input">
-                        {value || "—"}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    const checkbox = (
-        label,
-        key
-    ) => (
-        <label
-            style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                cursor: editMode
-                    ? "pointer"
-                    : "default",
-            }}
-        >
-            <input
-                type="checkbox"
-                checked={
-                    Boolean(
-                        editMode
-                            ? editForm?.[key]
-                            : quotation?.[key]
-                    )
-                }
-                disabled={!editMode}
-                onChange={(e) =>
-                    onChange(
-                        key,
-                        e.target.checked
-                    )
-                }
-            />
-
-            {label}
-        </label>
-    );
-
     const formatDate = (value) => {
         if (!value) {
             return "—";
@@ -129,294 +37,229 @@ export default function QuotationDetailsModal({
             return value;
         }
 
-        return date.toLocaleDateString(
-            "en-IN",
-            {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-            }
+        return date.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        });
+    };
+
+    const getValue = (key) =>
+        editMode
+            ? (editForm?.[key] ?? "")
+            : (quotation?.[key] ?? "");
+
+    const field = (
+        label,
+        key,
+        {
+            type = "text",
+            multiline = false,
+            rows = 3,
+        } = {}
+    ) => {
+        const value = getValue(key);
+
+        return (
+            <div className="space-y-2">
+                <label className="text-sm font-medium">
+                    {label}
+                </label>
+
+                {editMode ? (
+                    multiline ? (
+                        <Textarea
+                            rows={rows}
+                            value={value}
+                            onChange={(e) =>
+                                onChange(
+                                    key,
+                                    e.target.value
+                                )
+                            }
+                        />
+                    ) : (
+                        <Input
+                            type={type}
+                            value={value}
+                            onChange={(e) =>
+                                onChange(
+                                    key,
+                                    e.target.value
+                                )
+                            }
+                        />
+                    )
+                ) : (
+                    <div
+                        className={`min-h-10 rounded-md border bg-muted/30 px-3 py-2 text-sm ${
+                            multiline
+                                ? "whitespace-pre-wrap"
+                                : ""
+                        }`}
+                    >
+                        {value || "—"}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const checkbox = (label, key) => {
+        const checked = Boolean(
+            editMode
+                ? editForm?.[key]
+                : quotation?.[key]
+        );
+
+        return (
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id={`quotation-${key}`}
+                    checked={checked}
+                    disabled={!editMode}
+                    onCheckedChange={(value) =>
+                        onChange(key, Boolean(value))
+                    }
+                />
+
+                <label
+                    htmlFor={`quotation-${key}`}
+                    className="text-sm font-medium"
+                >
+                    {label}
+                </label>
+            </div>
         );
     };
 
     return (
-        <div className="modal-overlay">
+        <Dialog
+            open={Boolean(quotation)}
+            onOpenChange={(open) => {
+                if (!open && !saving) {
+                    onClose();
+                }
+            }}
+        >
+            <DialogContent className="max-h-[90vh] w-[95vw] max-w-4xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>
+                        {editMode
+                            ? "Edit Quotation"
+                            : "Quotation Details"}
+                    </DialogTitle>
 
-            <div
-                className="frappe-card"
-                style={{
-                    width: "min(900px, 95vw)",
-                    maxHeight: "90vh",
-                    overflowY: "auto",
-                }}
-            >
+                    <DialogDescription className="font-mono font-semibold text-primary">
+                        {quotation.quote_number || "—"}
+                    </DialogDescription>
+                </DialogHeader>
 
-                {/* =====================================================
-                    HEADER
-                ====================================================== */}
-
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent:
-                            "space-between",
-                        alignItems: "center",
-                        marginBottom: 20,
-                        paddingBottom: 15,
-                        borderBottom:
-                            "1px solid var(--border-light)",
-                    }}
-                >
-
-                    <div>
-                        <h3
-                            style={{
-                                margin: 0,
-                            }}
-                        >
-                            {editMode
-                                ? "Edit Quotation"
-                                : "Quotation Details"}
-                        </h3>
-
-                        <div
-                            style={{
-                                marginTop: 6,
-                                fontFamily:
-                                    "monospace",
-                                color:
-                                    "var(--brand-accent)",
-                                fontWeight: 700,
-                            }}
-                        >
-                            {quotation.quote_number ||
-                                "—"}
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="btn-text"
-                        onClick={onClose}
-                    >
-                        ✕ Close
-                    </button>
-
-                </div>
-
-
-                {/* =====================================================
-                    LIFECYCLE SUMMARY
-                ====================================================== */}
-
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                            "repeat(4, minmax(0, 1fr))",
-                        gap: 10,
-                        marginBottom: 25,
-                    }}
-                >
-
-                    <div
-                        style={{
-                            padding: 12,
-                            borderRadius: 8,
-                            background:
-                                "var(--bg-main)",
-                        }}
-                    >
-                        <small
-                            style={{
-                                color:
-                                    "var(--text-muted)",
-                            }}
-                        >
+                {/* Lifecycle */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-lg bg-muted/50 p-3">
+                        <div className="text-xs text-muted-foreground">
                             Status
-                        </small>
+                        </div>
 
-                        <div
-                            style={{
-                                marginTop: 4,
-                                fontWeight: 700,
-                            }}
-                        >
-                            {quotation.status ||
-                                "GENERATED"}
+                        <div className="mt-1 font-semibold">
+                            {quotation.status || "GENERATED"}
                         </div>
                     </div>
 
-
-                    <div
-                        style={{
-                            padding: 12,
-                            borderRadius: 8,
-                            background:
-                                "var(--bg-main)",
-                        }}
-                    >
-                        <small
-                            style={{
-                                color:
-                                    "var(--text-muted)",
-                            }}
-                        >
+                    <div className="rounded-lg bg-muted/50 p-3">
+                        <div className="text-xs text-muted-foreground">
                             Generated
-                        </small>
+                        </div>
 
-                        <div
-                            style={{
-                                marginTop: 4,
-                                fontWeight: 700,
-                            }}
-                        >
+                        <div className="mt-1 font-semibold">
                             {formatDate(
                                 quotation.generated_at
                             )}
                         </div>
                     </div>
 
-
-                    <div
-                        style={{
-                            padding: 12,
-                            borderRadius: 8,
-                            background:
-                                "var(--bg-main)",
-                        }}
-                    >
-                        <small
-                            style={{
-                                color:
-                                    "var(--text-muted)",
-                            }}
-                        >
+                    <div className="rounded-lg bg-muted/50 p-3">
+                        <div className="text-xs text-muted-foreground">
                             Resolved
-                        </small>
+                        </div>
 
-                        <div
-                            style={{
-                                marginTop: 4,
-                                fontWeight: 700,
-                            }}
-                        >
+                        <div className="mt-1 font-semibold">
                             {formatDate(
                                 quotation.resolved_at
                             )}
                         </div>
                     </div>
 
-
-                    <div
-                        style={{
-                            padding: 12,
-                            borderRadius: 8,
-                            background:
-                                "var(--bg-main)",
-                        }}
-                    >
-                        <small
-                            style={{
-                                color:
-                                    "var(--text-muted)",
-                            }}
-                        >
+                    <div className="rounded-lg bg-muted/50 p-3">
+                        <div className="text-xs text-muted-foreground">
                             ERP Order
-                        </small>
+                        </div>
 
                         <div
-                            style={{
-                                marginTop: 4,
-                                fontWeight: 700,
-                                color:
-                                    quotation.converted_order_id
-                                        ? "var(--brand-success)"
-                                        : "var(--text-muted)",
-                            }}
+                            className={`mt-1 font-semibold ${
+                                quotation.converted_order_id
+                                    ? "text-emerald-600"
+                                    : "text-muted-foreground"
+                            }`}
                         >
                             {quotation.converted_order_id
                                 ? `#${quotation.converted_order_id}`
                                 : "Not converted"}
                         </div>
                     </div>
-
                 </div>
 
+                {/* Customer */}
+                <section className="space-y-4">
+                    <h4 className="text-base font-semibold">
+                        Customer Details
+                    </h4>
 
-                {/* =====================================================
-                    CUSTOMER DETAILS
-                ====================================================== */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {field(
+                            "Customer Company",
+                            "client_company"
+                        )}
 
-                <h4
-                    style={{
-                        marginBottom: 15,
-                    }}
-                >
-                    Customer Details
-                </h4>
+                        {field(
+                            "Product",
+                            "product_name"
+                        )}
 
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                            "repeat(2, minmax(0, 1fr))",
-                        gap: 16,
-                    }}
-                >
+                        {field(
+                            "Buyer Name",
+                            "buyer_name"
+                        )}
 
-                    {field(
-                        "Customer Company",
-                        "client_company"
-                    )}
+                        {field(
+                            "Buyer Phone",
+                            "buyer_phone_number"
+                        )}
 
-                    {field(
-                        "Product",
-                        "product_name"
-                    )}
+                        {field(
+                            "Client Email",
+                            "client_email",
+                            { type: "email" }
+                        )}
 
-                    {field(
-                        "Buyer Name",
-                        "buyer_name"
-                    )}
+                        {field(
+                            "Enquiry Date",
+                            "enquiry_date",
+                            { type: "date" }
+                        )}
 
-                    {field(
-                        "Buyer Phone",
-                        "buyer_phone_number"
-                    )}
+                        {field(
+                            "City",
+                            "client_city"
+                        )}
 
-                    {field(
-                        "Client Email",
-                        "client_email",
-                        {
-                            type: "email",
-                        }
-                    )}
+                        {field(
+                            "Postal Code",
+                            "client_postal_code"
+                        )}
+                    </div>
 
-                    {field(
-                        "Enquiry Date",
-                        "enquiry_date",
-                        {
-                            type: "date",
-                        }
-                    )}
-
-                    {field(
-                        "City",
-                        "client_city"
-                    )}
-
-                    {field(
-                        "Postal Code",
-                        "client_postal_code"
-                    )}
-
-                </div>
-
-
-                {/* ADDRESS */}
-
-                <div style={{ marginTop: 16 }}>
                     {field(
                         "Address",
                         "client_address_line1",
@@ -425,74 +268,38 @@ export default function QuotationDetailsModal({
                             rows: 3,
                         }
                     )}
-                </div>
+                </section>
 
+                <div className="border-t" />
 
-                <hr
-                    style={{
-                        margin: "25px 0",
-                        border: 0,
-                        borderTop:
-                            "1px solid var(--border-light)",
-                    }}
-                />
+                {/* Commercial Terms */}
+                <section className="space-y-4">
+                    <h4 className="text-base font-semibold">
+                        Commercial Terms
+                    </h4>
 
-
-                {/* =====================================================
-                    COMMERCIAL TERMS
-                ====================================================== */}
-
-                <h4
-                    style={{
-                        marginBottom: 15,
-                    }}
-                >
-                    Commercial Terms
-                </h4>
-
-                {field(
-                    "Supply",
-                    "supply",
-                    {
+                    {field("Supply", "supply", {
                         multiline: true,
                         rows: 4,
-                    }
-                )}
+                    })}
 
-                {field(
-                    "Installation",
-                    "installation",
-                    {
+                    {field(
+                        "Installation",
+                        "installation",
+                        {
+                            multiline: true,
+                            rows: 3,
+                        }
+                    )}
+
+                    {field("Freight", "freight", {
                         multiline: true,
                         rows: 3,
-                    }
-                )}
+                    })}
+                </section>
 
-                {field(
-                    "Freight",
-                    "freight",
-                    {
-                        multiline: true,
-                        rows: 3,
-                    }
-                )}
-
-
-                {/* =====================================================
-                    QUOTATION FLAGS
-                ====================================================== */}
-
-                <div
-                    style={{
-                        display: "flex",
-                        gap: 25,
-                        marginTop: 15,
-                        padding: 14,
-                        background:
-                            "var(--bg-main)",
-                        borderRadius: 8,
-                    }}
-                >
+                {/* Flags */}
+                <div className="flex flex-wrap gap-6 rounded-lg bg-muted/50 p-4">
                     {checkbox(
                         "Dealer quotation",
                         "is_dealer"
@@ -504,93 +311,30 @@ export default function QuotationDetailsModal({
                     )}
                 </div>
 
-
-                {/* =====================================================
-                    SALES OWNER
-                ====================================================== */}
-
-                <div
-                    style={{
-                        marginTop: 20,
-                        padding: 14,
-                        border:
-                            "1px solid var(--border-light)",
-                        borderRadius: 8,
-                    }}
-                >
-                    <small
-                        style={{
-                            color:
-                                "var(--text-muted)",
-                        }}
-                    >
+                {/* Sales Owner */}
+                <section className="rounded-lg border p-4">
+                    <div className="text-xs text-muted-foreground">
                         Sales Owner
-                    </small>
-
-                    <div
-                        style={{
-                            marginTop: 4,
-                            fontWeight: 650,
-                        }}
-                    >
-                        {quotation.sales_user_name ||
-                            "—"}
                     </div>
 
-                    <div
-                        style={{
-                            marginTop: 2,
-                            fontSize: 12,
-                            color:
-                                "var(--text-muted)",
-                        }}
-                    >
-                        {quotation.sales_user_email ||
-                            "—"}
+                    <div className="mt-1 font-semibold">
+                        {quotation.sales_user_name || "—"}
                     </div>
-                </div>
 
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                        {quotation.sales_user_email || "—"}
+                    </div>
+                </section>
 
-                {/* =====================================================
-                    TIMELINE
-                ====================================================== */}
-
-                <div
-                    style={{
-                        marginTop: 20,
-                        padding: 14,
-                        border:
-                            "1px solid var(--border-light)",
-                        borderRadius: 8,
-                    }}
-                >
-
-                    <h5
-                        style={{
-                            marginTop: 0,
-                            marginBottom: 12,
-                        }}
-                    >
+                {/* Timeline */}
+                <section className="rounded-lg border p-4">
+                    <h5 className="mb-3 text-sm font-semibold">
                         Lifecycle Timeline
                     </h5>
 
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                                "repeat(3, 1fr)",
-                            gap: 12,
-                            fontSize: 12,
-                        }}
-                    >
-
+                    <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
                         <div>
-                            <div
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
+                            <div className="text-xs text-muted-foreground">
                                 Completed
                             </div>
 
@@ -602,12 +346,7 @@ export default function QuotationDetailsModal({
                         </div>
 
                         <div>
-                            <div
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
+                            <div className="text-xs text-muted-foreground">
                                 Rejected
                             </div>
 
@@ -619,12 +358,7 @@ export default function QuotationDetailsModal({
                         </div>
 
                         <div>
-                            <div
-                                style={{
-                                    color:
-                                        "var(--text-muted)",
-                                }}
-                            >
+                            <div className="text-xs text-muted-foreground">
                                 Changed
                             </div>
 
@@ -634,75 +368,51 @@ export default function QuotationDetailsModal({
                                 )}
                             </strong>
                         </div>
-
                     </div>
+                </section>
 
-                </div>
-
-
-                {/* =====================================================
-                    FOOTER
-                ====================================================== */}
-
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent:
-                            "flex-end",
-                        gap: 10,
-                        marginTop: 25,
-                        paddingTop: 15,
-                        borderTop:
-                            "1px solid var(--border-light)",
-                    }}
-                >
-
+                <DialogFooter>
                     {editMode ? (
                         <>
-                            <button
+                            <Button
                                 type="button"
-                                className="btn-text"
+                                variant="outline"
                                 onClick={onClose}
                                 disabled={saving}
                             >
                                 Cancel
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 type="button"
-                                className="btn btn-primary"
                                 onClick={onSave}
                                 disabled={saving}
                             >
                                 {saving
                                     ? "Saving..."
                                     : "Save Changes"}
-                            </button>
+                            </Button>
                         </>
                     ) : (
                         <>
-                            <button
+                            <Button
                                 type="button"
-                                className="btn-text"
+                                variant="outline"
                                 onClick={onClose}
                             >
                                 Close
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
                                 type="button"
-                                className="btn btn-primary"
                                 onClick={onEdit}
                             >
                                 Edit Quotation
-                            </button>
+                            </Button>
                         </>
                     )}
-
-                </div>
-
-            </div>
-
-        </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
