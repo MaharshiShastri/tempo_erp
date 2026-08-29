@@ -22,18 +22,26 @@ export default function useProductionAnalytics({
         datasets: [
             {
                 data: (prodKpis?.production_stage ?? []).map(
-                    x => x.count
+                    x => Number(x.count || 0)
                 ),
 
                 backgroundColor: [
-                    "rgba(201,203,207,.8)",
-                    "rgba(54,162,235,.8)",
-                    "rgba(255,206,86,.8)",
-                    "rgba(75,192,192,.8)",
-                    "rgba(153,102,255,.8)"
-                ]
-            }
-        ]
+                    "#94a3b8", // Slate
+                    "#3b82f6", // Blue
+                    "#f59e0b", // Amber
+                    "#10b981", // Emerald
+                    "#8b5cf6", // Violet
+                    "#06b6d4", // Cyan
+                ],
+
+                borderColor: "#ffffff",
+                borderWidth: 3,
+
+                hoverOffset: 10,
+
+                borderRadius: 6,
+            },
+        ],
     }), [prodKpis]);
 
     const productionBarChart = useMemo(() => ({
@@ -44,20 +52,38 @@ export default function useProductionAnalytics({
         datasets: [
             {
                 label: "Assigned",
+
                 data: (prodKpis?.task_summary ?? []).map(
-                    x => x.assigned
+                    x => Number(x.assigned || 0)
                 ),
-                backgroundColor: "#2490ef"
+
+                backgroundColor: "#3b82f6",
+
+                borderRadius: 8,
+                borderSkipped: false,
+
+                barThickness: 22,
+
+                hoverBackgroundColor: "#2563eb",
             },
 
             {
                 label: "Received",
+
                 data: (prodKpis?.task_summary ?? []).map(
-                    x => x.received
+                    x => Number(x.received || 0)
                 ),
-                backgroundColor: "#22c55e"
-            }
-        ]
+
+                backgroundColor: "#10b981",
+
+                borderRadius: 8,
+                borderSkipped: false,
+
+                barThickness: 22,
+
+                hoverBackgroundColor: "#059669",
+            },
+        ],
     }), [prodKpis]);
 
     const productionLineChart = useMemo(() => ({
@@ -70,17 +96,26 @@ export default function useProductionAnalytics({
                 label: "Completed Tasks",
 
                 data: (prodKpis?.daily_completed ?? []).map(
-                    x => x.completed
+                    x => Number(x.completed || 0)
                 ),
 
-                borderColor: "#2490ef",
-                backgroundColor: "rgba(36,144,239,.25)",
-                pointBackgroundColor: "#2490ef",
-                pointBorderColor: "#2490ef",
+                borderColor: "#3b82f6",
+
+                backgroundColor: "rgba(59, 130, 246, 0.12)",
+
+                pointBackgroundColor: "#ffffff",
+                pointBorderColor: "#3b82f6",
+                pointBorderWidth: 3,
+                pointRadius: 4,
+                pointHoverRadius: 7,
+
                 fill: true,
-                tension: 0.35
-            }
-        ]
+
+                tension: 0.4,
+
+                borderWidth: 3,
+            },
+        ],
     }), [prodKpis]);
 
     // =========================================================

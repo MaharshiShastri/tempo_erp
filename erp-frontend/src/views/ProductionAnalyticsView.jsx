@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Line, Bar, Pie } from "react-chartjs-2";
+import { Line, Bar, Doughnut } from "react-chartjs-2";
 
 import GeoMapCanvas from "../components/geo/GeoMapCanvas";
 import SearchableMultiSelect from "../components/shared/SearchableMultiselect";
@@ -569,27 +569,108 @@ export default function ProductionAnalyticsView({ state }) {
 
         <TabsContent
           value="charts"
-          className="grid gap-6 lg:grid-cols-2"
+          className="space-y-6"
         >
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>
-                Tasks Completed Daily
-              </CardTitle>
+          <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="lg:col-span-2 overflow-hidden">
+            <CardHeader className="border-b bg-gradient-to-r from-blue-500/10 via-background to-cyan-500/10">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="text-base">
+                            Daily Production Output
+                        </CardTitle>
+
+                        <CardDescription className="mt-1">
+                            Completed production tasks over the selected period
+                        </CardDescription>
+                    </div>
+
+                    <div className="flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                        <span className="size-2 rounded-full bg-blue-500" />
+                        Completed
+                    </div>
+                </div>
             </CardHeader>
 
-            <CardContent>
-              <div className="h-[400px]">
-                <Line
-                  data={productionLineChart}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                  }}
-                />
-              </div>
+            <CardContent className="p-5 md:p-6">
+                <div className="h-[380px]">
+                    <Line
+                        data={productionLineChart}
+                        options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            interaction: {
+                                mode: "index",
+                                intersect: false,
+                            },
+
+                            plugins: {
+                                legend: {
+                                    display: false,
+                                },
+
+                                tooltip: {
+                                    backgroundColor: "rgba(15, 23, 42, 0.95)",
+                                    padding: 12,
+                                    cornerRadius: 10,
+
+                                    titleFont: {
+                                        size: 12,
+                                        weight: "600",
+                                    },
+
+                                    bodyFont: {
+                                        size: 13,
+                                    },
+
+                                    displayColors: false,
+                                },
+                            },
+
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false,
+                                    },
+
+                                    border: {
+                                        display: false,
+                                    },
+
+                                    ticks: {
+                                        color: "#64748b",
+                                        font: {
+                                            size: 11,
+                                        },
+                                    },
+                                },
+
+                                y: {
+                                    beginAtZero: true,
+
+                                    border: {
+                                        display: false,
+                                    },
+
+                                    grid: {
+                                        color: "rgba(148, 163, 184, 0.15)",
+                                    },
+
+                                    ticks: {
+                                        color: "#64748b",
+                                        precision: 0,
+                                        font: {
+                                            size: 11,
+                                        },
+                                    },
+                                },
+                            },
+                        }}
+                    />
+                </div>
             </CardContent>
-          </Card>
+        </Card>
 
           <Card>
             <CardHeader>
@@ -600,41 +681,167 @@ export default function ProductionAnalyticsView({ state }) {
 
             <CardContent>
               <div className="h-[400px]">
-                <Pie
+                <Doughnut
                   data={productionPieChart}
                   options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: "bottom",
+                      responsive: true,
+                      maintainAspectRatio: false,
+
+                      cutout: "68%",
+
+                      plugins: {
+                          legend: {
+                              position: "bottom",
+
+                              labels: {
+                                  usePointStyle: true,
+                                  pointStyle: "circle",
+
+                                  padding: 18,
+
+                                  font: {
+                                      size: 11,
+                                  },
+                              },
+                          },
+
+                          tooltip: {
+                              backgroundColor: "rgba(15, 23, 42, 0.95)",
+                              padding: 12,
+                              cornerRadius: 10,
+
+                              callbacks: {
+                                  label: function (context) {
+                                      const value = context.raw ?? 0;
+
+                                      const dataset =
+                                          context.dataset.data || [];
+
+                                      const total = dataset.reduce(
+                                          (sum, item) =>
+                                              sum + Number(item || 0),
+                                          0
+                                      );
+
+                                      const percentage =
+                                          total > 0
+                                              ? ((value / total) * 100).toFixed(1)
+                                              : 0;
+
+                                      return ` ${value} tasks (${percentage}%)`;
+                                  },
+                              },
+                          },
                       },
-                    },
                   }}
-                />
+              />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Tasks Assigned vs Received
-              </CardTitle>
+          <Card className="overflow-hidden">
+            <CardHeader className="border-b bg-gradient-to-r from-emerald-500/10 via-background to-blue-500/10">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <CardTitle className="text-base">
+                            Task Flow by Operator
+                        </CardTitle>
+
+                        <CardDescription className="mt-1">
+                            Assigned versus received production tasks
+                        </CardDescription>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs">
+                        <div className="flex items-center gap-1.5">
+                            <span className="size-2.5 rounded-sm bg-blue-500" />
+                            <span className="text-muted-foreground">
+                                Assigned
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                            <span className="size-2.5 rounded-sm bg-emerald-500" />
+                            <span className="text-muted-foreground">
+                                Received
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </CardHeader>
 
-            <CardContent>
-              <div className="h-[400px]">
-                <Bar
-                  data={productionBarChart}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                  }}
-                />
-              </div>
+            <CardContent className="p-5 md:p-6">
+                <div className="h-[400px]">
+                    <Bar
+                        data={productionBarChart}
+                        options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            interaction: {
+                                mode: "index",
+                                intersect: false,
+                            },
+
+                            plugins: {
+                                legend: {
+                                    display: false,
+                                },
+
+                                tooltip: {
+                                    backgroundColor:
+                                        "rgba(15, 23, 42, 0.95)",
+
+                                    padding: 12,
+                                    cornerRadius: 10,
+                                },
+                            },
+
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false,
+                                    },
+
+                                    border: {
+                                        display: false,
+                                    },
+
+                                    ticks: {
+                                        color: "#64748b",
+                                        font: {
+                                            size: 11,
+                                        },
+                                    },
+                                },
+
+                                y: {
+                                    beginAtZero: true,
+
+                                    border: {
+                                        display: false,
+                                    },
+
+                                    grid: {
+                                        color:
+                                            "rgba(148, 163, 184, 0.15)",
+                                    },
+
+                                    ticks: {
+                                        precision: 0,
+                                        color: "#64748b",
+                                        font: {
+                                            size: 11,
+                                        },
+                                    },
+                                },
+                            },
+                        }}
+                    />
+                </div>
             </CardContent>
-          </Card>
+        </Card>
+        </div>
         </TabsContent>
 
         {/* ====================================================
