@@ -1,180 +1,816 @@
-import useLogisticsHub from "../hooks/logistics/useLogisticsHub";
 import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+
 export default function LogisticsPartnerEntryView({ state }) {
-    const [modalAlert, setModalAlert] = useState({ isOpen: false, title: "", message: "", isError: false });
-    const hasChanges = JSON.stringify(state.buildCurrentPayload()) !== state.originalPayloadString;
+  const [modalAlert, setModalAlert] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    isError: false,
+  });
 
-    return (
-        <div className="frappe-card" style={{ maxWidth: 1200, margin: "0 auto", padding: 25 }}>
-            <div className="system-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3>🚚 Master Logistics Onboarding</h3>
-                
-                <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-                    <div>
-                        <input type="file" accept=".pdf" ref={state.fileInputRef} style={{ display: 'none' }} onChange={state.handleLogisticsFileUpload} />
-                        <button type="button" className="btn btn-secondary" style={{ background: "var(--brand-accent)", color: "#fff", border: "none" }} onClick={() => state.fileInputRef.current.click()} disabled={state.isExtracting}>
-                            {state.isExtracting ? "⏳ Extracting..." : "🤖 Auto-Fill via Contract PDF"}
-                        </button>
-                    </div>
+  const hasChanges =
+    JSON.stringify(state.buildCurrentPayload()) !==
+    state.originalPayloadString;
 
-                    <select className="form-select-native" value={state.selectedPartnerId} onChange={state.handlePartnerSelection}>
-                        <option value="">➕ Create Manually</option>
-                        {state.availablePartners.map(p => <option key={p.id} value={p.id}>✏️ {p.name}</option>)}
-                    </select>
-                </div>
+  const closeModal = () => {
+    setModalAlert({
+      isOpen: false,
+      title: "",
+      message: "",
+      isError: false,
+    });
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-[1200px] p-6">
+      <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+        {/* Header */}
+        <div className="flex flex-col gap-4 border-b p-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight">
+              🚚 Master Logistics Onboarding
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Configure transporter contract parameters, zones, fuel escalation,
+              and ODA delivery rates.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {/* PDF Upload */}
+            <div>
+              <input
+                type="file"
+                accept=".pdf"
+                ref={state.fileInputRef}
+                className="hidden"
+                onChange={state.handleLogisticsFileUpload}
+              />
+
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => state.fileInputRef.current?.click()}
+                disabled={state.isExtracting}
+              >
+                {state.isExtracting
+                  ? "⏳ Extracting..."
+                  : "🤖 Auto-Fill via Contract PDF"}
+              </Button>
             </div>
 
-            <form onSubmit={state.handlePartnerSave}>
-                <h4 style={{ color: "var(--brand-accent)", marginTop: "20px" }}>Core Contract Parameters</h4>
-                <div className="form-grid-layout" style={{ gap: "15px", display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
-                    <div className="form-group"><label className="input-label">Transporter Name</label><input required className="form-input" value={state.partner.name} onChange={e => state.setPartner({ ...state.partner, name: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">Distance Calculator Link</label><input type="url" className="form-input" value={state.partner.partner_link || ""} onChange={e => state.setPartner({ ...state.partner, partner_link: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">Mobile Number</label><input type="text" className="form-input" value={state.partner.mobile_number || ""} onChange={e=> state.setPartner({...state.partner, mobile_number: e.target.value})} /></div>
-                    <div className="form-group"><label className="input-label">CFT Factor</label><input required type="number" step="0.01" className="form-input" value={state.partner.cft_factor} onChange={e => state.setPartner({ ...state.partner, cft_factor: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">Min Weight (KG)</label><input required type="number" className="form-input" value={state.partner.minimum_weight} onChange={e => state.setPartner({ ...state.partner, minimum_weight: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">Min Freight Value (₹)</label><input required type="number" className="form-input" value={state.partner.minimum_freight_value} onChange={e => state.setPartner({ ...state.partner, minimum_freight_value: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">Docs/GC Charge</label><input required type="number" className="form-input" value={state.partner.documentation_charge} onChange={e => state.setPartner({ ...state.partner, documentation_charge: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">FOV Risk (%)</label><input required type="number" step="0.01" className="form-input" value={state.partner.fov_percentage} onChange={e => state.setPartner({ ...state.partner, fov_percentage: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label" style={{ color: 'var(--brand-success)'}}>Local Loading cost (₹)</label><input required type="number" step="1" className="form-input" value={state.partner.local_loading_cost} onChange={e => state.setPartner({ ...state.partner, local_loading_cost: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label" style={{ color: 'var(--brand-danger)'}}>Max Hub Loading Cap (₹)</label><input required type="number" step="1" className="form-input" value={state.partner.hub_loading_max_cost} onChange={e => state.setPartner({ ...state.partner, hub_loading_max_cost: e.target.value })} /></div>
-                    <div className="form-group"><label className="input-label">GST Rate (%)</label><input required type="number" className="form-input" value={state.partner.gst_percentage} onChange={e => state.setPartner({ ...state.partner, gst_percentage: e.target.value })} /></div>
-                </div>
+            {/* Partner Selector */}
+            <Select
+              value={state.selectedPartnerId || "__manual__"}
+              onValueChange={(value) =>
+                state.handlePartnerSelection({
+                  target: {
+                    value: value === "__manual__" ? "" : value,
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="w-full sm:w-[240px]">
+                <SelectValue placeholder="Select transporter" />
+              </SelectTrigger>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>Zone Definitions & Freight Rates</h4>
-                    <button type="button" className="btn btn-secondary" onClick={() => state.addZoneRow(state.setZones, { zone_code: "", zone_name: "", states_raw: "", rate_per_kg: "" })}>+ Add Zone Rate</button>
-                </div>
-                <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead><tr style={{ textAlign: "left" }}>
-                        <th>Zone Code</th>
-                        <th>Regions Served</th>
-                        <th>States (Comma Separated)</th>
-                        <th>Rate (₹/kg)</th>
-                        <th></th>
-                    </tr></thead>
-                    <tbody>
-                        {state.zones.map((z, i) => (
-                            <tr key={i}>
-                                <td><input className="form-input" style={{ textTransform: "uppercase" }} value={z.zone_code} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "zone_code", e.target.value)} /></td>
-                                <td><input className="form-input" value={z.zone_name} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "zone_name", e.target.value)} /></td>
-                                <td><input className="form-input" value={z.states_raw} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "states_raw", e.target.value)} /></td>
-                                <td><input className="form-input" type="number" step="0.01" placeholder="0.00" value={z.rate_per_kg} onChange={e => state.handleTableChange(state.zones, state.setZones, i, "rate_per_kg", e.target.value)} /></td>
-                                <td><button type="button" className="btn-text-danger" onClick={() => state.removeZoneRow(state.zones, state.setZones, i)}>✕</button></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+              <SelectContent>
+                <SelectItem value="__manual__">
+                  ➕ Create Manually
+                </SelectItem>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>Fuel Escalation (FSC)</h4>
-                    <button type="button" className="btn btn-secondary" onClick={() => state.addZoneRow(state.setFuelMatrix, { fuel_price_from: "", fuel_price_to: "", surcharge_percentage: "" })}>+ Add Fuel Slab</button>
-                </div>
-                <table style={{ width: "100%", marginBottom: "20px" }}>
-                    <thead>
-                        <tr style={{ textAlign: "left" }}>
-                            <th>Diesel Price From (₹)</th>
-                            <th>Diesel Price To (₹)</th>
-                            <th>FSC Applicable (%)</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {state.fuelMatrix.map((f, i) => (
-                            <tr key={i}>
-                                <td><input className="form-input" type="number" step="0.01" value={f.fuel_price_from} onChange={e => state.handleTableChange(state.fuelMatrix, state.setFuelMatrix, i, "fuel_price_from", e.target.value)} /></td>
-                                <td><input className="form-input" type="number" step="0.01" value={f.fuel_price_to} onChange={e => state.handleTableChange(state.fuelMatrix, state.setFuelMatrix, i, "fuel_price_to", e.target.value)} /></td>
-                                <td><input className="form-input" type="number" step="0.01" value={f.surcharge_percentage} onChange={e => state.handleTableChange(state.fuelMatrix, state.setFuelMatrix, i, "surcharge_percentage", e.target.value)} /></td>
-                                <td><button type="button" className="btn-text-danger" onClick={() => state.removeZoneRow(state.fuelMatrix, state.setFuelMatrix, i)}>✕</button></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px", marginBottom: "15px" }}>
-                    <h4 style={{ color: "var(--brand-accent)" }}>ODA Delivery Matrix</h4>
-                    <div>
-                        <button type="button" className="btn btn-secondary" style={{ marginRight: "10px" }} onClick={state.addOdaCol}>+ Add Weight Column</button>
-                        <button type="button" className="btn btn-secondary" onClick={state.addOdaRow}>+ Add Distance Row</button>
-                    </div>
-                </div>
-
-                <div style={{ overflowX: "auto", border: "1px solid var(--border-light)", borderRadius: "var(--radius-sm)", marginBottom: "30px" }}>
-                    <table style={{ width: "100%", minWidth: "800px", borderCollapse: "collapse" }}>
-                        <thead>
-                            <tr>
-                                <th style={{ background: "var(--bg-surface)", padding: "10px", borderBottom: "2px solid var(--border-light)", borderRight: "2px solid var(--border-light)" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "right" }}>Weights (KG) &rarr;</div>
-                                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "left" }}>Distances (KM) &darr;</div>
-                                </th>
-                                {state.odaWeights.map(wt => (
-                                    <th key={wt.id} style={{ background: "var(--bg-surface)", padding: "10px", borderBottom: "2px solid var(--border-light)", borderRight: "1px solid var(--border-light)" }}>
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} placeholder="Min" value={wt.from} onChange={e => state.updateOdaAxis(state.setOdaWeights, state.odaWeights, wt.id, 'from', e.target.value)} />
-                                            <span style={{ color: "var(--text-muted)" }}>-</span>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} placeholder="Max" value={wt.to} onChange={e => state.updateOdaAxis(state.setOdaWeights, state.odaWeights, wt.id, 'to', e.target.value)} />
-                                            <button type="button" className="btn-text-danger" style={{ padding: "0 5px", fontSize: "16px" }} onClick={() => state.removeOdaCol(wt.id)}>&times;</button>
-                                        </div>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {state.odaDistances.map(dist => (
-                                <tr key={dist.id}>
-                                    <td style={{ background: "var(--bg-surface)", padding: "10px", borderBottom: "1px solid var(--border-light)", borderRight: "2px solid var(--border-light)" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} placeholder="Min" value={dist.from} onChange={e => state.updateOdaAxis(state.setOdaDistances, state.odaDistances, dist.id, 'from', e.target.value)} />
-                                            <span style={{ color: "var(--text-muted)" }}>-</span>
-                                            <input className="form-input" style={{ width: "60px", padding: "4px", textAlign: "center" }} placeholder="Max" value={dist.to} onChange={e => state.updateOdaAxis(state.setOdaDistances, state.odaDistances, dist.id, 'to', e.target.value)} />
-                                            <button type="button" className="btn-text-danger" style={{ padding: "0 5px", fontSize: "16px", marginLeft: "auto" }} onClick={() => state.removeOdaRow(dist.id)}>&times;</button>
-                                        </div>
-                                    </td>
-                                    {state.odaWeights.map(wt => {
-                                        const cellKey = `${dist.id}_${wt.id}`;
-                                        return (
-                                            <td key={cellKey} style={{ padding: "10px", borderBottom: "1px solid var(--border-light)", borderRight: "1px solid var(--border-light)" }}>
-                                                <input className="form-input" type="number" placeholder="₹" style={{ width: "100%", boxSizing: "border-box", textAlign: "center" }} value={state.odaCharges[cellKey] ?? ""} onChange={e => state.updateOdaCharge(dist.id, wt.id, e.target.value)} />
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-light)", paddingTop: "20px", marginTop: "20px" }}>
-                    <div>
-                        {state.selectedPartnerId && (
-                            <button type="button"  className="btn"  style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold", background: "var(--brand-danger, #dc3545)", color: "#fff", border: "none" }} onClick={state.handlePartnerDelete} disabled={state.isDeleting}>
-                                {state.isDeleting ? "⏳ Deleting..." : "🗑️ Delete Transporter"}
-                            </button>
-                        )}
-                    </div>
-                    
-                    <div>
-                        {hasChanges && (
-                            <button type="submit" className="btn btn-success" style={{ padding: "12px 30px", fontSize: "16px", fontWeight: "bold" }}>
-                                {state.selectedPartnerId ? "Update Changed Matrices" : "Save New Transporter Master"}
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </form>
-
-            {modalAlert.isOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-box" style={{ borderTop: `4px solid ${modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
-                        <h3 style={{ color: modalAlert.isError ? "var(--brand-danger)" : "var(--brand-success)" }}>
-                            {modalAlert.title}
-                        </h3>
-                        <p style={{ margin: "15px 0" }}>{modalAlert.message}</p>
-                        <button className="btn btn-secondary" onClick={() =>setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>
-                            {state.isExtracting ? "Dismiss" : "Acknowledge"}
-                        </button>
-                    </div>
-                </div>
-            )}
+                {state.availablePartners.map((partner) => (
+                  <SelectItem key={partner.id} value={String(partner.id)}>
+                    ✏️ {partner.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-    );
+
+        <form onSubmit={state.handlePartnerSave}>
+          <div className="space-y-8 p-6">
+            {/* Core Contract Parameters */}
+            <section>
+              <div className="mb-5">
+                <h4 className="text-lg font-semibold text-primary">
+                  Core Contract Parameters
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  Basic transporter and commercial contract configuration.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <FormField label="Transporter Name">
+                  <Input
+                    required
+                    value={state.partner.name}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="Distance Calculator Link">
+                  <Input
+                    type="url"
+                    value={state.partner.partner_link || ""}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        partner_link: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="Mobile Number">
+                  <Input
+                    type="text"
+                    value={state.partner.mobile_number || ""}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        mobile_number: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="CFT Factor">
+                  <Input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={state.partner.cft_factor}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        cft_factor: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="Min Weight (KG)">
+                  <Input
+                    required
+                    type="number"
+                    value={state.partner.minimum_weight}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        minimum_weight: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="Min Freight Value (₹)">
+                  <Input
+                    required
+                    type="number"
+                    value={state.partner.minimum_freight_value}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        minimum_freight_value: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="Docs/GC Charge">
+                  <Input
+                    required
+                    type="number"
+                    value={state.partner.documentation_charge}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        documentation_charge: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="FOV Risk (%)">
+                  <Input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={state.partner.fov_percentage}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        fov_percentage: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField
+                  label="Local Loading Cost (₹)"
+                  labelClassName="text-emerald-600"
+                >
+                  <Input
+                    required
+                    type="number"
+                    step="1"
+                    value={state.partner.local_loading_cost}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        local_loading_cost: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField
+                  label="Max Hub Loading Cap (₹)"
+                  labelClassName="text-destructive"
+                >
+                  <Input
+                    required
+                    type="number"
+                    step="1"
+                    value={state.partner.hub_loading_max_cost}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        hub_loading_max_cost: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+
+                <FormField label="GST Rate (%)">
+                  <Input
+                    required
+                    type="number"
+                    value={state.partner.gst_percentage}
+                    onChange={(e) =>
+                      state.setPartner({
+                        ...state.partner,
+                        gst_percentage: e.target.value,
+                      })
+                    }
+                  />
+                </FormField>
+              </div>
+            </section>
+
+            {/* Zone Definitions */}
+            <section>
+              <SectionHeader
+                title="Zone Definitions & Freight Rates"
+                description="Configure geographical zones and their applicable freight rates."
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    state.addZoneRow(state.setZones, {
+                      zone_code: "",
+                      zone_name: "",
+                      states_raw: "",
+                      rate_per_kg: "",
+                    })
+                  }
+                >
+                  + Add Zone Rate
+                </Button>
+              </SectionHeader>
+
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Zone Code</TableHead>
+                      <TableHead>Regions Served</TableHead>
+                      <TableHead>States (Comma Separated)</TableHead>
+                      <TableHead>Rate (₹/kg)</TableHead>
+                      <TableHead className="w-[60px]" />
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {state.zones.map((zone, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Input
+                            className="uppercase"
+                            value={zone.zone_code}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.zones,
+                                state.setZones,
+                                index,
+                                "zone_code",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Input
+                            value={zone.zone_name}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.zones,
+                                state.setZones,
+                                index,
+                                "zone_name",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Input
+                            value={zone.states_raw}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.zones,
+                                state.setZones,
+                                index,
+                                "states_raw",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={zone.rate_per_kg}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.zones,
+                                state.setZones,
+                                index,
+                                "rate_per_kg",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() =>
+                              state.removeZoneRow(
+                                state.zones,
+                                state.setZones,
+                                index
+                              )
+                            }
+                          >
+                            ✕
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+
+            {/* Fuel Escalation */}
+            <section>
+              <SectionHeader
+                title="Fuel Escalation (FSC)"
+                description="Define fuel price slabs and their applicable surcharge percentages."
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    state.addZoneRow(state.setFuelMatrix, {
+                      fuel_price_from: "",
+                      fuel_price_to: "",
+                      surcharge_percentage: "",
+                    })
+                  }
+                >
+                  + Add Fuel Slab
+                </Button>
+              </SectionHeader>
+
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Diesel Price From (₹)</TableHead>
+                      <TableHead>Diesel Price To (₹)</TableHead>
+                      <TableHead>FSC Applicable (%)</TableHead>
+                      <TableHead className="w-[60px]" />
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {state.fuelMatrix.map((fuel, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={fuel.fuel_price_from}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.fuelMatrix,
+                                state.setFuelMatrix,
+                                index,
+                                "fuel_price_from",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={fuel.fuel_price_to}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.fuelMatrix,
+                                state.setFuelMatrix,
+                                index,
+                                "fuel_price_to",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={fuel.surcharge_percentage}
+                            onChange={(e) =>
+                              state.handleTableChange(
+                                state.fuelMatrix,
+                                state.setFuelMatrix,
+                                index,
+                                "surcharge_percentage",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() =>
+                              state.removeZoneRow(
+                                state.fuelMatrix,
+                                state.setFuelMatrix,
+                                index
+                              )
+                            }
+                          >
+                            ✕
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+
+            {/* ODA Matrix */}
+            <section>
+              <SectionHeader
+                title="ODA Delivery Matrix"
+                description="Configure ODA charges based on distance and weight ranges."
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={state.addOdaCol}
+                  >
+                    + Add Weight Column
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={state.addOdaRow}
+                  >
+                    + Add Distance Row
+                  </Button>
+                </div>
+              </SectionHeader>
+
+              <div className="overflow-x-auto rounded-lg border">
+                <Table className="min-w-[800px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[180px] border-r-2 bg-muted/50">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-right text-xs text-muted-foreground">
+                            Weights (KG) →
+                          </span>
+                          <span className="text-left text-xs text-muted-foreground">
+                            Distances (KM) ↓
+                          </span>
+                        </div>
+                      </TableHead>
+
+                      {state.odaWeights.map((weight) => (
+                        <TableHead
+                          key={weight.id}
+                          className="border-r bg-muted/50"
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <Input
+                              className="h-8 w-[65px] px-2 text-center"
+                              placeholder="Min"
+                              value={weight.from}
+                              onChange={(e) =>
+                                state.updateOdaAxis(
+                                  state.setOdaWeights,
+                                  state.odaWeights,
+                                  weight.id,
+                                  "from",
+                                  e.target.value
+                                )
+                              }
+                            />
+
+                            <span className="text-muted-foreground">-</span>
+
+                            <Input
+                              className="h-8 w-[65px] px-2 text-center"
+                              placeholder="Max"
+                              value={weight.to}
+                              onChange={(e) =>
+                                state.updateOdaAxis(
+                                  state.setOdaWeights,
+                                  state.odaWeights,
+                                  weight.id,
+                                  "to",
+                                  e.target.value
+                                )
+                              }
+                            />
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                              onClick={() => state.removeOdaCol(weight.id)}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {state.odaDistances.map((distance) => (
+                      <TableRow key={distance.id}>
+                        <TableCell className="border-r-2 bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              className="h-8 w-[65px] px-2 text-center"
+                              placeholder="Min"
+                              value={distance.from}
+                              onChange={(e) =>
+                                state.updateOdaAxis(
+                                  state.setOdaDistances,
+                                  state.odaDistances,
+                                  distance.id,
+                                  "from",
+                                  e.target.value
+                                )
+                              }
+                            />
+
+                            <span className="text-muted-foreground">-</span>
+
+                            <Input
+                              className="h-8 w-[65px] px-2 text-center"
+                              placeholder="Max"
+                              value={distance.to}
+                              onChange={(e) =>
+                                state.updateOdaAxis(
+                                  state.setOdaDistances,
+                                  state.odaDistances,
+                                  distance.id,
+                                  "to",
+                                  e.target.value
+                                )
+                              }
+                            />
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="ml-auto h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() =>
+                                state.removeOdaRow(distance.id)
+                              }
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        </TableCell>
+
+                        {state.odaWeights.map((weight) => {
+                          const cellKey = `${distance.id}_${weight.id}`;
+
+                          return (
+                            <TableCell
+                              key={cellKey}
+                              className="border-r"
+                            >
+                              <Input
+                                type="number"
+                                placeholder="₹"
+                                className="text-center"
+                                value={state.odaCharges[cellKey] ?? ""}
+                                onChange={(e) =>
+                                  state.updateOdaCharge(
+                                    distance.id,
+                                    weight.id,
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex flex-col-reverse gap-3 border-t bg-muted/20 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {state.selectedPartnerId && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="lg"
+                  onClick={state.handlePartnerDelete}
+                  disabled={state.isDeleting}
+                >
+                  {state.isDeleting
+                    ? "⏳ Deleting..."
+                    : "🗑️ Delete Transporter"}
+                </Button>
+              )}
+            </div>
+
+            <div>
+              {hasChanges && (
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="font-semibold"
+                >
+                  {state.selectedPartnerId
+                    ? "Update Changed Matrices"
+                    : "Save New Transporter Master"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* Alert Dialog */}
+      <Dialog
+        open={modalAlert.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeModal();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle
+              className={
+                modalAlert.isError
+                  ? "text-destructive"
+                  : "text-emerald-600"
+              }
+            >
+              {modalAlert.title}
+            </DialogTitle>
+
+            <DialogDescription className="whitespace-pre-wrap pt-2">
+              {modalAlert.message}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button type="button" onClick={closeModal}>
+              {state.isExtracting ? "Dismiss" : "Acknowledge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Small presentational helpers                                               */
+/* -------------------------------------------------------------------------- */
+
+function FormField({
+  label,
+  children,
+  labelClassName = "",
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className={labelClassName}>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  description,
+  children,
+}) {
+  return (
+    <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h4 className="text-lg font-semibold text-primary">{title}</h4>
+
+        {description && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </div>
+
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
 }
