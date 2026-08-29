@@ -1,71 +1,197 @@
-import React, { useState } from 'react';
-export default function OperatorMultiSelect({ users, selectedEmails, onChange, }) {
-    const [search, setSearch] = useState('');
-    const [isOpen, setIsOpen] = useState(false);
+import React, { useMemo, useState } from "react";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 
-    // Prioritize StartsWith, then Contains
-    const filteredUsers = users.filter(u => {
-        const query = search.toLowerCase();
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+export default function OperatorMultiSelect({
+  users,
+  selectedEmails,
+  onChange,
+}) {
+  const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredUsers = useMemo(() => {
+    const query = search.toLowerCase();
+
+    return users
+      .filter((u) => {
         const name = u.name.toLowerCase();
-        return name.startsWith(query) || name.includes(query);
-    }).sort((a, b) => {
+
+        return (
+          name.startsWith(query) ||
+          name.includes(query)
+        );
+      })
+      .sort((a, b) => {
         const query = search.toLowerCase();
-        if (a.name.toLowerCase().startsWith(query) && !b.name.toLowerCase().startsWith(query)) return -1;
-        return 0;
-    });
 
-    const toggleUser = (email) => {
-        if (selectedEmails.includes(email)) {
-            onChange(selectedEmails.filter(e => e !== email));
-        } else {
-            onChange([...selectedEmails, email]);
-        }
-    };
+        const aStarts = a.name
+          .toLowerCase()
+          .startsWith(query);
 
-    return (
-        <div style={{ position: 'relative', flex: 1 }}>
-            <div 
-                className="form-input" 
-                style={{ minHeight: '38px', cursor: 'text', display: 'flex', flexWrap: 'wrap', gap: '4px', padding: '4px' }} 
-                onClick={() => setIsOpen(true)}
-            >
-                {selectedEmails.map(email => {
-                    const u = users.find(x => x.email === email);
-                    return (
-                        <span key={email} style={{ background: 'var(--brand-accent)', color: '#fff', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>
-                            {u ? u.name : email} 
-                            <span onClick={(e) => { e.stopPropagation(); toggleUser(email); }} style={{ marginLeft: '4px', cursor: 'pointer', fontWeight: 'bold' }}>×</span>
-                        </span>
-                    );
-                })}
-                <input 
-                    type="text" 
-                    placeholder={selectedEmails.length === 0 ? "Search & Assign Operators..." : ""}
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', flex: 1, minWidth: '120px' }}
-                    onFocus={() => setIsOpen(true)}
-                />
-            </div>
-            {isOpen && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', maxHeight: '150px', overflowY: 'auto', zIndex: 1000, boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                    {filteredUsers.length === 0 ? <div style={{ padding: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>No operators found.</div> : null}
-                    {filteredUsers.map(u => (
-                        <div 
-                            key={u.email} 
-                            onClick={() => toggleUser(u.email)}
-                            style={{ padding: '8px 12px', fontSize: '13px', cursor: 'pointer', background: selectedEmails.includes(u.email) ? 'var(--combobox-hover)' : 'transparent', display: 'flex', alignItems: 'center', gap: '8px' }}
-                        >
-                            <input type="checkbox" checked={selectedEmails.includes(u.email)} readOnly />
-                            <div>
-                                <strong>{u.name}</strong> <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({u.role})</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-            {/* Click-away backdrop overlay */}
-            {isOpen && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }} onClick={() => setIsOpen(false)} />}
-        </div>
+        const bStarts = b.name
+          .toLowerCase()
+          .startsWith(query);
+
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        return a.name.localeCompare(b.name);
+      });
+  }, [users, search]);
+
+  const toggleUser = (email) => {
+    if (selectedEmails.includes(email)) {
+      onChange(
+        selectedEmails.filter(
+          (selected) => selected !== email
+        )
+      );
+    } else {
+      onChange([...selectedEmails, email]);
+    }
+  };
+
+  const removeUser = (email) => {
+    onChange(
+      selectedEmails.filter(
+        (selected) => selected !== email
+      )
     );
+  };
+
+  return (
+    <Popover
+      open={isOpen}
+      onOpenChange={setIsOpen}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={isOpen}
+          className="h-auto min-h-10 w-full justify-between px-3 py-2"
+        >
+          <div className="flex flex-1 flex-wrap gap-1.5">
+            {selectedEmails.length === 0 ? (
+              <span className="text-sm text-muted-foreground">
+                Search & Assign Operators...
+              </span>
+            ) : (
+              selectedEmails.map((email) => {
+                const user = users.find(
+                  (u) => u.email === email
+                );
+
+                return (
+                  <Badge
+                    key={email}
+                    variant="secondary"
+                    className="gap-1"
+                  >
+                    {user ? user.name : email}
+
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="cursor-pointer rounded-full hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        removeUser(email);
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          e.key === "Enter" ||
+                          e.key === " "
+                        ) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removeUser(email);
+                        }
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </span>
+                  </Badge>
+                );
+              })
+            )}
+          </div>
+
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+      >
+        <Command>
+          <CommandInput
+            placeholder="Search operators..."
+            value={search}
+            onValueChange={setSearch}
+          />
+
+          <CommandList>
+            <CommandEmpty>
+              No operators found.
+            </CommandEmpty>
+
+            <CommandGroup>
+              {filteredUsers.map((user) => {
+                const selected =
+                  selectedEmails.includes(user.email);
+
+                return (
+                  <CommandItem
+                    key={user.email}
+                    value={`${user.name} ${user.email}`}
+                    onSelect={() =>
+                      toggleUser(user.email)
+                    }
+                  >
+                    <Check
+                      className={`mr-2 h-4 w-4 ${
+                        selected
+                          ? "opacity-100"
+                          : "opacity-0"
+                      }`}
+                    />
+
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {user.name}
+                      </span>
+
+                      <span className="text-xs text-muted-foreground">
+                        {user.role}
+                      </span>
+                    </div>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
