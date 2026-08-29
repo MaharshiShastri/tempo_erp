@@ -1,7 +1,7 @@
 import API from "../../api/api";
 import { useState, useEffect } from "react";
 
-export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAlertOpen, setActiveTab}){
+export default function useCompanyMaster({sessionToken, setAlertMessage, setIsAlertOpen, activeTab, setActiveTab}){
     const defaultCompanyForm = { name: '', address_line_1: '', city: '', state: '', pincode: '', contact_name: '', contact_role: '', contact_phone: '' };    
     
     const [companiesMaster, setCompaniesMaster] = useState([]);

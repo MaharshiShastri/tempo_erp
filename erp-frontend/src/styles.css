@@ -1698,13 +1698,13 @@ details div > strong {
         width: 100%;
     }
 
-    .production-calendar-frame .fc .fc-toolbar {
+    .production-calendar-wrapper .fc .fc-toolbar {
         gap: 8px;
 
         overflow-x: auto;
     }
 
-    .production-calendar-frame .fc .fc-toolbar-chunk {
+    .production-calendar-wrapper .fc .fc-toolbar-chunk {
         flex-shrink: 0;
     }
 }
@@ -1740,17 +1740,17 @@ details div > strong {
         width: 135px;
     }
 
-    .production-calendar-frame .fc .fc-toolbar {
+    .production-calendar-wrapper .fc .fc-toolbar {
         padding: 8px !important;
 
         overflow-x: auto;
     }
 
-    .production-calendar-frame .fc .fc-toolbar-title {
+    .production-calendar-wrapper .fc .fc-toolbar-title {
         font-size: 15px;
     }
 
-    .production-calendar-frame .fc .fc-button {
+    .production-calendar-wrapper .fc .fc-button {
         min-height: 30px;
 
         padding: 4px 7px;
@@ -2174,4 +2174,24 @@ details div > strong {
         font-size: 0.75rem;
         padding: 0.4rem 0.6rem;
     }
+}
+
+.production-calendar-wrapper {
+    width: 100%;
+    min-width: 0;
+    min-height: 500px;
+    overflow: hidden;
+}
+
+.production-calendar-wrapper .fc {
+    width: 100%;
+    height: 100%;
+}
+
+.production-calendar-wrapper .fc-view-harness {
+    min-height: 0;
+}
+
+.production-calendar-wrapper .fc-scroller {
+    overflow-y: auto !important;
 }

@@ -475,7 +475,7 @@ export default function ProductionCalendar({ state }) {
 
             <Card className="overflow-hidden border-border/70 shadow-sm">
                 <CardContent className="relative p-0">
-                    <div className="production-calendar-wrapper h-[calc(100vh-420px)] min-h-[500px] p-3 md:p-5">
+                    <div className="production-calendar-wrapper h-[calc(100vh-420px)] min-h-[500px] overflow-hidden p-3 md:p-5">
                         <FullCalendar
                             ref={calendarRef}
                             plugins={[

@@ -192,6 +192,8 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
                 start: schedule.planned_start,
                 end: schedule.planned_end,
 
+                allDay: false,
+
                 classNames: [
                     `production-event-${String(
                         schedule.status || "PLANNED"
@@ -374,44 +376,32 @@ export default function useProductionCalendar({sessionToken, showErrorModal, onC
             initialView: "timeGridWeek",
 
             headerToolbar: {
-                left:
-                    "prev,next today",
-
-                center:
-                    "title",
-
-                right:
-                    "dayGridMonth,timeGridWeek,timeGridDay",
+                left: "prev,next today",
+                center: "title",
+                right: "dayGridMonth,timeGridWeek,timeGridDay",
             },
-            
-            height: "100%",
-            
-            expandRows: true,
-            
+
             nowIndicator: true,
 
             selectable: true,
-
             editable: true,
 
             eventResizableFromStart: true,
-
             selectMirror: true,
 
-            dayMaxEvents: true,
-
             slotDuration: "00:30:00",
-            
             slotLabelInterval: "01:00:00",
-            
-            slotMinTime:"07:00:00",
 
+            slotMinTime: "07:00:00",
             slotMaxTime: "21:00:00",
 
-            events:
-                loadSchedules,
+            allDaySlot: false,
+
+            eventDisplay: "block",
+
+            events: loadSchedules,
         }),
-        [loadSchedules,]
+        [loadSchedules]
     );
 
 
