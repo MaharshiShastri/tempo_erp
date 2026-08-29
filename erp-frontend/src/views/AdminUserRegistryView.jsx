@@ -1,133 +1,410 @@
-import React, { useState, useEffect } from "react";
-import API from "../api/api";
+import React from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function AdminUserRegistryView({ state }) {
-    const {form, setForm, users, loading, isEditing, availableRegions, handleRoleChange, handleSave, handleEditClick,
-        handleDelete, handleCancelEdit
-    } = state;
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* TOP: FORM WIDGET */}
-            <div className="frappe-card">
-                <div className="system-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3>{isEditing ? '✏️ Edit Team Member' : '🔐 Provision New Team Member'}</h3>
-                    {isEditing && <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>Cancel Edit</button>}
+  const {
+    form,
+    setForm,
+    users,
+    loading,
+    isEditing,
+    availableRegions,
+    handleRoleChange,
+    handleSave,
+    handleEditClick,
+    handleDelete,
+    handleCancelEdit,
+  } = state;
+
+  const updateForm = (field, value) => {
+    setForm({
+      ...form,
+      [field]: value,
+    });
+  };
+
+  const toggleRegion = (region, checked) => {
+    setForm({
+      ...form,
+      regions: checked
+        ? [...form.regions, region]
+        : form.regions.filter((r) => r !== region),
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* ============================================================
+          USER FORM
+      ============================================================ */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-lg">
+            {isEditing
+              ? "✏️ Edit Team Member"
+              : "🔐 Provision New Team Member"}
+          </CardTitle>
+
+          {isEditing && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelEdit}
+            >
+              Cancel Edit
+            </Button>
+          )}
+        </CardHeader>
+
+        <CardContent>
+          <form
+            onSubmit={handleSave}
+            className="rounded-lg border bg-muted/30 p-5"
+          >
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* Full Name */}
+              <div className="space-y-2">
+                <Label htmlFor="user-name">
+                  Full Name <span className="text-destructive">*</span>
+                </Label>
+
+                <Input
+                  id="user-name"
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => updateForm("name", e.target.value)}
+                />
+              </div>
+
+              {/* Business Email */}
+              <div className="space-y-2">
+                <Label htmlFor="user-email">
+                  Business Email (Login ID){" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+
+                <Input
+                  id="user-email"
+                  type="email"
+                  required
+                  disabled={isEditing}
+                  value={form.email}
+                  onChange={(e) => updateForm("email", e.target.value)}
+                />
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <Label htmlFor="user-password">
+                  {isEditing
+                    ? "New Password (Leave blank to keep current)"
+                    : "Temporary Password *"}
+                </Label>
+
+                <Input
+                  id="user-password"
+                  type="text"
+                  required={!isEditing}
+                  placeholder={isEditing ? "********" : ""}
+                  value={form.password}
+                  onChange={(e) => updateForm("password", e.target.value)}
+                />
+              </div>
+
+              {/* Role */}
+              <div className="space-y-2">
+                <Label htmlFor="user-role">
+                  Role Definition{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+
+                <Select
+                  value={form.role || ""}
+                  onValueChange={handleRoleChange}
+                  required
+                >
+                  <SelectTrigger id="user-role" className="w-full">
+                    <SelectValue placeholder="-- Assign Role Matrix --" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    <SelectItem value="Sales Representative">
+                      Sales Representative
+                    </SelectItem>
+
+                    <SelectItem value="Dispatch Engineer">
+                      Dispatch Engineer
+                    </SelectItem>
+
+                    <SelectItem value="Admin">
+                      System Administrator
+                    </SelectItem>
+
+                    <SelectItem value="Shop Floor Worker">
+                      Shop Floor Worker
+                    </SelectItem>
+
+                    <SelectItem value="Shop Floor Administrator">
+                      Shop Floor Administrator
+                    </SelectItem>
+
+                    <SelectItem value="R&D Engineer">
+                      R&amp;D Engineer
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date of Birth */}
+              <div className="space-y-2">
+                <Label htmlFor="user-dob">Date of Birth</Label>
+
+                <Input
+                  id="user-dob"
+                  type="date"
+                  value={form.dob}
+                  onChange={(e) => updateForm("dob", e.target.value)}
+                />
+              </div>
+
+              {/* Personal Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="user-phone-personal">
+                  Personal Phone
+                </Label>
+
+                <Input
+                  id="user-phone-personal"
+                  type="text"
+                  value={form.phone_personal}
+                  onChange={(e) =>
+                    updateForm("phone_personal", e.target.value)
+                  }
+                />
+              </div>
+
+              {/* Business Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="user-phone-business">
+                  Business Phone
+                </Label>
+
+                <Input
+                  id="user-phone-business"
+                  type="text"
+                  value={form.phone_business}
+                  onChange={(e) =>
+                    updateForm("phone_business", e.target.value)
+                  }
+                />
+              </div>
+
+              {/* ======================================================
+                  SALES REGIONS
+              ====================================================== */}
+              {form.role === "Sales Representative" && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-primary">
+                    Assigned Operational Regions &amp; Territories{" "}
+                    <span className="text-muted-foreground">
+                      (Sales Only)
+                    </span>
+                  </Label>
+
+                  <div className="rounded-lg border border-dashed border-primary/50 bg-muted/20 p-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {availableRegions.map((region) => {
+                        const checked = form.regions.includes(region);
+
+                        return (
+                          <div
+                            key={region}
+                            className="flex items-center gap-2"
+                          >
+                            <Checkbox
+                              id={`region-${region}`}
+                              checked={checked}
+                              onCheckedChange={(value) =>
+                                toggleRegion(region, Boolean(value))
+                              }
+                            />
+
+                            <Label
+                              htmlFor={`region-${region}`}
+                              className="cursor-pointer text-sm font-normal"
+                            >
+                              {region}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                
-                <form onSubmit={handleSave} className="form-grid-layout" style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                    <div className="form-group">
-                        <label className="input-label">Full Name *</label>
-                        <input type="text" required className="form-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Business Email (Login ID) *</label>
-                        <input type="email" required disabled={isEditing} className="form-input" style={{ backgroundColor: isEditing ? '#f0f0f0' : 'transparent', cursor: isEditing ? 'not-allowed' : 'text'}} value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">{isEditing ? 'New Password (Leave blank to keep current)' : 'Temporary Password *'}</label>
-                        <input type="text" required={!isEditing} className="form-input" placeholder={isEditing ? '********' : ''} value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Role Definition *</label>
-                        <select required className="form-select-native" value={form.role} onChange={e => handleRoleChange(e.target.value)}>
-                            <option value="">-- Assign Role Matrix --</option>
-                            <option value="Sales Representative">Sales Representative</option>
-                            <option value="Dispatch Engineer">Dispatch Engineer</option>
-                            <option value="Admin">System Administrator</option>
-                            <option value="Shop Floor Worker">Shop Floor Worker</option>
-                            <option value="Shop Floor Administrator">Shop Floor Administrator</option>
-                            <option value="R&D Engineer"> R&D Engineer</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Date of Birth</label>
-                        <input type="date" className="form-input" value={form.dob} onChange={e => setForm({...form, dob: e.target.value})} />
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Personal Phone</label>
-                        <input type="text" className="form-input" value={form.phone_personal} onChange={e => setForm({...form, phone_personal: e.target.value})} />
-                    </div>
-                    <div className="form-group">
-                        <label className="input-label">Business Phone</label>
-                        <input type="text" className="form-input" value={form.phone_business} onChange={e => setForm({...form, phone_business: e.target.value})} />
-                    </div>
-                    
-                    {/* DYNAMIC REGIONS WIDGET */}
-                    {form.role === 'Sales Representative' && (
-                        <div className="form-group grid-span-2">
-                            <label className="input-label" style={{ color: 'var(--brand-accent)' }}>Assigned Operational Regions & Territories (Sales Only)</label>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', background: 'var(--bg-surface)', padding: '15px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--brand-accent)' }}>
-                                {availableRegions.map(region => (
-                                    <label key={region} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', minWidth: '140px' }}>
-                                        <input type="checkbox" checked={form.regions.includes(region)} onChange={e => {
-                                            if(e.target.checked) setForm({...form, regions: [...form.regions, region]});
-                                            else setForm({...form, regions: form.regions.filter(r => r !== region)});
-                                        }} /> {region}
-                                    </label>
-                                ))}
-                            </div>
+              )}
+
+              {/* ======================================================
+                  SUBMIT
+              ====================================================== */}
+              <div className="flex justify-end border-t pt-4 md:col-span-2">
+                <Button type="submit">
+                  {isEditing
+                    ? "Commit Changes"
+                    : "Provision Member Access"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* ============================================================
+          TEAM DIRECTORY
+      ============================================================ */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            👥 Current Team Directory
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Team Member</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Business Phone</TableHead>
+                  <TableHead>Territories (If Sales)</TableHead>
+                  <TableHead className="text-right">Manage</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Loading Directory...
+                    </TableCell>
+                  </TableRow>
+                ) : users.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      No team members found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.email}>
+                      {/* Member */}
+                      <TableCell>
+                        <div className="font-semibold">
+                          {user.name}
                         </div>
-                    )}
 
-                    <div className="grid-span-2" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', paddingTop: '15px', borderTop: '1px solid var(--border-light)' }}>
-                        <button type="submit" className="btn btn-primary" style={{ padding: '10px 24px' }}>
-                            {isEditing ? 'Commit Changes' : 'Provision Member Access'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                        <div className="text-xs text-muted-foreground">
+                          {user.email}
+                        </div>
+                      </TableCell>
 
-            {/* BOTTOM: DIRECTORY TABLE */}
-            <div className="frappe-card">
-                <div className="system-header">
-                    <h3>👥 Current Team Directory</h3>
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-                        <thead>
-                            <tr style={{ background: "var(--bg-surface)", textAlign: "left", borderBottom: "2px solid var(--border-light)" }}>
-                                <th style={{ padding: "12px" }}>Team Member</th>
-                                <th style={{ padding: "12px" }}>Role</th>
-                                <th style={{ padding: "12px" }}>Business Phone</th>
-                                <th style={{ padding: "12px" }}>Territories (If Sales)</th>
-                                <th style={{ padding: "12px", textAlign: "right" }}>Manage</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="5" style={{ padding: "20px", textAlign: "center" }}>Loading Directory...</td></tr>
-                            ) : users.map((u) => (
-                                <tr key={u.email} style={{ borderBottom: "1px solid var(--border-light)" }}>
-                                    <td style={{ padding: "12px" }}>
-                                        <div style={{ fontWeight: "600", color: "var(--text-main)" }}>{u.name}</div>
-                                        <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{u.email}</div>
-                                    </td>
-                                    <td style={{ padding: "12px" }}>
-                                        <span style={{ padding: "4px 8px", background: "var(--bg-surface)", borderRadius: "4px", fontSize: "11px", fontWeight: "bold", border: "1px solid var(--border-subtle)" }}>
-                                            {u.role}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: "12px", color: "var(--text-muted)" }}>{u.phone_business || 'N/A'}</td>
-                                    <td style={{ padding: "12px" }}>
-                                        {(u.regions && u.regions.length > 0) ? (
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                {u.regions.slice(0, 3).map(r => (
-                                                    <span key={r} style={{ fontSize: '10px', background: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: '10px' }}>{r}</span>
-                                                ))}
-                                                {u.regions.length > 3 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>+{u.regions.length - 3} more</span>}
-                                            </div>
-                                        ) : <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>None</span>}
-                                    </td>
-                                    <td style={{ padding: "12px", textAlign: "right" }}>
-                                        <button className="btn btn-secondary" style={{ fontSize: "11px", padding: "4px 8px", marginRight: "5px" }} onClick={() => handleEditClick(u)}>Edit</button>
-                                        <button className="btn-text-danger" style={{ fontSize: "11px", padding: "4px 8px", background: "var(--bg-surface)", border: "1px solid var(--brand-danger)", borderRadius: "4px" }} onClick={() => handleDelete(u.email)}>Revoke</button>
-                                    </td>
-                                </tr>
+                      {/* Role */}
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+
+                      {/* Business Phone */}
+                      <TableCell className="text-muted-foreground">
+                        {user.phone_business || "N/A"}
+                      </TableCell>
+
+                      {/* Territories */}
+                      <TableCell>
+                        {user.regions && user.regions.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {user.regions.slice(0, 3).map((region) => (
+                              <Badge
+                                key={region}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {region}
+                              </Badge>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
+
+                            {user.regions.length > 3 && (
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                +{user.regions.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            None
+                          </span>
+                        )}
+                      </TableCell>
+
+                      {/* Manage */}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(user)}
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(user.email)}
+                          >
+                            Revoke
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
