@@ -1,283 +1,1193 @@
-import { FiExternalLink, FiTruck, FiPrinter } from "react-icons/fi";
-import IndianCurrencyInput from "../components/shared/IndianCurrencyInput";
-import DispatchReport from "../components/DispatchReport";
+import { FiExternalLink, FiPrinter } from "react-icons/fi";
+import { useRef, useEffect, useState } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import {useRef} from "react";
-export default function DispatchCalculatorView({state = {}, theme = "light", setTheme = ()=>{},}) {
-    const reportRef = useRef();
 
-    const generatePDF = async () => {
-        
-        const originalTheme = theme || localStorage.getItem("erp-theme") || "light";
+import IndianCurrencyInput from "../components/shared/IndianCurrencyInput";
+import DispatchReport from "../components/DispatchReport";
 
-        const wasDark = originalTheme === "dark";
-        try{
-            if(wasDark){
-                setTheme("light");
-                localStorage.setItem("erp-theme", "light");
-                await new Promise((resolve) => setTimeout(resolve, 150));
-            }
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
-            if (!reportRef.current) {
-                throw new Error("Dispatch report is not available.");
-            }
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 
-            const canvas = await html2canvas(reportRef.current, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: "#ffffff",
-            logging: false,
-        });
+export default function DispatchCalculatorView({
+  state = {},
+  theme = "light",
+  setTheme = () => {},
+}) {
+  const reportRef = useRef();
 
-        const img = canvas.toDataURL("image/png");
-
-        const pdf = new jsPDF("p", "mm", "a4");
-
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-
-        // Keep the report inside one A4 page.
-        const imageRatio = canvas.width / canvas.height;
-        const pageRatio = pdfWidth / pdfHeight;
-
-        let renderWidth = pdfWidth;
-        let renderHeight = renderWidth / imageRatio;
-
-        if (renderHeight > pdfHeight) {
-            renderHeight = pdfHeight;
-            renderWidth = renderHeight * imageRatio;
-        }
-
-        const x = (pdfWidth - renderWidth) / 2;
-        const y = (pdfHeight - renderHeight) / 2;
-
-        pdf.addImage(img, "PNG", x, y, renderWidth, renderHeight);
-
-        pdf.save(`Dispatch_Report_${Date.now()}.pdf`);
-        } catch(error){
-            state?.showErrorModal("Error in printing!", "Unable to print, please check console or contact");
-        }finally{
-            if(wasDark){
-                setTheme("dark");
-                localStorage.setItem("erp-theme", "dark");
-            }
-        }
-        
-    };
-
-    return (
-        <div className="frappe-card">  
-            <div className="system-header">
-                <div>
-                    <h2>Freight Logistics Evaluator</h2>
-                     <p style={{ margin: 0, fontSize: "13px", color: "var(--text-muted)" }}>Contract Rate Comparison</p>
-                </div>
-            </div>
-            <form onSubmit={state?.handleEvaluate} style={{ background: "var(--bg-main)", padding: "20px", borderRadius: "var(--radius-sm)", marginBottom: "20px", border: "1px solid var(--border-light)" }}>
-                
-                {/* ROW 1: Multi-Product Cart */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h4 style={{ margin: 0 }}>Shipment Contents</h4>
-                    
-                    {/* Unit Toggle Switch */}
-                    <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: '20px', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-                        <button type="button" onClick={() => state?.setUnit('cm')} style={{ padding: '4px 12px', border: 'none', background: state?.unit === 'cm' ? 'var(--brand-accent)' : 'transparent', color: state?.unit === 'cm' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state?.unit === 'cm' ? '600' : 'normal', transition: 'all 0.2s' }}>
-                            Centimeters (cm)
-                        </button>
-                        <button type="button" onClick={() => state?.setUnit('in')} style={{ padding: '4px 12px', border: 'none', background: state?.unit === 'in' ? 'var(--brand-accent)' : 'transparent', color: state?.unit === 'in' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state?.unit === 'in' ? '600' : 'normal', transition: 'all 0.2s' }}>
-                            Inches (in)
-                        </button>
-                    </div>
-                </div>
-
-                {state?.products?.map((p, idx) => (
-                    <div key={idx} style={{ background: 'var(--bg-surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '10px', position: 'relative' }}>
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>PRODUCT PACKAGING {idx + 1}</div>
-                            {idx > 0 && (
-                                <button type="button" onClick={() => state?.removeProduct(idx)} className="btn-text-danger" style={{ fontSize: '14px', padding: 0 }}>✕ Remove</button>
-                            )}
-                        </div>
-
-                        <div className="form-grid-layout" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-                            <div>
-                                <label className="input-label">Width <strong>({state?.unit})</strong></label>
-                                <input type="number" step="0.01" min="0" required className="form-input" value={p.width} onChange={(e) => state?.updateProduct(idx, 'width', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="input-label">Depth <strong>({state?.unit})</strong></label>
-                                <input type="number" step="0.01" min="0" required className="form-input" value={p.depth} onChange={(e) => state?.updateProduct(idx, 'depth', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="input-label">Height <strong>({state?.unit})</strong></label>
-                                <input type="number" step="0.01" min="0" required className="form-input" value={p.height} onChange={(e) => state?.updateProduct(idx, 'height', e.target.value)} />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {state?.products?.length < 5 && (
-                    <button type="button" onClick={state?.addProduct} style={{ width: '100%', padding: '10px', border: '1px dashed var(--brand-accent)', background: 'transparent', color: 'var(--brand-accent)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '25px', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = '#f0f7ff'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
-                        + Add Another Package ({state?.products?.length}/5)
-                    </button>
-                )}
-
-                {/* ROW 2: FIXED GRID ALIGNMENT */}
-                <div className="form-grid-layout" style={{gridTemplateColumns: "repeat(3, 1fr)", marginBottom: '25px'}}>
-                    <div>
-                        <label className="input-label">Total Invoice Value (₹)</label>
-                        <IndianCurrencyInput className="form-input" value={state?.dim?.invoice_value === 0 ? '' : state?.dim?.invoice_value} onChange={(raw) => state?.setDim({ ...state?.dim, invoice_value: raw })} />
-                    </div>
-                    <div>
-                        <label className="input-label">Destination City <strong style={{color: "var(--brand-danger)"}}>(CITY ONLY!)</strong></label>
-                        <input type="text" required className="form-input" value={state?.dim?.destination_city} onChange={(e) => state?.setDim({ ...state?.dim, destination_city: e.target.value })} />
-                    </div>
-                    <div>
-                        <label className="input-label">Weight of the material(KG)</label>
-                        <input type="number" min="0" step="0.01" required className="form-input" value={state?.dim?.weight} onChange={(e) => state?.setDim({ ...state?.dim, weight: +e.target.value })} />
-                    </div>
-                </div>
-
-                {/* ROW 3 */}
-                <h4 style={{margin: "0 0 10px 0"}}>Operations & Loading <strong style={{color: "var(--brand-warning)"}}>(Ask from Mr.Sachin)</strong></h4>
-                <div className="form-grid-layout" style={{gridTemplateColumns:"repeat(3, 1fr)", marginBottom: '20px', alignItems:"start"}}>
-                    
-                    {/* CUSTOM TOGGLE SWITCH: Loading Method */}
-                    <div style={{ background: 'var(--bg-surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                        <label className="input-label" style={{ marginBottom: '10px', display: 'block' }}>Loading Method Setup</label>
-                        
-                        <div style={{ display: 'flex', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-light)', overflow: 'hidden', width: 'fit-content' }}>
-                            <button type="button" onClick={() => state?.setDim({...state?.dim, loading_type: 'local'})} style={{ padding: '6px 14px', border: 'none', background: state?.dim?.loading_type === 'local' ? 'var(--brand-accent)' : 'transparent', color: state?.dim?.loading_type === 'local' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state?.dim?.loading_type === 'local' ? '600' : 'normal', transition: 'all 0.2s' }}>
-                                📍 Local (Fixed)
-                            </button>
-                            <button type="button" onClick={() => state?.setDim({...state?.dim, loading_type: 'hub'})} style={{ padding: '6px 14px', border: 'none', background: state?.dim?.loading_type === 'hub' ? 'var(--brand-accent)' : 'transparent', color: state?.dim?.loading_type === 'hub' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state?.dim?.loading_type === 'hub' ? '600' : 'normal', transition: 'all 0.2s' }}>
-                                🏢 Hub (Variable)
-                            </button>
-                        </div>
-
-                        {state?.dim?.loading_type === 'hub' && (
-                            <div style={{ marginTop: '15px' }}>
-                                <label className="input-label" style={{ fontSize: '11px', color: 'var(--brand-danger)' }}>Enter Hub Amount (₹)</label>
-                                <input className="form-input" type="number" required value={state?.dim?.hub_loading_input} onChange={e => state?.setDim({...state?.dim, hub_loading_input: +e.target.value})} />
-                                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>*Will be capped by partner max threshold if defined</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* CUSTOM TOGGLE SWITCH: Delivery Type */}
-                    <div style={{ background: 'var(--bg-surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                        <label className="input-label" style={{ marginBottom: '10px', display: 'block' }}>Final Delivery Type</label>
-                        
-                        <div style={{ display: 'flex', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-light)', overflow: 'hidden', width: 'fit-content' }}>
-                            <button type="button" onClick={() => state?.setDim({...state?.dim, delivery_type: 'door'})} style={{ padding: '6px 14px', border: 'none', background: state?.dim?.delivery_type === 'door' ? 'var(--brand-accent)' : 'transparent', color: state?.dim?.delivery_type === 'door' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state?.dim?.delivery_type === 'door' ? '600' : 'normal', transition: 'all 0.2s' }}>
-                                🚪 Door
-                            </button>
-                            <button type="button" onClick={() => state?.setDim({...state?.dim, delivery_type: 'godown'})} style={{ padding: '6px 14px', border: 'none', background: state?.dim?.delivery_type === 'godown' ? 'var(--brand-accent)' : 'transparent', color: state?.dim?.delivery_type === 'godown' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', fontWeight: state?.dim?.delivery_type === 'godown' ? '600' : 'normal', transition: 'all 0.2s' }}>
-                                🏭 Godown Hub
-                            </button>
-                        </div>
-                        
-                        <div style={{ fontSize: '11px', color: state?.dim?.delivery_type === 'door' ? 'var(--text-primary)' : 'var(--text-muted)', marginTop: '15px' }}>
-                            {state?.dim?.delivery_type === 'door' ? "Requires manual distance mapping below." : "Distance mapping disabled. No ODA charges will apply."}
-                        </div>
-                    </div>
-
-                    <div style={{ background: 'var(--bg-surface)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--brand-accent)' }}>
-                        <label className="input-label" style={{ color: 'var(--brand-accent)' }}>Extra Hamali Adjustments</label>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                             <div><label className="input-label" style={{ fontSize: "11px" }}>Detail</label><input className="form-input" placeholder="e.g., Unloading" value={state?.dim?.hamali_detail} onChange={(e) => state?.setDim({ ...state?.dim, hamali_detail: e.target.value })} /></div>
-                            <div><label className="input-label" style={{ fontSize: "11px" }}>Cost (₹)</label><input className="form-input" type="number" value={state?.dim?.hamali_cost} onChange={(e) => state?.setDim({ ...state?.dim, hamali_cost: +e.target.value })} /></div>
-                        </div>
-                    </div>
-                </div>
-
-                {state?.dim?.delivery_type === 'door' && (
-                    <>
-                        <h4 style={{ marginTop: 25, borderTop: "1px solid var(--border-light)", paddingTop: "15px" }}>Transporter Distance Mapping (Door Delivery)</h4>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: "15px", marginTop: "10px" }}>
-                            {state?.partners?.filter(partner => partner?.partner_link).map((partner) => ( 
-                                <div key={partner.id} style={{ border: "1px solid var(--border-light)", borderRadius: "8px", padding: "15px", background: "var(--bg-surface)" }}>
-                                    <h4 style={{ margin: 0 }}>{partner.name}</h4>
-                                    <p style={{ marginTop: "4px", fontSize: "12px", color: "var(--text-muted)"}}>
-                                        {partner.partner_link && (<a href={partner.partner_link} style={{color: 'var(--text-primary)'}} target="_blank" rel="noopener noreferrer" title="Open Partner Website">Find distance calculator here <FiExternalLink size={14} /></a>)}
-                                    </p>
-                                    <label className="input-label">Distance from Hub (KM)</label>
-                                    <input type="number" min={1} className="form-input" value={state?.partnerDistances[partner?.id] || 0} onChange={(e) => state.setPartnerDistances({ ...state.partnerDistances, [partner.id]: Number(e.target.value) }) } />
-                                </div>
-                            ))}
-                        </div>
-                    </>
-                )}
-                <button className="btn btn-primary" type="submit" style={{ marginTop: 20 }}>Evaluate Dispatch Options</button>
-            </form>
-            
-
-            {state?.resultsData?.options?.length > 0 && (
-                <div>
-                    <h4>Total Options: {state.resultsData.options.length}</h4>{" Download comparison report: "}<button className="btn btn-primary" onClick={generatePDF}><FiPrinter />Download Dispatch Report</button>
-                    <div style={{ display: "flex", gap: 15, overflowX: "auto" }}>
-                        {state?.resultsData?.options.map((opt, idx) => {
-                            const isBest = state.selectedTransport?.partner_name === opt.partner_name;
-                            return (
-                                 <div key={idx} style={{ minWidth: 280, padding: 15, border: isBest ? "2px solid var(--brand-success)" : "1px solid var(--border-subtle)", background: isBest ? "#eaffea" : "var(--bg-surface)" }}>
-                                    <strong style={{ color: "var(--brand-accent)" }}>Partners Evaluation:</strong>
-                                    <h4 style={{color: "var(--brand-success)"}}>{opt.partner_name}{isBest && <span style={{marginLeft: 8, padding: "2px 8px", fontSize: "11px", fontWeight: 600, borderRadius: "12px", background: "var(--brand-success)", color: "#fff", display: "inline-block", verticalAlign: "middle" }}>🟢 Cheapest</span>}</h4>
-                                    <p style={{color: "var(--brand-accent"}}>Cost: ₹{opt.dispatch_cost_gst}</p>
-                                    <details style={{ marginTop: 10 }}>
-                                         <summary>Cost Breakdown</summary>
-                                        <div style={{ marginTop: 10, fontSize: "13px", display: "grid", gridTemplateColumns: "1fr auto", gap: "6px" }}>
-                                            <span>Destination Zone</span><strong>{opt.destination_zone}</strong>
-                                            <span>State</span><strong>{opt.state}</strong>
-                                            <span>Chargeable Weight</span><strong>{opt.chargeable_weight} kg</strong>
-                                            <span>Basic Freight</span><strong>₹{opt.basic_freight}</strong>
-                                            <span>Loading Charge</span><strong>₹{opt.loading_charge}</strong>
-                                            <span>Fuel Charge</span><strong>₹{opt.fuel_charge}</strong>
-                                            <span>Documentation Charge</span><strong>₹{opt.documentation_charge}</strong>
-                                            <span>FOV Charge</span><strong>₹{opt.fov_charge}</strong>
-                                            <span>ODA Charge</span><strong>₹{opt.oda_charge}</strong>
-                                            {opt.hamali_cost > 0 && (<><span style={{color: "var(--brand-accent)"}}>{opt.hamali_detail || "Hamali Charges"}</span><strong style={{color: "var(--brand-accent)"}}>₹{opt.hamali_cost}</strong></>)}
-                                            <span>Charges before Taxes</span><strong>₹{opt.subtotal}</strong>
-                                            <span>Total Cost after Taxes</span><strong>₹{opt.dispatch_cost_gst}</strong>
-                                        </div>
-                                    </details>
-                                      <button className="btn btn-success" onClick={() => state?.confirmTransport(opt)} style={{ marginTop: '10px', width: '100%' }}>Select</button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {state?.selectedTransport && state?.isTransportModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-box">
-                          <h3>Confirmed Transport</h3>
-                        <p>{state?.selectedTransport?.partner_name}</p>
-                        <p>Final Cost: ₹{state?.selectedTransport?.dispatch_cost_gst}</p>
-                        <button className="btn btn-primary" onClick={() => state?.confirmTransport(state?.selectedTransport)}>Print Invoice</button>
-                        {" or "}
-                        <button className="btn btn-secondary" onClick={() => state?.setIsTransportModalOpen(false)}>Close</button>
-                    </div>
-                </div>
-            )}
-            
-            {state?.modalAlert?.isOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-box" style={{ borderTop: `4px solid ${state?.modalAlert?.isError ? "var(--brand-danger)" : "var(--brand-success)"}` }}>
-                        <h3 style={{ color: state?.modalAlert?.isError ? "var(--brand-danger)" : "var(--brand-success)" }}>
-                            {state?.modalAlert?.title}
-                        </h3>
-                        <p style={{ margin: "15px 0" }}>{state?.modalAlert?.message}</p>
-                        <button className="btn btn-secondary" onClick={() => state?.setModalAlert({ isOpen: false, title: "", message: "", isError: false })}>Acknowledge</button>
-                    </div>
-                </div>
-            )}
-            <div style={{position:"absolute", left:"-9999px", top:0}}>
-                {state?.resultsData && <DispatchReport ref={reportRef} state={state}/>}
-            </div>
-            
-        </div>
+    const [isEvaluating, setIsEvaluating] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState(
+    "AI is finding the zone rate"
     );
+
+    const handleEvaluate = async (event) => {
+    event?.preventDefault();
+
+    setIsEvaluating(true);
+    setLoadingMessage("AI is finding the zone rate");
+
+    state?.setModalAlert?.({
+      isOpen: true,
+      title: "Evaluating Dispatch Options",
+      message: "AI is finding the zone rate",
+      isError: false,
+      type: "loading",
+    });
+
+    try {
+      await state?.handleEvaluate?.(event);
+    } finally {
+      setIsEvaluating(false);
+
+      state?.setModalAlert?.({
+        isOpen: false,
+        title: "",
+        message: "",
+        isError: false,
+        type: null,
+      });
+    }
+  };
+
+    useEffect(() => {
+    if (!isEvaluating) return;
+
+    const messages = [
+        "AI is finding the zone rate",
+        "Performing calculation for each transporter",
+    ];
+
+    let index = 0;
+
+    const interval = setInterval(() => {
+        index = (index + 1) % messages.length;
+        setLoadingMessage(messages[index]);
+    }, 1800);
+
+    return () => clearInterval(interval);
+    }, [isEvaluating]);
+  const generatePDF = async () => {
+    const originalTheme =
+      theme || localStorage.getItem("erp-theme") || "light";
+
+    const wasDark = originalTheme === "dark";
+
+    try {
+      if (wasDark) {
+        setTheme("light");
+        localStorage.setItem("erp-theme", "light");
+
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+
+      if (!reportRef.current) {
+        throw new Error("Dispatch report is not available.");
+      }
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const img = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imageRatio = canvas.width / canvas.height;
+
+      let renderWidth = pdfWidth;
+      let renderHeight = renderWidth / imageRatio;
+
+      if (renderHeight > pdfHeight) {
+        renderHeight = pdfHeight;
+        renderWidth = renderHeight * imageRatio;
+      }
+
+      const x = (pdfWidth - renderWidth) / 2;
+      const y = (pdfHeight - renderHeight) / 2;
+
+      pdf.addImage(
+        img,
+        "PNG",
+        x,
+        y,
+        renderWidth,
+        renderHeight
+      );
+
+      pdf.save(`Dispatch_Report_${Date.now()}.pdf`);
+    } catch (error) {
+      console.error(error);
+
+      state?.showErrorModal(
+        "Error in printing!",
+        "Unable to print, please check console or contact"
+      );
+    } finally {
+      if (wasDark) {
+        setTheme("dark");
+        localStorage.setItem("erp-theme", "dark");
+      }
+    }
+  };
+
+  const isHubLoading = state?.dim?.loading_type === "hub";
+  const isDoorDelivery = state?.dim?.delivery_type === "door";
+  
+  return (
+    <div className="space-y-6">
+      {/* ============================================================
+          HEADER
+      ============================================================ */}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-2xl">
+            🚚 Freight Logistics Evaluator
+          </CardTitle>
+
+          <CardDescription>
+            Contract Rate Comparison
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* ============================================================
+          INPUT FORM
+      ============================================================ */}
+
+      <form
+        onSubmit={handleEvaluate}
+        className="space-y-6"
+      >
+        {/* ==========================================================
+            SHIPMENT CONTENTS
+        ========================================================== */}
+
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-lg">
+                Shipment Contents
+              </CardTitle>
+
+              <CardDescription>
+                Add the packages included in this shipment.
+              </CardDescription>
+            </div>
+
+            {/* Unit selector */}
+            <div className="flex w-fit overflow-hidden rounded-lg border bg-muted p-1">
+              <button
+                type="button"
+                onClick={() => state?.setUnit("cm")}
+                className={[
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  state?.unit === "cm"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                Centimeters
+              </button>
+
+              <button
+                type="button"
+                onClick={() => state?.setUnit("in")}
+                className={[
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  state?.unit === "in"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                Inches
+              </button>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            {state?.products?.map((product, idx) => (
+              <Card
+                key={idx}
+                className="border-muted-foreground/20 bg-muted/20"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline">
+                      Product Packaging {idx + 1}
+                    </Badge>
+
+                    {idx > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() =>
+                          state?.removeProduct(idx)
+                        }
+                      >
+                        ✕ Remove
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <FormField
+                      label={`Width (${state?.unit})`}
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={product.width}
+                        onChange={(e) =>
+                          state?.updateProduct(
+                            idx,
+                            "width",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </FormField>
+
+                    <FormField
+                      label={`Depth (${state?.unit})`}
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={product.depth}
+                        onChange={(e) =>
+                          state?.updateProduct(
+                            idx,
+                            "depth",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </FormField>
+
+                    <FormField
+                      label={`Height (${state?.unit})`}
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={product.height}
+                        onChange={(e) =>
+                          state?.updateProduct(
+                            idx,
+                            "height",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </FormField>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {state?.products?.length < 5 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={state?.addProduct}
+              >
+                + Add Another Package{" "}
+                <span className="ml-1 text-muted-foreground">
+                  ({state?.products?.length}/5)
+                </span>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ==========================================================
+            SHIPMENT DETAILS
+        ========================================================== */}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">
+              Shipment Details
+            </CardTitle>
+
+            <CardDescription>
+              Enter the commercial and destination information.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <FormField label="Total Invoice Value (₹)">
+                <IndianCurrencyInput
+                  className="w-full"
+                  value={
+                    state?.dim?.invoice_value === 0
+                      ? ""
+                      : state?.dim?.invoice_value
+                  }
+                  onChange={(raw) =>
+                    state?.setDim({
+                      ...state?.dim,
+                      invoice_value: raw,
+                    })
+                  }
+                />
+              </FormField>
+
+              <FormField
+                label={
+                  <>
+                    Destination City{" "}
+                    <span className="text-destructive">
+                      (CITY ONLY!)
+                    </span>
+                  </>
+                }
+              >
+                <Input
+                  type="text"
+                  required
+                  value={state?.dim?.destination_city}
+                  onChange={(e) =>
+                    state?.setDim({
+                      ...state?.dim,
+                      destination_city: e.target.value,
+                    })
+                  }
+                />
+              </FormField>
+
+              <FormField label="Weight of the Material (KG)">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={state?.dim?.weight}
+                  onChange={(e) =>
+                    state?.setDim({
+                      ...state?.dim,
+                      weight: +e.target.value,
+                    })
+                  }
+                />
+              </FormField>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ==========================================================
+            OPERATIONS
+        ========================================================== */}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">
+              Operations & Loading
+            </CardTitle>
+
+            <CardDescription>
+              Configure loading and final delivery behavior.
+              <span className="ml-1 font-medium text-amber-600">
+                Ask from Mr. Sachin
+              </span>
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 lg:grid-cols-3">
+              {/* ====================================================
+                  LOADING METHOD
+              ==================================================== */}
+
+              <SelectionCard
+                title="Loading Method"
+                description="Choose where the shipment is loaded."
+                active={isHubLoading}
+                activeLabel="Hub Loading"
+                inactiveLabel="Local Loading"
+                activeBadgeClass="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                activeSwitchClass="data-[state=checked]:bg-blue-600"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {isHubLoading
+                        ? "🏢 Hub"
+                        : "📍 Local"}
+                    </p>
+
+                    <p className="text-xs text-muted-foreground">
+                      {isHubLoading
+                        ? "Variable hub loading charge"
+                        : "Fixed local loading charge"}
+                    </p>
+                  </div>
+
+                  <Switch
+                    checked={isHubLoading}
+                    onCheckedChange={(checked) =>
+                        state?.setDim({
+                        ...state?.dim,
+                        loading_type: checked ? "hub" : "local",
+                        })
+                    }
+                    aria-label="Toggle loading method"
+                    className="
+                        h-7 w-12
+                        border-2
+                        border-emerald-600
+                        bg-emerald-500
+                        shadow-sm
+                        transition-colors
+
+                        data-[state=checked]:border-orange-600
+                        data-[state=checked]:bg-orange-500
+
+                        [&>span]:h-5
+                        [&>span]:w-5
+                        [&>span]:bg-white
+                        [&>span]:shadow-md
+
+                        data-[state=checked]:[&>span]:translate-x-5
+                    "
+                    />
+                </div>
+
+                <Badge
+                  className={
+                    isHubLoading
+                      ? "border-blue-500/30 bg-blue-500/10 text-blue-700 hover:bg-blue-500/10 dark:text-blue-300"
+                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
+                  }
+                  variant="outline"
+                >
+                  {isHubLoading
+                    ? "🏢 Hub Selected"
+                    : "📍 Local Selected"}
+                </Badge>
+
+                {isHubLoading && (
+                  <div className="space-y-2 border-t pt-4">
+                    <Label
+                      htmlFor="hub-loading"
+                      className="text-xs text-blue-600"
+                    >
+                      Enter Hub Amount (₹)
+                    </Label>
+
+                    <Input
+                      id="hub-loading"
+                      type="number"
+                      min="0"
+                      required
+                      value={
+                        state?.dim?.hub_loading_input
+                      }
+                      onChange={(e) =>
+                        state?.setDim({
+                          ...state?.dim,
+                          hub_loading_input:
+                            +e.target.value,
+                        })
+                      }
+                    />
+
+                    <p className="text-[11px] text-muted-foreground">
+                      * Will be capped by partner max
+                      threshold if defined.
+                    </p>
+                  </div>
+                )}
+              </SelectionCard>
+
+              {/* ====================================================
+                  DELIVERY TYPE
+              ==================================================== */}
+
+              <SelectionCard
+                title="Final Delivery"
+                description="Choose how the shipment reaches its destination."
+                active={isDoorDelivery}
+                activeLabel="Door Delivery"
+                inactiveLabel="Godown Hub"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {isDoorDelivery
+                        ? "🚪 Door"
+                        : "🏭 Godown Hub"}
+                    </p>
+
+                    <p className="text-xs text-muted-foreground">
+                      {isDoorDelivery
+                        ? "Distance mapping required"
+                        : "No ODA charges"}
+                    </p>
+                  </div>
+
+                  <Switch
+                    checked={isDoorDelivery}
+                    onCheckedChange={(checked) =>
+                        state?.setDim({
+                        ...state?.dim,
+                        delivery_type: checked ? "door" : "godown",
+                        })
+                    }
+                    aria-label="Toggle delivery type"
+                    className="
+                        h-7 w-12
+                        border-2
+                        border-orange-600
+                        bg-orange-500
+                        shadow-sm
+                        transition-colors
+
+                        data-[state=checked]:border-emerald-600
+                        data-[state=checked]:bg-emerald-500
+
+                        [&>span]:h-5
+                        [&>span]:w-5
+                        [&>span]:bg-white
+                        [&>span]:shadow-md
+
+                        data-[state=checked]:[&>span]:translate-x-5
+                    "
+                    />
+                </div>
+
+                <Badge
+                  variant="outline"
+                  className={
+                    isDoorDelivery
+                      ? "border-orange-500/30 bg-orange-500/10 text-orange-700 hover:bg-orange-500/10 dark:text-orange-300"
+                      : "border-violet-500/30 bg-violet-500/10 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+                  }
+                >
+                  {isDoorDelivery
+                    ? "🚪 Door Delivery Selected"
+                    : "🏭 Godown Hub Selected"}
+                </Badge>
+
+                <div
+                  className={
+                    isDoorDelivery
+                      ? "rounded-md bg-orange-500/10 p-3 text-xs text-orange-700 dark:text-orange-300"
+                      : "rounded-md bg-violet-500/10 p-3 text-xs text-violet-700 dark:text-violet-300"
+                  }
+                >
+                  {isDoorDelivery
+                    ? "Requires manual distance mapping below."
+                    : "Distance mapping disabled. No ODA charges will apply."}
+                </div>
+              </SelectionCard>
+
+              {/* ====================================================
+                  HAMALI
+              ==================================================== */}
+
+              <SelectionCard
+                title="Extra Hamali"
+                description="Optional additional handling adjustment."
+                className="border-dashed"
+              >
+                <div className="space-y-4">
+                  <FormField label="Detail">
+                    <Input
+                      placeholder="e.g. Unloading"
+                      value={
+                        state?.dim?.hamali_detail
+                      }
+                      onChange={(e) =>
+                        state?.setDim({
+                          ...state?.dim,
+                          hamali_detail:
+                            e.target.value,
+                        })
+                      }
+                    />
+                  </FormField>
+
+                  <FormField label="Cost (₹)">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={state?.dim?.hamali_cost}
+                      onChange={(e) =>
+                        state?.setDim({
+                          ...state?.dim,
+                          hamali_cost:
+                            +e.target.value,
+                        })
+                      }
+                    />
+                  </FormField>
+                </div>
+              </SelectionCard>
+            </div>
+
+            {/* ========================================================
+                DISTANCE MAPPING
+            ======================================================== */}
+
+            {isDoorDelivery && (
+              <>
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold">
+                      Transporter Distance Mapping
+                    </h3>
+
+                    <p className="text-sm text-muted-foreground">
+                      Required for door delivery.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {state?.partners
+                      ?.filter(
+                        (partner) => partner?.partner_link
+                      )
+                      .map((partner) => (
+                        <Card
+                          key={partner.id}
+                          className="bg-muted/20"
+                        >
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">
+                              {partner.name}
+                            </CardTitle>
+
+                            {partner.partner_link && (
+                              <CardDescription>
+                                <a
+                                  href={partner.partner_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  Find distance calculator
+                                  <FiExternalLink
+                                    size={13}
+                                  />
+                                </a>
+                              </CardDescription>
+                            )}
+                          </CardHeader>
+
+                          <CardContent>
+                            <FormField label="Distance from Hub (KM)">
+                              <Input
+                                type="number"
+                                min={1}
+                                value={
+                                  state?.partnerDistances?.[
+                                    partner.id
+                                  ] || 0
+                                }
+                                onChange={(e) =>
+                                  state?.setPartnerDistances({
+                                    ...state.partnerDistances,
+                                    [partner.id]:
+                                      Number(
+                                        e.target.value
+                                      ),
+                                  })
+                                }
+                              />
+                            </FormField>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full sm:w-auto"
+            >
+              🚚 Evaluate Dispatch Options
+            </Button>
+          </CardContent>
+        </Card>
+      </form>
+
+      {/* ==============================================================
+          RESULTS
+      ============================================================== */}
+
+      {state?.resultsData?.options?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle>
+                  Dispatch Options
+                </CardTitle>
+
+                <CardDescription>
+                  {state.resultsData.options.length} transporter
+                  option
+                  {state.resultsData.options.length === 1
+                    ? ""
+                    : "s"} evaluated.
+                </CardDescription>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generatePDF}
+              >
+                <FiPrinter className="mr-2" />
+                Download Dispatch Report
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <div className="mb-4">
+              <Badge variant="secondary">
+                Total Options:{" "}
+                {state.resultsData.options.length}
+              </Badge>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {state.resultsData.options.map((opt, idx) => {
+                const isBest =
+                  state.selectedTransport?.partner_name ===
+                  opt.partner_name;
+
+                return (
+                  <Card
+                    key={idx}
+                    className={
+                      isBest
+                        ? "border-2 border-emerald-500 bg-emerald-500/5"
+                        : ""
+                    }
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-base">
+                          {opt.partner_name}
+                        </CardTitle>
+
+                        {isBest && (
+                          <Badge className="shrink-0 bg-emerald-600">
+                            🟢 Cheapest
+                          </Badge>
+                        )}
+                      </div>
+
+                      <CardDescription>
+                        Partners Evaluation
+                      </CardDescription>
+
+                      <div className="text-xl font-bold text-primary">
+                        ₹{opt.dispatch_cost_gst}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-4">
+                      <details>
+                        <summary className="cursor-pointer text-sm font-medium">
+                          Cost Breakdown
+                        </summary>
+
+                        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                          <span className="text-muted-foreground">
+                            Destination Zone
+                          </span>
+                          <strong className="text-right">
+                            {opt.destination_zone}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            State
+                          </span>
+                          <strong className="text-right">
+                            {opt.state}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            Chargeable Weight
+                          </span>
+                          <strong className="text-right">
+                            {opt.chargeable_weight} kg
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            Basic Freight
+                          </span>
+                          <strong className="text-right">
+                            ₹{opt.basic_freight}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            Loading Charge
+                          </span>
+                          <strong className="text-right">
+                            ₹{opt.loading_charge}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            Fuel Charge
+                          </span>
+                          <strong className="text-right">
+                            ₹{opt.fuel_charge}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            Documentation Charge
+                          </span>
+                          <strong className="text-right">
+                            ₹{opt.documentation_charge}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            FOV Charge
+                          </span>
+                          <strong className="text-right">
+                            ₹{opt.fov_charge}
+                          </strong>
+
+                          <span className="text-muted-foreground">
+                            ODA Charge
+                          </span>
+                          <strong className="text-right">
+                            ₹{opt.oda_charge}
+                          </strong>
+
+                          {opt.hamali_cost > 0 && (
+                            <>
+                              <span className="text-primary">
+                                {opt.hamali_detail ||
+                                  "Hamali Charges"}
+                              </span>
+
+                              <strong className="text-right text-primary">
+                                ₹{opt.hamali_cost}
+                              </strong>
+                            </>
+                          )}
+
+                          <Separator className="col-span-2 my-2" />
+
+                          <span className="font-medium">
+                            Charges before Taxes
+                          </span>
+
+                          <strong className="text-right">
+                            ₹{opt.subtotal}
+                          </strong>
+
+                          <span className="font-semibold">
+                            Total Cost after Taxes
+                          </span>
+
+                          <strong className="text-right text-lg text-primary">
+                            ₹{opt.dispatch_cost_gst}
+                          </strong>
+                        </div>
+                      </details>
+
+                      <Button
+                        type="button"
+                        className="w-full"
+                        variant={
+                          isBest ? "default" : "secondary"
+                        }
+                        onClick={() =>
+                          state?.confirmTransport(opt)
+                        }
+                      >
+                        Select
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+        
+      {/* ==============================================================
+          CONFIRMED TRANSPORT MODAL
+      ============================================================== */}
+
+      {state?.selectedTransport &&
+        state?.isTransportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="w-full max-w-md shadow-xl">
+              <CardHeader>
+                <CardTitle>
+                  Confirmed Transport
+                </CardTitle>
+
+                <CardDescription>
+                  Selected transporter
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Transporter
+                  </p>
+
+                  <p className="font-semibold">
+                    {
+                      state.selectedTransport
+                        ?.partner_name
+                    }
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Final Cost
+                  </p>
+
+                  <p className="text-2xl font-bold text-primary">
+                    ₹
+                    {
+                      state.selectedTransport
+                        ?.dispatch_cost_gst
+                    }
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={() =>
+                      state?.confirmTransport(
+                        state?.selectedTransport
+                      )
+                    }
+                  >
+                    <FiPrinter className="mr-2" />
+                    Print Invoice
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() =>
+                      state?.setIsTransportModalOpen(
+                        false
+                      )
+                    }
+                  >
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+      {/* ==============================================================
+          ALERT MODAL
+      ============================================================== */}
+
+      {state?.modalAlert?.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <Card
+            className={[
+              "w-full max-w-md shadow-2xl",
+              state?.modalAlert?.isError
+                ? "border-t-4 border-t-destructive"
+                : state?.modalAlert?.type === "loading"
+                  ? "border-0"
+                  : "border-t-4 border-t-emerald-500",
+            ].join(" ")}
+          >
+            <CardHeader>
+              <CardTitle
+                className={
+                  state?.modalAlert?.isError
+                    ? "text-destructive"
+                    : state?.modalAlert?.type === "loading"
+                      ? "text-foreground"
+                      : "text-emerald-600"
+                }
+              >
+                {state?.modalAlert?.title}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {state?.modalAlert?.type === "loading" ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  {/* Spinner */}
+                  <div className="mb-6">
+                    <div
+                      className="h-14 w-14 animate-spin rounded-full border-4 border-muted border-t-primary"
+                      aria-hidden="true"
+                    />
+                  </div>
+
+                  <p className="text-lg font-semibold text-foreground">
+                    {loadingMessage}
+                  </p>
+
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Please wait while we evaluate the available transporters.
+                  </p>
+
+                  {/* Progress dots */}
+                  <div className="mt-6 flex items-center gap-1.5">
+                    <span
+                      className={[
+                        "h-1.5 w-1.5 rounded-full transition-all",
+                        loadingMessage === "AI is finding the zone rate"
+                          ? "scale-125 bg-primary"
+                          : "bg-muted-foreground/30",
+                      ].join(" ")}
+                    />
+
+                    <span
+                      className={[
+                        "h-1.5 w-1.5 rounded-full transition-all",
+                        loadingMessage ===
+                        "Performing calculation for each transporter"
+                          ? "scale-125 bg-primary"
+                          : "bg-muted-foreground/30",
+                      ].join(" ")}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    {state?.modalAlert?.message}
+                  </p>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() =>
+                      state?.setModalAlert?.({
+                        isOpen: false,
+                        title: "",
+                        message: "",
+                        isError: false,
+                        type: null,
+                      })
+                    }
+                  >
+                    Acknowledge
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ==============================================================
+          HIDDEN PDF REPORT
+      ============================================================== */}
+
+      <div
+        className="absolute left-[-9999px] top-0"
+        aria-hidden="true"
+      >
+        {state?.resultsData && (
+          <DispatchReport
+            ref={reportRef}
+            state={state}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* =====================================================================
+   FORM FIELD
+===================================================================== */
+
+function FormField({ label, children }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+/* =====================================================================
+   SELECTION CARD
+===================================================================== */
+
+function SelectionCard({
+  title,
+  description,
+  children,
+  className = "",
+}) {
+  return (
+    <Card
+      className={`bg-muted/20 ${className}`}
+    >
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">
+          {title}
+        </CardTitle>
+
+        <CardDescription>
+          {description}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {children}
+      </CardContent>
+    </Card>
+  );
 }
