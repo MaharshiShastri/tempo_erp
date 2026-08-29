@@ -92,7 +92,7 @@ export default function TransportAnalyticsView({ state }) {
           <Button
             type="button"
             onClick={() =>
-              state.fetchAnalytics(state.fromDate, state.toDate)
+              state.fetchAnalytics(state.user.role,state.fromDate, state.toDate)
             }
           >
             Refresh

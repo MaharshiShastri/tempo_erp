@@ -455,7 +455,7 @@ export default function SalesAnalyticsView({ state }) {
 
             <Button
               onClick={() =>
-                fetchAnalytics(fromDate, toDate)
+                fetchAnalytics(user.role, fromDate, toDate)
               }
             >
               <FiActivity className="mr-2 h-4 w-4" />
