@@ -74,6 +74,7 @@ export default function QuotationTable({
                 </TableHeader>
 
                 <TableBody>
+                    {console.log(quotations)}
                     {quotations.map((quotation) => {
                         const isDealer =
                             Boolean(quotation.is_dealer);
@@ -124,8 +125,9 @@ export default function QuotationTable({
                                     </div>
 
                                     <div className="text-xs text-muted-foreground">
-                                        {quotation.buyer_name}
+                                        {quotation.buyer_name}, client of {quotation.sales_user_name}
                                     </div>
+                                    
                                 </TableCell>
 
                                 <TableCell>

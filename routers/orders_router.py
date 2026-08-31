@@ -1,4 +1,3 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from schemas.orders_schema import OrderHeaderCreate, StageUpdatePayload
 from database.repository import EDBR
 from security import verify_bearer_token
@@ -9,7 +8,9 @@ import base64
 from groq import Groq
 import io
 import PyPDF2
-
+from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from services.billing_invoice_service import BillingInvoiceService
 router = APIRouter(prefix="/api/v1/orders", tags=["Orders Operations Engine"])
 
 @router.get("", dependencies=[Depends(check_department("Sales Representative"))])
@@ -136,3 +137,33 @@ def claim_order(oa_id: str, user_profile: dict = Depends(verify_bearer_token),):
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to claim order: {str(exc)}",)
+
+@router.get("/pdf", dependencies=[Depends(check_department("Sales Representative"))],)
+def get_order_pdf(order_id: str = Query(...), user_profile: dict = Depends(verify_bearer_token),):
+
+    try:
+
+        pdf_path = BillingInvoiceService.get_or_generate_order_pdf(order_id,document_title="Ordered Sales",)
+
+        return FileResponse(
+            path=pdf_path,
+            media_type="application/pdf",
+            filename=pdf_path.name,
+        )
+
+    except ValueError as e:
+
+        raise HTTPException(
+            status_code=404,
+            detail=str(e),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Failed to generate ordered sales PDF: "
+                f"{str(e)}"
+            ),
+        )

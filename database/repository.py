@@ -30,7 +30,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAsL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAaL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -3000,11 +3000,20 @@ class PostgresRepository:
             return quotation
 
 
-    def get_quotation(self, quotation_id: int):
+    def get_quotation(self, quotation_id: int, user: dict):
         with SessionLocal() as session:
-            stmt = (select(Quotation)
-                .where(Quotation.id == quotation_id, Quotation.is_active.is_(True),)
-            )
+            role = user.get("role")
+            email = user.get("email")
+            conditions = [Quotation.id == quotation_id, Quotation.is_active.is_(True)]
+            if role == "Sales Representative":
+                conditions.append(Quotation.sales_user_email == email)
+
+            elif role in ("Admin", "Chief Full Stack Developer"):
+                pass
+
+            else:
+                raise PermissionError("You are not authorized to access qoutations.")
+            stmt = (select(Quotation).where(*conditions))
 
             return session.scalars(stmt).first()
 
@@ -3019,11 +3028,24 @@ class PostgresRepository:
             return session.scalars(stmt).first()
 
 
-    def get_quotations(self, skip: int = 0, limit: int = 100):
+    def get_quotations(self, user: dict, skip: int = 0, limit: int = 100):
         with SessionLocal() as session:
+            role = user.get("role")
+            email = user.get("email")
+            conditions = [Quotation.is_active.is_(True)]
+
+            if role == "Sales Representative":
+                conditions.append(Quotation.sales_user_email == email)
+
+            elif role in ("Admin", "Chief Full Stack Developer"):
+                pass
+
+            else:
+                raise PermissionError("You are not allowed to access qoutations.")
+            
             stmt = (
                 select(Quotation)
-                .where(Quotation.is_active.is_(True))
+                .where(*conditions)
                 .order_by(Quotation.generated_at.desc())
                 .offset(skip)
                 .limit(limit)
@@ -3069,9 +3091,23 @@ class PostgresRepository:
             return quotation
 
     
-    def deactivate_quotation(self, quotation_id: int):
+    def deactivate_quotation(self, quotation_id: int, user: dict,):
         with SessionLocal() as session:
-            quotation = session.get(Quotation, quotation_id,)
+            role = user.get("role")
+            email = user.get("email")
+            conditions = [Quotation.id == quotation_id, Quotation.is_active.is_(True)]
+            if role == "Sales Representative":
+                conditions.append(Quotation.sales_user_email == email)
+
+            elif role in ("Admin", "Chief Full Stack Developer"):
+                pass
+
+            else:
+                raise PermissionError("You are not authenticated to access qoutations")
+            
+            stmt = select(Quotation).where(*conditions)
+
+            quotation = session.scalars(stmt).first()
 
             if not quotation or not quotation.is_active:
                 return None
@@ -3084,7 +3120,7 @@ class PostgresRepository:
             return quotation
 
 
-    def update_quotation_status(self, quotation_id: int, status: str, *, converted_order_id: int | None = None, snapshot: dict | None = None,):
+    def update_quotation_status(self, quotation_id: int, status: str, *, converted_order_id: int | None = None, snapshot: dict | None = None, user: dict):
         allowed = {
             "GENERATED",
             "ORDERED",
@@ -3096,11 +3132,23 @@ class PostgresRepository:
             raise ValueError(f"Invalid quotation status: {status}")
 
         with SessionLocal() as session:
+            role = user.get("role")
+            email = user.get("email")
 
-            quotation = session.get(
-                Quotation,
-                quotation_id,
-            )
+            conditions = [Quotation.id == quotation_id, Quotation.is_active.is_(True)]
+
+            if role == "Sales Representative":
+                conditions.append(Quotation.sales_user_email == email)
+
+            elif role in ("Admin", "Chief Full Stack Developer"):
+                pass
+
+            else:
+                raise PermissionError("You cannot access the quotations.")
+            
+            stmt = select(Quotation).where(*conditions)
+
+            quotation = session.scalars(stmt).first()
 
             if not quotation or not quotation.is_active:
                 return None

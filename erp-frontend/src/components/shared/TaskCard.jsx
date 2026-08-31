@@ -1,10 +1,7 @@
 import React, { useState } from "react";
 import {
-  ChevronDown,
-  ChevronUp,
   Download,
   Edit2,
-  FileText,
   Paperclip,
   Save,
   Trash2,
@@ -13,12 +10,11 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 
 export default function TaskCard({
   task,
@@ -35,8 +31,6 @@ export default function TaskCard({
     details: task.details,
     deadline: task.deadline || "",
   });
-
-  const isExpanded = expandedTaskId === task.id;
 
   const getUserName = (email) => {
     const userMatch = state.systemUsers?.find(
@@ -66,8 +60,7 @@ export default function TaskCard({
 
     const baseName = path.split(/[\\/]/).pop();
 
-    const underscoreIndex =
-      baseName.indexOf("_");
+    const underscoreIndex = baseName.indexOf("_");
 
     return underscoreIndex >= 0
       ? baseName.substring(underscoreIndex + 1)
@@ -91,11 +84,7 @@ export default function TaskCard({
     e.stopPropagation();
 
     try {
-      await state.updateTask(
-        task.id,
-        editForm
-      );
-
+      await state.updateTask(task.id, editForm);
       setIsEditing(false);
     } catch (err) {
       state.showErrorModal(
@@ -126,50 +115,75 @@ export default function TaskCard({
     }
   };
 
-  const toggleExpanded = () => {
-    if (!isEditing) {
-      setExpandedTaskId(
-        isExpanded ? null : task.id
-      );
-    }
-  };
-
   return (
-    <Card className="overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-        {/* Task identity */}
+    <Card
+      className="
+        overflow-hidden
+        border-border/70
+        shadow-sm
+        transition-shadow
+        hover:shadow-md
+      "
+    >
+      <div
+        className="
+          grid
+          items-stretch
+          gap-0
+          lg:grid-cols-[18%_minmax(0,1fr)_13%_10%_auto]
+        "
+      >
+        {/* =========================================================
+            TASK / IDENTITY
+        ========================================================= */}
         <div
-          className={`min-w-0 flex-1 ${
-            isEditing
-              ? ""
-              : "cursor-pointer"
-          }`}
-          onClick={toggleExpanded}
+          className="
+            min-w-0
+            border-b
+            bg-muted/20
+            p-4
+            lg:border-b-0
+            lg:border-r
+          "
         >
           {isEditing ? (
-            <Input
-              value={editForm.title}
-              onChange={(e) =>
-                updateEditField(
-                  "title",
-                  e.target.value
-                )
-              }
-              onClick={(e) =>
-                e.stopPropagation()
-              }
-              className="font-semibold"
-            />
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Task
+              </Label>
+
+              <Input
+                value={editForm.title}
+                onChange={(e) =>
+                  updateEditField(
+                    "title",
+                    e.target.value
+                  )
+                }
+                onClick={(e) =>
+                  e.stopPropagation()
+                }
+                className="font-semibold"
+              />
+            </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <h3
-                  className={`truncate text-sm font-semibold md:text-base ${
-                    task.is_incomplete
-                      ? ""
-                      : "text-muted-foreground line-through"
-                  }`}
+                  className={`
+                    min-w-0
+                    flex-1
+                    text-sm
+                    font-semibold
+                    leading-5
+                    md:text-base
+                    ${
+                      task.is_incomplete
+                        ? "text-foreground"
+                        : "text-muted-foreground line-through"
+                    }
+                  `}
+                  title={task.title}
                 >
                   {task.title}
                 </h3>
@@ -180,6 +194,7 @@ export default function TaskCard({
                       ? "outline"
                       : "secondary"
                   }
+                  className="shrink-0"
                 >
                   {task.is_incomplete
                     ? "Pending"
@@ -187,7 +202,7 @@ export default function TaskCard({
                 </Badge>
               </div>
 
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 {viewTab === "received"
                   ? `Assigned by: ${getUserName(
                       task.assigned_by
@@ -196,17 +211,204 @@ export default function TaskCard({
                       .map(getUserName)
                       .join(", ")}`}
               </p>
+
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Created{" "}
+                {formatDateTime(task.created_at)}
+              </p>
             </>
           )}
         </div>
 
-        {/* Actions */}
+        {/* =========================================================
+            TASK INSTRUCTION
+            This intentionally gets the maximum available space.
+        ========================================================= */}
         <div
-          className="flex flex-wrap items-center gap-2"
+          className="
+            min-w-0
+            border-b
+            p-4
+            lg:border-b-0
+            lg:border-r
+          "
+        >
+          {isEditing ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Task Instruction</Label>
+
+                <Textarea
+                  rows={6}
+                  value={editForm.details}
+                  onChange={(e) =>
+                    updateEditField(
+                      "details",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Task details..."
+                  className="min-h-[140px] resize-y"
+                />
+              </div>
+
+              <div className="max-w-sm space-y-2">
+                <Label>Deadline</Label>
+
+                <Input
+                  type="datetime-local"
+                  value={editForm.deadline}
+                  onChange={(e) =>
+                    updateEditField(
+                      "deadline",
+                      e.target.value
+                    )
+                  }
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="h-full">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Task Instruction
+              </p>
+
+              <div
+                className="
+                  whitespace-pre-wrap
+                  break-words
+                  text-sm
+                  leading-6
+                  text-foreground
+                "
+              >
+                {task.details || "No instruction provided."}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* =========================================================
+            DEADLINE
+        ========================================================= */}
+        <div
+          className="
+            min-w-0
+            border-b
+            p-4
+            lg:border-b-0
+            lg:border-r
+          "
+        >
+          <p className="text-xs font-medium text-muted-foreground">
+            Deadline
+          </p>
+
+          <p
+            className="
+              mt-2
+              break-words
+              text-sm
+              font-semibold
+              leading-5
+              text-primary
+            "
+          >
+            {task.deadline
+              ? formatDateTime(task.deadline)
+              : "—"}
+          </p>
+
+          {task.completed_at &&
+            !task.is_incomplete && (
+              <>
+                <p className="mt-4 text-xs font-medium text-muted-foreground">
+                  Completed
+                </p>
+
+                <p className="mt-2 text-sm font-semibold leading-5 text-emerald-600 dark:text-emerald-400">
+                  {formatDateTime(
+                    task.completed_at
+                  )}
+                </p>
+              </>
+            )}
+        </div>
+
+        {/* =========================================================
+            STATUS
+        ========================================================= */}
+        <div
+          className="
+            flex
+            items-center
+            justify-center
+            border-b
+            p-4
+            lg:border-b-0
+            lg:border-r
+          "
           onClick={(e) =>
             e.stopPropagation()
           }
         >
+          <label
+            className="
+              flex
+              cursor-pointer
+              flex-col
+              items-center
+              gap-2
+              rounded-lg
+              border
+              bg-muted/30
+              px-3
+              py-3
+              text-center
+            "
+          >
+            <span className="text-xs text-muted-foreground">
+              Status
+            </span>
+
+            <strong
+              className={
+                task.is_incomplete
+                  ? "text-xs text-destructive"
+                  : "text-xs text-emerald-600 dark:text-emerald-400"
+              }
+            >
+              {task.is_incomplete
+                ? "Pending"
+                : "Done"}
+            </strong>
+
+            <Checkbox
+              checked={!task.is_incomplete}
+              onCheckedChange={() =>
+                state.toggleTask(task.id)
+              }
+            />
+          </label>
+        </div>
+
+        {/* =========================================================
+            ACTIONS
+        ========================================================= */}
+        <div
+          className="
+            flex
+            flex-wrap
+            items-center
+            justify-center
+            gap-1.5
+            p-3
+          "
+          onClick={(e) =>
+            e.stopPropagation()
+          }
+        >
+          {/* Attachments */}
           {!isEditing &&
             task?.attachment_urls?.length >
               0 && (
@@ -217,15 +419,15 @@ export default function TaskCard({
                       key={file}
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="icon"
+                      title={getDisplayFileName(
+                        file
+                      )}
                       onClick={() =>
                         handleFileAction(file)
                       }
                     >
-                      <Paperclip className="mr-1.5 h-3.5 w-3.5" />
-                      <span className="max-w-[180px] truncate">
-                        {getDisplayFileName(file)}
-                      </span>
+                      <Paperclip className="h-3.5 w-3.5" />
                     </Button>
                   )
                 )}
@@ -264,12 +466,9 @@ export default function TaskCard({
                     size="icon"
                     variant="ghost"
                     title="Edit task"
-                    onClick={() => {
-                      setIsEditing(true);
-                      setExpandedTaskId(
-                        task.id
-                      );
-                    }}
+                    onClick={() =>
+                      setIsEditing(true)
+                    }
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
@@ -287,177 +486,24 @@ export default function TaskCard({
 
                   <Button
                     type="button"
+                    size="icon"
                     variant="ghost"
-                    size="sm"
+                    title="Download task"
                     className="text-primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() =>
                       state.downloadTaskPDF(
                         task.id
-                      );
-                    }}
+                      )
+                    }
                   >
-                    <Download className="mr-1.5 h-4 w-4" />
-                    Download Task
+                    <Download className="h-4 w-4" />
                   </Button>
                 </>
               )}
-
-              <label
-                className="flex cursor-pointer items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs"
-                onClick={(e) =>
-                  e.stopPropagation()
-                }
-              >
-                <span>
-                  Status:{" "}
-                  <strong
-                    className={
-                      task.is_incomplete
-                        ? "text-destructive"
-                        : "text-emerald-600 dark:text-emerald-400"
-                    }
-                  >
-                    {task.is_incomplete
-                      ? "Pending"
-                      : "Done"}
-                  </strong>
-                </span>
-
-                <Checkbox
-                  checked={!task.is_incomplete}
-                  onCheckedChange={() =>
-                    state.toggleTask(task.id)
-                  }
-                />
-              </label>
-
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={toggleExpanded}
-                title={
-                  isExpanded
-                    ? "Collapse task"
-                    : "Expand task"
-                }
-              >
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
             </>
           )}
         </div>
       </div>
-
-      {/* Details */}
-      {isExpanded && (
-        <>
-          <Separator />
-
-          <CardContent className="space-y-5 bg-muted/20 p-5">
-            {isEditing ? (
-              <div
-                className="space-y-4"
-                onClick={(e) =>
-                  e.stopPropagation()
-                }
-              >
-                <div className="space-y-2">
-                  <Label>Task Details</Label>
-
-                  <Textarea
-                    rows={5}
-                    value={editForm.details}
-                    onChange={(e) =>
-                      updateEditField(
-                        "details",
-                        e.target.value
-                      )
-                    }
-                    placeholder="Task details..."
-                  />
-                </div>
-
-                <div className="max-w-sm space-y-2">
-                  <Label>Deadline</Label>
-
-                  <Input
-                    type="datetime-local"
-                    value={editForm.deadline}
-                    onChange={(e) =>
-                      updateEditField(
-                        "deadline",
-                        e.target.value
-                      )
-                    }
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
-                  {task.details}
-                </p>
-
-                <div className="grid gap-3 rounded-lg border bg-background p-4 sm:grid-cols-3">
-                  <InfoItem
-                    label="Created"
-                    value={formatDateTime(
-                      task.created_at
-                    )}
-                  />
-
-                  {task.deadline && (
-                    <InfoItem
-                      label="Deadline"
-                      value={formatDateTime(
-                        task.deadline
-                      )}
-                      valueClassName="text-primary"
-                    />
-                  )}
-
-                  {task.completed_at &&
-                    !task.is_incomplete && (
-                      <InfoItem
-                        label="Completed"
-                        value={formatDateTime(
-                          task.completed_at
-                        )}
-                        valueClassName="text-emerald-600 dark:text-emerald-400"
-                      />
-                    )}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </>
-      )}
     </Card>
-  );
-}
-
-function InfoItem({
-  label,
-  value,
-  valueClassName = "",
-}) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-muted-foreground">
-        {label}
-      </p>
-
-      <p
-        className={`mt-1 text-sm font-semibold ${valueClassName}`}
-      >
-        {value || "—"}
-      </p>
-    </div>
   );
 }

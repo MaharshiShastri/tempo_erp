@@ -103,7 +103,7 @@ def quotation_analytics_today(user: dict = Depends(verify_bearer_token),):
 def list_quotations(skip: int = 0, limit: int = 100, user: dict = Depends(verify_bearer_token),):
     
     try:
-        quotations = EDBR.get_quotations(skip=skip, limit=limit,)
+        quotations = EDBR.get_quotations(user=user, skip=skip, limit=limit,)
 
         return quotations
 
@@ -115,7 +115,7 @@ def list_quotations(skip: int = 0, limit: int = 100, user: dict = Depends(verify
 @router.get("/{quotation_id}")
 def get_quotation( quotation_id: int, user: dict = Depends(verify_bearer_token),):
     try:
-        quotation = EDBR.get_quotation(quotation_id)
+        quotation = EDBR.get_quotation(quotation_id, user=user)
 
         if not quotation:
             raise HTTPException(status_code=404, detail="Quotation not found.",)
@@ -134,7 +134,7 @@ def get_quotation( quotation_id: int, user: dict = Depends(verify_bearer_token),
 @router.put("/{quotation_id}")
 def update_quotation(quotation_id: int, request: QuotationUpdateRequest, user: dict = Depends(verify_bearer_token),):
     
-    quotation = EDBR.get_quotation(quotation_id)
+    quotation = EDBR.get_quotation(quotation_id, user=user)
 
     if not quotation:
         raise HTTPException(status_code=404, detail="Quotation not found.",)
@@ -169,7 +169,7 @@ def update_quotation(quotation_id: int, request: QuotationUpdateRequest, user: d
 @router.delete("/{quotation_id}")
 def deactivate_quotation(quotation_id: int, user: dict = Depends(verify_bearer_token),):
     
-    quotation = EDBR.deactivate_quotation(quotation_id)
+    quotation = EDBR.deactivate_quotation(quotation_id, user=user)
 
     if not quotation:
         raise HTTPException(status_code=404, detail="Quotation not found.",)
@@ -183,7 +183,7 @@ def deactivate_quotation(quotation_id: int, user: dict = Depends(verify_bearer_t
 @router.get("/{quotation_id}/download")
 def download_quotation(quotation_id: int, user: dict = Depends(verify_bearer_token),):
     
-    quotation = EDBR.get_quotation(quotation_id)
+    quotation = EDBR.get_quotation(quotation_id, user=user)
 
     if not quotation:
         raise HTTPException(status_code=404, detail="Quotation not found.",)
@@ -215,6 +215,7 @@ def update_quotation_status(quotation_id: int, request: QuotationStatusUpdateReq
             request.status,
             converted_order_id=request.converted_order_id,
             snapshot=(request.snapshot.model_dump() if request.snapshot else None),
+            user=user,
         )
 
         if not quotation:
