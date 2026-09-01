@@ -20,6 +20,7 @@ export default function QuotationTable({
     onReject,
     onChanged,
     onDownload,
+    onOrderBooking,
 }) {
     const formatDate = (value) => {
         if (!value) {
@@ -190,6 +191,7 @@ export default function QuotationTable({
                                         onOrder={onOrder}
                                         onReject={onReject}
                                         onChanged={onChanged}
+                                        onOrderBooking={onOrderBooking}
                                     />
                                 </TableCell>
                             </TableRow>

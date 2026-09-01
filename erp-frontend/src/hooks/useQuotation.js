@@ -178,6 +178,41 @@ export default function useQuotation({sessionToken, showErrorModal}){
         }
     };
 
+    const downloadQuotationOrderBooking = async (quotation) => {
+        if (!quotation?.quote_number) {
+            showErrorModal("Order Booking", "Quotation number is missing.");
+            return;
+        }
+
+        try {
+            const blob = await API.downloadQuotationOrderBooking(sessionToken, quotation.quote_number);
+
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+
+            link.href = url;
+
+            const safeQuoteNumber = (
+                quotation.quote_number || ""
+            ).replace(
+                /[^a-zA-Z0-9_.-]+/g,
+                "_"
+            );
+
+            link.download = `Order_Booking_${safeQuoteNumber}.pdf`;
+
+            document.body.appendChild(link);
+
+            link.click();
+
+            link.remove();
+
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            showErrorModal("Order Booking", err.message);
+        }
+    };
 
     const loadQuotations = async () => {
         try {
@@ -520,6 +555,6 @@ export default function useQuotation({sessionToken, showErrorModal}){
     setQuotationDeleteOpen, quotationSearch, setQuotationSearch, loadQuotations, openQuotation, closeQuotationModal, confirmDeleteQuotation, 
     deactivateQuotation, editQuotation, quotationEditMode, setQuotationEditMode, quotationEditForm, setQuotationEditForm, quotationSaving, updateQuotationField,
     saveQuotationChanges, downloadQuotation, updateQuotationStatus, openQuotationChange,  closeQuotationChange, quotationChangeOpen, quotationChangeForm,
-    updateQuotationChangeField, submitQuotationChange,
+    updateQuotationChangeField, submitQuotationChange, downloadQuotationOrderBooking
     }
 }

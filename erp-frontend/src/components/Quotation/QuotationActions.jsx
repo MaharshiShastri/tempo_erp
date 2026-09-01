@@ -7,10 +7,11 @@ export default function QuotationActions({
     onOrder,
     onReject,
     onChanged,
+    onOrderBooking,
 }) {
-    const isGenerated =
-        (quotation?.status || "GENERATED") === "GENERATED";
-
+    const status = quotation.status || "GENERATED"
+    const isGenerated = (quotation?.status || "GENERATED") === "GENERATED";
+    const isOrdered = status == "ORDERED";
     return (
         <div className="flex items-center justify-end gap-1">
             <Button
@@ -61,6 +62,12 @@ export default function QuotationActions({
                         Reject
                     </Button>
                 </>
+            )}
+
+            {isOrdered && (
+                <Button type="button" variant="outline" size="sm" onClick={() => { console.log("Qoute number inside view: ", quotation.quote_number); onOrderBooking?.(quotation);}}>
+                    🖨 Order Booking
+                </Button>
             )}
         </div>
     );

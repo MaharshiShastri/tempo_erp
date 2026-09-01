@@ -1084,6 +1084,31 @@ const API = {
     return await response.blob();
   },
 
+  downloadQuotationOrderBooking: async (sessionToken, quoteNumber) => {
+      const response = await fetch(
+          `/api/v1/quotations/${quoteNumber}/pdf`,
+          {
+              method: "GET",
+              headers: {Authorization: `Bearer ${sessionToken}`,},
+          }
+      );
+
+      if (!response.ok) {
+          let message = "Unable to generate order booking PDF.";
+
+          try {
+              const error = await response.json();
+              message = error.detail || message;
+          } catch {
+              // Response wasn't JSON.
+          }
+
+          throw new Error(message);
+      }
+
+      return await response.blob();
+  },
+
   async claimPendingOrder(sessionToken, oaId) {
     const safeId = encodeURIComponent(oaId);
 

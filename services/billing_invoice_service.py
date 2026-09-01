@@ -21,7 +21,6 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
@@ -33,6 +32,7 @@ from database.models import (
     BillItem,
     OrderHeader,
     OrderItem,
+    Quotation,
 )
 
 
@@ -42,7 +42,7 @@ from database.models import (
 
 INVOICE_STORAGE_DIR = Path("storage/invoices")
 ORDER_STORAGE_DIR = Path("storage/orders")
-
+QUOTATION_STORAGE_DIR = Path("storage/quotations")
 
 SELLER = {
     "name": "TEMPO INSTRUMENTS PRIVATE LIMITED",
@@ -96,8 +96,7 @@ def money_text(
     value: Decimal | int | float | str | None,
 ) -> str:
     """
-    Format a numeric amount using Indian invoice-style
-    comma grouping.
+    Format a numeric amount using Indian invoice-style comma grouping.
     """
     return f"{money(value):,.2f}"
 
@@ -117,8 +116,7 @@ def safe_filename(value: str) -> str:
 
 def date_text(value) -> str:
     """
-    Tally-style date format:
-    13-Jul-26
+    Tally-style date format: 13-Jul-26.
     """
     if not value:
         return ""
@@ -138,12 +136,7 @@ def amount_in_words(
     value = money(value)
 
     rupees = int(value)
-
-    paise = int(
-        (
-            value - Decimal(rupees)
-        ) * 100
-    )
+    paise = int((value - Decimal(rupees)) * 100)
 
     text = num2words(
         rupees,
@@ -169,7 +162,6 @@ def paragraph(text, style):
     Text is escaped before passing to ReportLab.
     """
     text = "" if text is None else str(text)
-
     text = escape(text)
 
     return Paragraph(
@@ -182,8 +174,7 @@ def markup_paragraph(text, style):
     """
     ReportLab markup Paragraph.
 
-    Use this when text intentionally contains:
-    <b>, <i>, <br/>, etc.
+    Use this when text intentionally contains <b>, <i>, <br/>, etc.
     """
     text = "" if text is None else str(text)
 
@@ -199,12 +190,10 @@ def obj_value(
     default="",
 ):
     """
-    Safely retrieve the first available non-empty attribute
-    from an object.
+    Safely retrieve the first available non-empty attribute from an object.
 
-    This is intentionally tolerant because different versions
-    of OrderHeader / BillHeader may not contain every Tally
-    metadata field.
+    This is intentionally tolerant because different versions of
+    OrderHeader / BillHeader / Quotation may not contain every field.
     """
     if obj is None:
         return default
@@ -246,10 +235,7 @@ def multiline_address(value) -> list[str]:
     """
     Convert an address into lines.
 
-    Supports:
-    - None
-    - strings
-    - lists/tuples
+    Supports None, strings and lists/tuples.
     """
     if value is None:
         return []
@@ -268,6 +254,13 @@ def multiline_address(value) -> list[str]:
     ]
 
 
+def yes_no(value) -> str:
+    """
+    Render a boolean as YES/NO.
+    """
+    return "YES" if bool(value) else "NO"
+
+
 # =========================================================
 # Service
 # =========================================================
@@ -275,7 +268,7 @@ def multiline_address(value) -> list[str]:
 class BillingInvoiceService:
 
     # =====================================================
-    # Public API
+    # Public API - Tax Invoice
     # =====================================================
 
     @classmethod
@@ -285,7 +278,7 @@ class BillingInvoiceService:
         document_title: str = "Tax Invoice",
     ) -> Path:
         """
-        Generate a tax invoice PDF from a BillHeader/BillItem.
+        Generate a tax invoice PDF from BillHeader/BillItem.
 
         Bill lookup is performed using bill_num.
         """
@@ -300,16 +293,9 @@ class BillingInvoiceService:
         )
 
         with SessionLocal() as session:
-
-            # ---------------------------------------------
-            # Bill
-            # ---------------------------------------------
-
             bill = session.scalar(
                 select(BillHeader)
-                .where(
-                    BillHeader.bill_num == bill_num
-                )
+                .where(BillHeader.bill_num == bill_num)
             )
 
             if not bill:
@@ -317,15 +303,7 @@ class BillingInvoiceService:
                     f"Bill '{bill_num}' was not found."
                 )
 
-            # ---------------------------------------------
-            # Order
-            #
-            # BillHeader uses order_id as the relationship
-            # to OrderHeader, so order_id is correct here.
-            # ---------------------------------------------
-
             order = None
-
             bill_order_id = obj_value(
                 bill,
                 "order_id",
@@ -335,25 +313,14 @@ class BillingInvoiceService:
             if bill_order_id is not None:
                 order = session.scalar(
                     select(OrderHeader)
-                    .where(
-                        OrderHeader.order_id
-                        == bill_order_id
-                    )
+                    .where(OrderHeader.order_id == bill_order_id)
                 )
-
-            # ---------------------------------------------
-            # Bill items
-            # ---------------------------------------------
 
             bill_items = list(
                 session.scalars(
                     select(BillItem)
-                    .where(
-                        BillItem.bill_num == bill_num
-                    )
-                    .order_by(
-                        BillItem.bill_item_id
-                    )
+                    .where(BillItem.bill_num == bill_num)
+                    .order_by(BillItem.bill_item_id)
                 )
             )
 
@@ -362,29 +329,16 @@ class BillingInvoiceService:
                     f"Bill '{bill_num}' has no bill items."
                 )
 
-            # ---------------------------------------------
-            # Order items
-            # ---------------------------------------------
-
             order_items = {}
-
             if order:
                 rows = session.scalars(
                     select(OrderItem)
-                    .where(
-                        OrderItem.order_id
-                        == order.order_id
-                    )
+                    .where(OrderItem.order_id == order.order_id)
                 )
-
                 order_items = {
                     item.order_item_id: item
                     for item in rows
                 }
-
-            # ---------------------------------------------
-            # Build model
-            # ---------------------------------------------
 
             invoice_data = cls._build_invoice_data(
                 bill=bill,
@@ -392,10 +346,6 @@ class BillingInvoiceService:
                 bill_items=bill_items,
                 order_items=order_items,
             )
-
-        # ---------------------------------------------
-        # Render
-        # ---------------------------------------------
 
         cls._render_pdf(
             invoice_data,
@@ -412,8 +362,7 @@ class BillingInvoiceService:
         document_title: str = "Tax Invoice",
     ) -> Path:
         """
-        Return an existing invoice PDF if available;
-        otherwise generate it.
+        Return an existing invoice PDF if available; otherwise generate it.
         """
         INVOICE_STORAGE_DIR.mkdir(
             parents=True,
@@ -427,21 +376,22 @@ class BillingInvoiceService:
 
         if output_path.exists():
             print(
-                f"Returning existing invoice PDF: "
-                f"{output_path}"
+                f"Returning existing invoice PDF: {output_path}"
             )
-
             return output_path
 
         print(
-            f"Generating new invoice PDF: "
-            f"{output_path}"
+            f"Generating new invoice PDF: {output_path}"
         )
 
         return cls.generate_invoice_pdf(
             bill_num,
             document_title=document_title,
         )
+
+    # =====================================================
+    # Public API - Ordered Sales
+    # =====================================================
 
     @classmethod
     def get_or_generate_order_pdf(
@@ -450,13 +400,15 @@ class BillingInvoiceService:
         document_title: str = "Ordered Sales",
     ) -> Path:
         """
-        Return an existing Ordered Sales PDF if available;
-        otherwise generate it.
+        Return an existing Ordered Sales PDF if available; otherwise generate it.
 
-        IMPORTANT:
-        Orders are identified by order_acceptance_id,
-        not order_id.
+        Orders are identified by order_acceptance_id, not order_id.
         """
+        if not order_acceptance_id:
+            raise ValueError(
+                "order_acceptance_id is required."
+            )
+
         ORDER_STORAGE_DIR.mkdir(
             parents=True,
             exist_ok=True,
@@ -469,15 +421,12 @@ class BillingInvoiceService:
 
         if output_path.exists():
             print(
-                f"Returning existing {document_title} PDF: "
-                f"{output_path}"
+                f"Returning existing {document_title} PDF: {output_path}"
             )
-
             return output_path
 
         print(
-            f"Generating new {document_title} PDF: "
-            f"{output_path}"
+            f"Generating new {document_title} PDF: {output_path}"
         )
 
         return cls.generate_order_pdf(
@@ -496,10 +445,13 @@ class BillingInvoiceService:
 
         IMPORTANT:
         OrderHeader is searched using order_acceptance_id.
-
-        Once the correct OrderHeader is found, its internal
-        order_id is used to fetch OrderItem records.
+        Once found, the internal order_id is used to retrieve OrderItems.
         """
+        if not order_acceptance_id:
+            raise ValueError(
+                "order_acceptance_id is required."
+            )
+
         ORDER_STORAGE_DIR.mkdir(
             parents=True,
             exist_ok=True,
@@ -511,14 +463,6 @@ class BillingInvoiceService:
         )
 
         with SessionLocal() as session:
-
-            # ---------------------------------------------
-            # Order
-            #
-            # IMPORTANT:
-            # Search by Order Acceptance ID.
-            # ---------------------------------------------
-
             order = session.scalars(
                 select(OrderHeader)
                 .where(
@@ -530,56 +474,151 @@ class BillingInvoiceService:
 
             if not order:
                 raise ValueError(
-                    "Order with "
-                    f"order_acceptance_id "
-                    f"'{order_acceptance_id}' "
-                    "was not found."
+                    "Order with order_acceptance_id "
+                    f"'{order_acceptance_id}' was not found."
                 )
-
-            # ---------------------------------------------
-            # Order items
-            #
-            # After locating the order by OA number,
-            # use its internal order_id to retrieve items.
-            # ---------------------------------------------
 
             order_items = list(
                 session.scalars(
                     select(OrderItem)
-                    .where(
-                        OrderItem.order_id
-                        == order.order_id
-                    )
-                    .order_by(
-                        OrderItem.order_item_id
-                    )
+                    .where(OrderItem.order_id == order.order_id)
+                    .order_by(OrderItem.order_item_id)
                 )
             )
 
             if not order_items:
                 raise ValueError(
-                    "Order with "
-                    f"order_acceptance_id "
-                    f"'{order_acceptance_id}' "
-                    "has no order items."
+                    "Order with order_acceptance_id "
+                    f"'{order_acceptance_id}' has no order items."
                 )
-
-            # ---------------------------------------------
-            # Build common PDF model
-            # ---------------------------------------------
 
             data = cls._build_order_data(
                 order=order,
                 order_items=order_items,
             )
 
-        # ---------------------------------------------
-        # Render
-        # ---------------------------------------------
-
         cls._render_pdf(
             data,
             output_path,
+            document_title=document_title,
+        )
+
+        return output_path
+
+    # =====================================================
+    # Public API - Quotation -> Order Booking PDF
+    # =====================================================
+
+    @classmethod
+    def get_or_generate_quotation_order_pdf(
+        cls,
+        quote_number: str,
+        document_title: str = "Order Booking",
+    ) -> Path:
+        """
+        Return an existing quotation-derived Order Booking PDF;
+        otherwise generate it.
+
+        This document is generated directly from the quotation.
+        It does not create an OrderHeader.
+        """
+
+        quote_number = str(
+            quote_number or ""
+        ).strip()
+
+        if not quote_number:
+            raise ValueError(
+                "quote_number is required."
+            )
+
+        QUOTATION_STORAGE_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        output_path = (
+            QUOTATION_STORAGE_DIR
+            / (
+                f"{safe_filename(quote_number)}"
+                "_order_booking.pdf"
+            )
+        )
+
+        if output_path.exists():
+            print(
+                "Returning existing quotation order booking PDF: "
+                f"{output_path}"
+            )
+            return output_path
+
+        print(
+            "Generating quotation order booking PDF: "
+            f"{output_path}"
+        )
+
+        return cls.generate_quotation_order_pdf(
+            quote_number=quote_number,
+            document_title=document_title,
+        )
+    
+    @classmethod
+    def generate_quotation_order_pdf(
+        cls,
+        quote_number: str,
+        document_title: str = "Order Booking",
+    ) -> Path:
+        """
+        Generate a preliminary Order Booking PDF directly from
+        the Quotation record.
+
+        No OrderHeader or OrderItem is required.
+        """
+
+        quote_number = str(
+            quote_number or ""
+        ).strip()
+
+        if not quote_number:
+            raise ValueError(
+                "quote_number is required."
+            )
+
+        QUOTATION_STORAGE_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        output_path = (
+            QUOTATION_STORAGE_DIR
+            / (
+                f"{safe_filename(quote_number)}"
+                "_order_booking.pdf"
+            )
+        )
+
+        with SessionLocal() as session:
+
+            quotation = session.scalar(
+                select(Quotation)
+                .where(
+                    Quotation.quote_number
+                    == quote_number
+                )
+            )
+
+            if not quotation:
+                raise ValueError(
+                    f"Quotation '{quote_number}' was not found."
+                )
+
+            data = cls._build_quotation_order_data(
+                quotation
+            )
+
+        cls._render_quotation_order_pdf(
+            data=data,
+            output_path=output_path,
             document_title=document_title,
         )
 
@@ -609,13 +648,8 @@ class BillingInvoiceService:
             / Decimal("100")
         )
 
-        seller_state = normalize_state(
-            SELLER["state"]
-        )
-
-        normalized_buyer_state = normalize_state(
-            buyer_state
-        )
+        seller_state = normalize_state(SELLER["state"])
+        normalized_buyer_state = normalize_state(buyer_state)
 
         is_intrastate = bool(
             seller_state
@@ -624,42 +658,24 @@ class BillingInvoiceService:
         )
 
         if is_intrastate:
-
-            cgst = money(
-                tax_amount / Decimal("2")
-            )
-
-            sgst = money(
-                tax_amount - cgst
-            )
-
+            cgst = money(tax_amount / Decimal("2"))
+            sgst = money(tax_amount - cgst)
             igst = Decimal("0.00")
 
-            cgst_rate = money(
-                tax_rate / Decimal("2")
-            )
-
-            sgst_rate = money(
-                tax_rate / Decimal("2")
-            )
-
+            cgst_rate = money(tax_rate / Decimal("2"))
+            sgst_rate = money(tax_rate / Decimal("2"))
             igst_rate = Decimal("0.00")
-
         else:
-
             cgst = Decimal("0.00")
             sgst = Decimal("0.00")
-
             igst = tax_amount
 
             cgst_rate = Decimal("0.00")
             sgst_rate = Decimal("0.00")
-
             igst_rate = tax_rate
 
         grand_total = money(
-            taxable_value
-            + tax_amount
+            taxable_value + tax_amount
         )
 
         return {
@@ -687,28 +703,16 @@ class BillingInvoiceService:
         order_items,
     ):
         items = []
-
         goods_total = Decimal("0.00")
 
-        # -------------------------------------------------
-        # Items
-        # -------------------------------------------------
-
         for bill_item in bill_items:
-
             order_item = order_items.get(
                 bill_item.order_item_id
             )
 
             item_code = first_non_empty(
-                obj_value(
-                    bill_item,
-                    "item_code",
-                ),
-                obj_value(
-                    order_item,
-                    "item_code",
-                ),
+                obj_value(bill_item, "item_code"),
+                obj_value(order_item, "item_code"),
                 default="",
             )
 
@@ -722,29 +726,11 @@ class BillingInvoiceService:
             )
 
             rate_value = first_non_empty(
-                obj_value(
-                    bill_item,
-                    "rate",
-                    default=None,
-                ),
-                obj_value(
-                    order_item,
-                    "rate",
-                    default=None,
-                ),
+                obj_value(bill_item, "rate", default=None),
+                obj_value(order_item, "rate", default=None),
                 default=0,
             )
-
             rate = money(rate_value)
-
-            # ---------------------------------------------
-            # Discount
-            #
-            # IMPORTANT:
-            # This must be calculated BEFORE amount.
-            # The original code referenced `discount`
-            # before assigning it.
-            # ---------------------------------------------
 
             discount_value = first_non_empty(
                 obj_value(
@@ -761,89 +747,43 @@ class BillingInvoiceService:
                 ),
                 default=0,
             )
-
             discount = money(discount_value)
 
-            # ---------------------------------------------
-            # Amount
-            # ---------------------------------------------
-
             amount_value = first_non_empty(
-                obj_value(
-                    bill_item,
-                    "amount",
-                    default=None,
-                ),
+                obj_value(bill_item, "amount", default=None),
                 default=None,
             )
 
             if amount_value is None:
-
-                gross_amount = (
-                    quantity * rate
-                )
-
+                gross_amount = quantity * rate
                 discount_amount = (
                     gross_amount
                     * discount
                     / Decimal("100")
                 )
-
                 amount = money(
-                    gross_amount
-                    - discount_amount
+                    gross_amount - discount_amount
                 )
-
             else:
                 amount = money(amount_value)
 
             goods_total += amount
 
-            # ---------------------------------------------
-            # Description
-            # ---------------------------------------------
-
             description = first_non_empty(
-                obj_value(
-                    order_item,
-                    "additional_spec_text",
-                ),
-                obj_value(
-                    bill_item,
-                    "additional_spec_text",
-                ),
+                obj_value(order_item, "additional_spec_text"),
+                obj_value(bill_item, "additional_spec_text"),
                 default="",
             )
-
-            # ---------------------------------------------
-            # HSN
-            # ---------------------------------------------
 
             hsn = first_non_empty(
-                obj_value(
-                    bill_item,
-                    "hsn_code",
-                ),
-                obj_value(
-                    order_item,
-                    "hsn_code",
-                ),
+                obj_value(bill_item, "hsn_code"),
+                obj_value(order_item, "hsn_code"),
                 default="",
             )
 
-            # ---------------------------------------------
-            # Unit
-            # ---------------------------------------------
-
             um = first_non_empty(
-                obj_value(
-                    order_item,
-                    "um",
-                ),
-                obj_value(
-                    bill_item,
-                    "um",
-                ),
+                obj_value(order_item, "um"),
+                obj_value(bill_item, "um"),
                 default="Nos.",
             )
 
@@ -860,192 +800,88 @@ class BillingInvoiceService:
                 }
             )
 
-        # -------------------------------------------------
-        # Charges
-        # -------------------------------------------------
-
         packing = money(
-            obj_value(
-                order,
-                "packing_charges",
-                default=0,
-            )
+            obj_value(order, "packing_charges", default=0)
         )
-
         freight = money(
-            obj_value(
-                order,
-                "freight_charges",
-                default=0,
-            )
+            obj_value(order, "freight_charges", default=0)
         )
 
         taxable_value = money(
-            goods_total
-            + packing
-            + freight
+            goods_total + packing + freight
         )
-
-        # -------------------------------------------------
-        # Tax rate
-        # -------------------------------------------------
 
         tax_rate = money(
-            obj_value(
-                order,
-                "tax_rate",
-                default=18,
-            )
+            obj_value(order, "tax_rate", default=18)
         )
 
-        # -------------------------------------------------
-        # Buyer information
-        # -------------------------------------------------
-
         buyer_name = first_non_empty(
-            obj_value(
-                order,
-                "billing_name",
-            ),
-            obj_value(
-                order,
-                "buyer_name",
-            ),
-            obj_value(
-                bill,
-                "buyer_name",
-            ),
+            obj_value(order, "billing_name"),
+            obj_value(order, "buyer_name"),
+            obj_value(bill, "buyer_name"),
             default="",
         )
 
         buyer_address = first_non_empty(
-            obj_value(
-                order,
-                "billing_address",
-            ),
-            obj_value(
-                order,
-                "buyer_address",
-            ),
-            obj_value(
-                bill,
-                "buyer_address",
-            ),
+            obj_value(order, "billing_address"),
+            obj_value(order, "buyer_address"),
+            obj_value(bill, "buyer_address"),
             default="",
         )
 
         buyer_gstin = first_non_empty(
-            obj_value(
-                order,
-                "buyer_gstin",
-            ),
-            obj_value(
-                order,
-                "billing_gstin",
-            ),
-            obj_value(
-                bill,
-                "buyer_gstin",
-            ),
+            obj_value(order, "buyer_gstin"),
+            obj_value(order, "billing_gstin"),
+            obj_value(bill, "buyer_gstin"),
             default="",
         )
 
         buyer_state = first_non_empty(
-            obj_value(
-                order,
-                "state_name",
-            ),
-            obj_value(
-                bill,
-                "indian_state",
-            ),
+            obj_value(order, "state_name"),
+            obj_value(bill, "indian_state"),
             default="",
         )
 
         buyer_state_code = first_non_empty(
-            obj_value(
-                order,
-                "state_code",
-            ),
-            obj_value(
-                bill,
-                "state_code",
-            ),
+            obj_value(order, "state_code"),
+            obj_value(bill, "state_code"),
             default="",
         )
 
-        # -------------------------------------------------
-        # Consignee / shipping information
-        # -------------------------------------------------
-
         consignee_name = first_non_empty(
-            obj_value(
-                order,
-                "shipping_name",
-            ),
-            obj_value(
-                order,
-                "consignee_name",
-            ),
+            obj_value(order, "shipping_name"),
+            obj_value(order, "consignee_name"),
             buyer_name,
             default="",
         )
 
         consignee_address = first_non_empty(
-            obj_value(
-                order,
-                "shipping_address",
-            ),
-            obj_value(
-                order,
-                "consignee_address",
-            ),
+            obj_value(order, "shipping_address"),
+            obj_value(order, "consignee_address"),
             buyer_address,
             default="",
         )
 
         consignee_gstin = first_non_empty(
-            obj_value(
-                order,
-                "shipping_gstin",
-            ),
-            obj_value(
-                order,
-                "consignee_gstin",
-            ),
+            obj_value(order, "shipping_gstin"),
+            obj_value(order, "consignee_gstin"),
             buyer_gstin,
             default="",
         )
 
         consignee_state = first_non_empty(
-            obj_value(
-                order,
-                "shipping_state",
-            ),
-            obj_value(
-                order,
-                "consignee_state",
-            ),
+            obj_value(order, "shipping_state"),
+            obj_value(order, "consignee_state"),
             buyer_state,
             default="",
         )
 
         consignee_state_code = first_non_empty(
-            obj_value(
-                order,
-                "shipping_state_code",
-            ),
-            obj_value(
-                order,
-                "consignee_state_code",
-            ),
+            obj_value(order, "shipping_state_code"),
+            obj_value(order, "consignee_state_code"),
             buyer_state_code,
             default="",
         )
-
-        # -------------------------------------------------
-        # Tax
-        # -------------------------------------------------
 
         tax_data = cls._calculate_tax(
             taxable_value=taxable_value,
@@ -1053,168 +889,76 @@ class BillingInvoiceService:
             buyer_state=buyer_state,
         )
 
-        # -------------------------------------------------
-        # Tally-style invoice metadata
-        # -------------------------------------------------
-
         invoice_metadata = {
             "invoice_no": first_non_empty(
-                obj_value(
-                    bill,
-                    "bill_num",
-                ),
+                obj_value(bill, "bill_num"),
                 default="",
             ),
-
             "invoice_date": obj_value(
                 bill,
                 "bill_date",
                 default=None,
             ),
-
             "delivery_note": first_non_empty(
-                obj_value(
-                    bill,
-                    "delivery_note",
-                ),
-                obj_value(
-                    order,
-                    "delivery_note",
-                ),
+                obj_value(bill, "delivery_note"),
+                obj_value(order, "delivery_note"),
                 default="",
             ),
-
             "payment_terms": first_non_empty(
-                obj_value(
-                    order,
-                    "payment_terms",
-                ),
-                obj_value(
-                    bill,
-                    "payment_terms",
-                ),
+                obj_value(order, "payment_terms"),
+                obj_value(bill, "payment_terms"),
                 default="",
             ),
-
             "reference_no": first_non_empty(
-                obj_value(
-                    order,
-                    "order_acceptance_id",
-                ),
-                obj_value(
-                    order,
-                    "reference_no",
-                ),
+                obj_value(order, "order_acceptance_id"),
+                obj_value(order, "reference_no"),
                 default="",
             ),
-
             "reference_date": first_non_empty(
-                obj_value(
-                    order,
-                    "order_acceptance_date",
-                ),
-                obj_value(
-                    order,
-                    "reference_date",
-                ),
+                obj_value(order, "order_acceptance_date"),
+                obj_value(order, "reference_date"),
                 default=None,
             ),
-
             "other_references": first_non_empty(
-                obj_value(
-                    order,
-                    "other_references",
-                ),
-                obj_value(
-                    bill,
-                    "other_references",
-                ),
+                obj_value(order, "other_references"),
+                obj_value(bill, "other_references"),
                 default="",
             ),
-
             "buyers_order_no": first_non_empty(
-                obj_value(
-                    order,
-                    "purchase_order_number",
-                ),
-                obj_value(
-                    order,
-                    "buyers_order_no",
-                ),
+                obj_value(order, "purchase_order_number"),
+                obj_value(order, "buyers_order_no"),
                 default="",
             ),
-
             "buyers_order_date": first_non_empty(
-                obj_value(
-                    order,
-                    "purchase_order_date",
-                ),
-                obj_value(
-                    order,
-                    "buyers_order_date",
-                ),
+                obj_value(order, "purchase_order_date"),
+                obj_value(order, "buyers_order_date"),
                 default=None,
             ),
-
             "dispatch_doc_no": first_non_empty(
-                obj_value(
-                    order,
-                    "dispatch_doc_no",
-                ),
-                obj_value(
-                    order,
-                    "dispatch_document_no",
-                ),
-                obj_value(
-                    bill,
-                    "dispatch_doc_no",
-                ),
+                obj_value(order, "dispatch_doc_no"),
+                obj_value(order, "dispatch_document_no"),
+                obj_value(bill, "dispatch_doc_no"),
                 default="",
             ),
-
             "delivery_note_date": first_non_empty(
-                obj_value(
-                    order,
-                    "delivery_note_date",
-                ),
-                obj_value(
-                    bill,
-                    "delivery_note_date",
-                ),
+                obj_value(order, "delivery_note_date"),
+                obj_value(bill, "delivery_note_date"),
                 default=None,
             ),
-
             "dispatched_through": first_non_empty(
-                obj_value(
-                    order,
-                    "dispatched_through",
-                ),
-                obj_value(
-                    order,
-                    "transport_mode",
-                ),
+                obj_value(order, "dispatched_through"),
+                obj_value(order, "transport_mode"),
                 default="",
             ),
-
             "destination": first_non_empty(
-                obj_value(
-                    order,
-                    "destination",
-                ),
+                obj_value(order, "destination"),
                 consignee_state,
                 buyer_state,
                 default="",
             ),
-
             "delivery_terms": first_non_empty(
-                obj_value(
-                    order,
-                    "delivery_terms",
-                ),
-                obj_value(
-                    order,
-                    "terms_of_delivery",
-                ),
+                obj_value(order, "delivery_terms"),
+                obj_value(order, "terms_of_delivery"),
                 default="",
             ),
         }
@@ -1222,9 +966,7 @@ class BillingInvoiceService:
         return {
             "bill_num": bill.bill_num,
             "bill_date": bill.bill_date,
-
             "seller": SELLER,
-
             "buyer": {
                 "name": buyer_name,
                 "address": buyer_address,
@@ -1232,18 +974,11 @@ class BillingInvoiceService:
                 "state": buyer_state,
                 "state_code": buyer_state_code,
                 "pan": first_non_empty(
-                    obj_value(
-                        order,
-                        "buyer_pan",
-                    ),
-                    obj_value(
-                        bill,
-                        "buyer_pan",
-                    ),
+                    obj_value(order, "buyer_pan"),
+                    obj_value(bill, "buyer_pan"),
                     default="",
                 ),
             },
-
             "consignee": {
                 "name": consignee_name,
                 "address": consignee_address,
@@ -1251,86 +986,68 @@ class BillingInvoiceService:
                 "state": consignee_state,
                 "state_code": consignee_state_code,
             },
-
             "invoice_metadata": invoice_metadata,
-
             "order": {
                 "order_id": obj_value(
                     order,
                     "order_id",
                     default=None,
                 ),
-
                 "order_acceptance_id": obj_value(
                     order,
                     "order_acceptance_id",
                     default="",
                 ),
-
                 "order_acceptance_date": obj_value(
                     order,
                     "order_acceptance_date",
                     default=None,
                 ),
-
                 "purchase_order_number": obj_value(
                     order,
                     "purchase_order_number",
                     default="",
                 ),
-
                 "purchase_order_date": obj_value(
                     order,
                     "purchase_order_date",
                     default=None,
                 ),
-
                 "payment_terms": obj_value(
                     order,
                     "payment_terms",
                     default="",
                 ),
-
                 "dispatched_through": obj_value(
                     order,
                     "dispatched_through",
                     default="",
                 ),
-
                 "destination": obj_value(
                     order,
                     "destination",
                     default="",
                 ),
-
                 "delivery_terms": obj_value(
                     order,
                     "delivery_terms",
                     default="",
                 ),
             },
-
             "items": items,
-
             "packing": packing,
             "freight": freight,
-
             "goods_total": goods_total,
             "taxable_value": taxable_value,
-
             "tax_rate": tax_rate,
-
             "cgst_rate": tax_data["cgst_rate"],
             "sgst_rate": tax_data["sgst_rate"],
             "igst_rate": tax_data["igst_rate"],
-
             "cgst": tax_data["cgst"],
             "sgst": tax_data["sgst"],
             "igst": tax_data["igst"],
-
             "tax_amount": tax_data["tax_amount"],
             "grand_total": tax_data["grand_total"],
-
             "is_intrastate": tax_data["is_intrastate"],
         }
 
@@ -1345,42 +1062,21 @@ class BillingInvoiceService:
         order_items,
     ):
         items = []
-
         goods_total = Decimal("0.00")
 
-        # -------------------------------------------------
-        # Items
-        # -------------------------------------------------
-
         for order_item in order_items:
-
             item_code = first_non_empty(
-                obj_value(
-                    order_item,
-                    "item_code",
-                ),
+                obj_value(order_item, "item_code"),
                 default="",
             )
 
             quantity = decimal_value(
-                obj_value(
-                    order_item,
-                    "quantity",
-                    default=0,
-                )
+                obj_value(order_item, "quantity", default=0)
             )
 
             rate = money(
-                obj_value(
-                    order_item,
-                    "rate",
-                    default=0,
-                )
+                obj_value(order_item, "rate", default=0)
             )
-
-            # -------------------------------------------------
-            # Discount
-            # -------------------------------------------------
 
             discount = money(
                 first_non_empty(
@@ -1394,30 +1090,17 @@ class BillingInvoiceService:
                 )
             )
 
-            # -------------------------------------------------
-            # Amount
-            # -------------------------------------------------
-
-            gross_amount = (
-                quantity * rate
-            )
-
+            gross_amount = quantity * rate
             discount_amount = (
                 gross_amount
                 * discount
                 / Decimal("100")
             )
-
             amount = money(
-                gross_amount
-                - discount_amount
+                gross_amount - discount_amount
             )
 
             goods_total += amount
-
-            # -------------------------------------------------
-            # Description
-            # -------------------------------------------------
 
             description = first_non_empty(
                 obj_value(
@@ -1427,21 +1110,10 @@ class BillingInvoiceService:
                 default="",
             )
 
-            # -------------------------------------------------
-            # HSN
-            # -------------------------------------------------
-
             hsn = first_non_empty(
-                obj_value(
-                    order_item,
-                    "hsn_code",
-                ),
+                obj_value(order_item, "hsn_code"),
                 default="",
             )
-
-            # -------------------------------------------------
-            # Unit
-            # -------------------------------------------------
 
             um = first_non_empty(
                 obj_value(
@@ -1465,172 +1137,83 @@ class BillingInvoiceService:
                 }
             )
 
-        # -------------------------------------------------
-        # Charges
-        # -------------------------------------------------
-
         packing = money(
-            obj_value(
-                order,
-                "packing_charges",
-                default=0,
-            )
+            obj_value(order, "packing_charges", default=0)
         )
-
         freight = money(
-            obj_value(
-                order,
-                "freight_charges",
-                default=0,
-            )
+            obj_value(order, "freight_charges", default=0)
         )
 
         taxable_value = money(
-            goods_total
-            + packing
-            + freight
+            goods_total + packing + freight
         )
-
-        # -------------------------------------------------
-        # Tax
-        # -------------------------------------------------
 
         tax_rate = money(
-            obj_value(
-                order,
-                "tax_rate",
-                default=18,
-            )
+            obj_value(order, "tax_rate", default=18)
         )
 
-        # -------------------------------------------------
-        # Buyer
-        # -------------------------------------------------
-
         buyer_name = first_non_empty(
-            obj_value(
-                order,
-                "billing_name",
-            ),
-            obj_value(
-                order,
-                "buyer_name",
-            ),
+            obj_value(order, "billing_name"),
+            obj_value(order, "buyer_name"),
             default="",
         )
 
         buyer_address = first_non_empty(
-            obj_value(
-                order,
-                "billing_address",
-            ),
-            obj_value(
-                order,
-                "buyer_address",
-            ),
+            obj_value(order, "billing_address"),
+            obj_value(order, "buyer_address"),
             default="",
         )
 
         buyer_gstin = first_non_empty(
-            obj_value(
-                order,
-                "buyer_gstin",
-            ),
-            obj_value(
-                order,
-                "billing_gstin",
-            ),
+            obj_value(order, "buyer_gstin"),
+            obj_value(order, "billing_gstin"),
             default="",
         )
 
         buyer_state = first_non_empty(
-            obj_value(
-                order,
-                "state_name",
-            ),
+            obj_value(order, "state_name"),
             default="",
         )
 
         buyer_state_code = first_non_empty(
-            obj_value(
-                order,
-                "state_code",
-            ),
+            obj_value(order, "state_code"),
             default="",
         )
 
-        # -------------------------------------------------
-        # Consignee
-        # -------------------------------------------------
-
         consignee_name = first_non_empty(
-            obj_value(
-                order,
-                "shipping_name",
-            ),
-            obj_value(
-                order,
-                "consignee_name",
-            ),
+            obj_value(order, "shipping_name"),
+            obj_value(order, "consignee_name"),
             buyer_name,
             default="",
         )
 
         consignee_address = first_non_empty(
-            obj_value(
-                order,
-                "shipping_address",
-            ),
-            obj_value(
-                order,
-                "consignee_address",
-            ),
+            obj_value(order, "shipping_address"),
+            obj_value(order, "consignee_address"),
             buyer_address,
             default="",
         )
 
         consignee_gstin = first_non_empty(
-            obj_value(
-                order,
-                "shipping_gstin",
-            ),
-            obj_value(
-                order,
-                "consignee_gstin",
-            ),
+            obj_value(order, "shipping_gstin"),
+            obj_value(order, "consignee_gstin"),
             buyer_gstin,
             default="",
         )
 
         consignee_state = first_non_empty(
-            obj_value(
-                order,
-                "shipping_state",
-            ),
-            obj_value(
-                order,
-                "consignee_state",
-            ),
+            obj_value(order, "shipping_state"),
+            obj_value(order, "consignee_state"),
             buyer_state,
             default="",
         )
 
         consignee_state_code = first_non_empty(
-            obj_value(
-                order,
-                "shipping_state_code",
-            ),
-            obj_value(
-                order,
-                "consignee_state_code",
-            ),
+            obj_value(order, "shipping_state_code"),
+            obj_value(order, "consignee_state_code"),
             buyer_state_code,
             default="",
         )
-
-        # -------------------------------------------------
-        # Tax
-        # -------------------------------------------------
 
         tax_data = cls._calculate_tax(
             taxable_value=taxable_value,
@@ -1638,18 +1221,8 @@ class BillingInvoiceService:
             buyer_state=buyer_state,
         )
 
-        # -------------------------------------------------
-        # Tally-style metadata
-        #
-        # IMPORTANT:
-        # OA number is the document number.
-        # -------------------------------------------------
-
         oa_number = first_non_empty(
-            obj_value(
-                order,
-                "order_acceptance_id",
-            ),
+            obj_value(order, "order_acceptance_id"),
             default="",
         )
 
@@ -1661,87 +1234,65 @@ class BillingInvoiceService:
 
         invoice_metadata = {
             "invoice_no": oa_number,
-
             "invoice_date": first_non_empty(
-                obj_value(
-                    order,
-                    "order_date",
-                ),
-                obj_value(
-                    order,
-                    "order_acceptance_date",
-                ),
+                obj_value(order, "order_date"),
+                obj_value(order, "order_acceptance_date"),
                 default=None,
             ),
-
             "delivery_note": obj_value(
                 order,
                 "delivery_note",
                 default="",
             ),
-
             "payment_terms": obj_value(
                 order,
                 "payment_terms",
                 default="",
             ),
-
             "reference_no": oa_number,
-
             "reference_date": obj_value(
                 order,
                 "order_acceptance_date",
                 default=None,
             ),
-
             "other_references": obj_value(
                 order,
                 "other_references",
                 default="",
             ),
-
             "buyers_order_no": obj_value(
                 order,
                 "purchase_order_number",
                 default="",
             ),
-
             "buyers_order_date": obj_value(
                 order,
                 "purchase_order_date",
                 default=None,
             ),
-
             "dispatch_doc_no": obj_value(
                 order,
                 "dispatch_doc_no",
                 "dispatch_document_no",
                 default="",
             ),
-
             "delivery_note_date": obj_value(
                 order,
                 "delivery_note_date",
                 default=None,
             ),
-
             "dispatched_through": obj_value(
                 order,
                 "dispatched_through",
                 "transport_mode",
                 default="",
             ),
-
             "destination": first_non_empty(
-                obj_value(
-                    order,
-                    "destination",
-                ),
+                obj_value(order, "destination"),
                 consignee_state,
                 buyer_state,
                 default="",
             ),
-
             "delivery_terms": obj_value(
                 order,
                 "delivery_terms",
@@ -1753,9 +1304,7 @@ class BillingInvoiceService:
         return {
             "bill_num": "",
             "bill_date": None,
-
             "seller": SELLER,
-
             "buyer": {
                 "name": buyer_name,
                 "address": buyer_address,
@@ -1768,7 +1317,6 @@ class BillingInvoiceService:
                     default="",
                 ),
             },
-
             "consignee": {
                 "name": consignee_name,
                 "address": consignee_address,
@@ -1776,100 +1324,171 @@ class BillingInvoiceService:
                 "state": consignee_state,
                 "state_code": consignee_state_code,
             },
-
             "invoice_metadata": invoice_metadata,
-
             "order": {
                 "order_id": obj_value(
                     order,
                     "order_id",
                     default=None,
                 ),
-
                 "order_acceptance_id": oa_number,
-
                 "order_acceptance_date": obj_value(
                     order,
                     "order_acceptance_date",
                     default=None,
                 ),
-
                 "purchase_order_number": obj_value(
                     order,
                     "purchase_order_number",
                     default="",
                 ),
-
                 "purchase_order_date": obj_value(
                     order,
                     "purchase_order_date",
                     default=None,
                 ),
-
                 "payment_terms": obj_value(
                     order,
                     "payment_terms",
                     default="",
                 ),
-
                 "dispatched_through": obj_value(
                     order,
                     "dispatched_through",
                     default="",
                 ),
-
                 "destination": obj_value(
                     order,
                     "destination",
                     default="",
                 ),
-
                 "delivery_terms": obj_value(
                     order,
                     "delivery_terms",
                     default="",
                 ),
             },
-
             "items": items,
-
             "packing": packing,
             "freight": freight,
-
             "goods_total": goods_total,
             "taxable_value": taxable_value,
-
             "tax_rate": tax_rate,
-
             "cgst_rate": tax_data["cgst_rate"],
             "sgst_rate": tax_data["sgst_rate"],
             "igst_rate": tax_data["igst_rate"],
-
             "cgst": tax_data["cgst"],
             "sgst": tax_data["sgst"],
             "igst": tax_data["igst"],
-
             "tax_amount": tax_data["tax_amount"],
             "grand_total": tax_data["grand_total"],
-
             "is_intrastate": tax_data["is_intrastate"],
         }
 
     # =====================================================
-    # PDF renderer
+    # Build quotation -> order booking model
     # =====================================================
 
     @classmethod
-    def _render_pdf(
+    def _build_quotation_order_data(
         cls,
-        data,
-        output_path: Path,
-        document_title: str,
+        quotation,
     ):
-        # -------------------------------------------------
-        # Fonts
-        # -------------------------------------------------
+        """
+        Convert a Quotation ORM object into a PDF-friendly model.
 
+        IMPORTANT:
+        The current Quotation table does not contain final ERP-order
+        commercial fields such as quantity, rate, HSN, GST rate,
+        payment terms, packing charges, freight amount, etc.
+
+        Therefore this method only exposes information that is actually
+        stored in the quotation record.
+        """
+
+        if quotation is None:
+            raise ValueError(
+                "Quotation record is required."
+            )
+
+        return {
+            # -------------------------------------------------
+            # Seller
+            # -------------------------------------------------
+            "seller": SELLER,
+
+            # -------------------------------------------------
+            # Quotation metadata
+            # -------------------------------------------------
+            "quote_number": quotation.quote_number,
+            "enquiry_date": quotation.enquiry_date,
+            "generated_at": quotation.generated_at,
+            "status": quotation.status,
+            "is_active": quotation.is_active,
+            "converted_order_id": quotation.converted_order_id,
+
+            # -------------------------------------------------
+            # Customer
+            # -------------------------------------------------
+            "customer": {
+                "company": quotation.client_company or "",
+                "address": quotation.client_address_line1 or "",
+                "city": quotation.client_city or "",
+                "postal_code": quotation.client_postal_code or "",
+                "email": quotation.client_email or "",
+            },
+
+            # -------------------------------------------------
+            # Buyer
+            # -------------------------------------------------
+            "buyer": {
+                "name": quotation.buyer_name or "",
+                "phone": quotation.buyer_phone_number or "",
+            },
+
+            # -------------------------------------------------
+            # Product
+            # -------------------------------------------------
+            "product": {
+                "name": quotation.product_name or "",
+            },
+
+            # -------------------------------------------------
+            # Commercial
+            # -------------------------------------------------
+            "commercial": {
+                "supply": quotation.supply or "",
+                "installation": quotation.installation or "",
+                "freight": quotation.freight or "",
+            },
+
+            # -------------------------------------------------
+            # Classification
+            # -------------------------------------------------
+            "flags": {
+                "is_dealer": bool(
+                    quotation.is_dealer
+                ),
+                "is_special_model": bool(
+                    quotation.is_special_model
+                ),
+            },
+
+            # -------------------------------------------------
+            # Sales ownership
+            # -------------------------------------------------
+            "sales": {
+                "name": quotation.sales_user_name or "",
+                "email": quotation.sales_user_email or "",
+            },
+        }
+
+    # =====================================================
+    # Shared PDF styles/helpers
+    # =====================================================
+
+    @classmethod
+    def _find_fonts(cls):
         font_paths = [
             "./services/DejaVuSans.ttf",
             "./services/DejaVuSans-Bold.ttf",
@@ -1898,34 +1517,24 @@ class BillingInvoiceService:
 
         if not regular_font or not bold_font:
             raise RuntimeError(
-                "A Unicode TTF font supporting the ₹ glyph "
-                "is required to render invoices."
+                "A Unicode TTF font supporting the ₹ glyph is required "
+                "to render ERP PDFs. Expected files: "
+                "./services/DejaVuSans.ttf and "
+                "./services/DejaVuSans-Bold.ttf"
             )
-
-        # -------------------------------------------------
-        # Register fonts
-        # -------------------------------------------------
 
         if "InvoiceDejaVu" not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(
-                TTFont(
-                    "InvoiceDejaVu",
-                    regular_font,
-                )
+                TTFont("InvoiceDejaVu", regular_font)
             )
 
         if "InvoiceDejaVu-Bold" not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(
-                TTFont(
-                    "InvoiceDejaVu-Bold",
-                    bold_font,
-                )
+                TTFont("InvoiceDejaVu-Bold", bold_font)
             )
 
-        # -------------------------------------------------
-        # Styles
-        # -------------------------------------------------
-
+    @classmethod
+    def _common_styles(cls):
         styles = getSampleStyleSheet()
 
         normal = ParagraphStyle(
@@ -1967,6 +1576,14 @@ class BillingInvoiceService:
             alignment=TA_CENTER,
         )
 
+        section_title = ParagraphStyle(
+            "InvoiceSectionTitle",
+            parent=normal,
+            fontName="InvoiceDejaVu-Bold",
+            fontSize=9,
+            leading=11,
+        )
+
         right = ParagraphStyle(
             "InvoiceRight",
             parent=normal,
@@ -2000,18 +1617,28 @@ class BillingInvoiceService:
             fontName="InvoiceDejaVu-Bold",
         )
 
-        # -------------------------------------------------
-        # Page geometry
-        # -------------------------------------------------
+        return {
+            "normal": normal,
+            "small": small,
+            "tiny": tiny,
+            "bold": bold,
+            "title": title,
+            "section_title": section_title,
+            "right": right,
+            "center": center,
+            "header_label": header_label,
+            "metadata_value": metadata_value,
+            "metadata_value_bold": metadata_value_bold,
+        }
 
+    @classmethod
+    def _page_geometry(cls):
         page_width, page_height = A4
 
         left_margin = 10 * mm
         right_margin = 10 * mm
-
         top_margin = 7 * mm
         bottom_margin = 14 * mm
-
         footer_height = 8 * mm
 
         content_width = (
@@ -2020,119 +1647,149 @@ class BillingInvoiceService:
             - right_margin
         )
 
-        frame = Frame(
+        return (
+            page_width,
+            page_height,
+            left_margin,
+            right_margin,
+            top_margin,
+            bottom_margin,
+            footer_height,
+            content_width,
+        )
+
+    @classmethod
+    def _make_frame(
+        cls,
+        left_margin,
+        bottom_margin,
+        footer_height,
+        page_width,
+        page_height,
+        top_margin,
+        content_width,
+    ):
+        return Frame(
             left_margin,
             bottom_margin + footer_height,
             content_width,
-            (
-                page_height
-                - top_margin
-                - bottom_margin
-                - footer_height
-            ),
-            id="invoice_body",
+            page_height
+            - top_margin
+            - bottom_margin
+            - footer_height,
+            id="erp_body",
             leftPadding=0,
             rightPadding=0,
             topPadding=0,
             bottomPadding=0,
         )
 
-        # -------------------------------------------------
-        # Footer
-        # -------------------------------------------------
+    @classmethod
+    def _draw_footer(
+        cls,
+        canvas,
+        doc,
+        page_width,
+        right_margin,
+    ):
+        canvas.saveState()
 
-        def draw_footer(canvas, doc):
-            canvas.saveState()
+        footer_y = 7 * mm
 
-            footer_y = 7 * mm
-
-            canvas.setFont(
-                "InvoiceDejaVu",
-                7,
-            )
-
-            canvas.drawCentredString(
-                page_width / 2,
-                footer_y,
-                "SUBJECT TO MUMBAI JURISDICTION",
-            )
-
-            canvas.drawRightString(
-                page_width - right_margin,
-                footer_y,
-                f"Page {doc.page}",
-            )
-
-            canvas.restoreState()
-
-        # -------------------------------------------------
-        # PDF metadata
-        # -------------------------------------------------
-
-        invoice_no = data["invoice_metadata"].get(
-            "invoice_no",
-            "",
+        canvas.setFont(
+            "InvoiceDejaVu",
+            7,
         )
 
-        doc = BaseDocTemplate(
-            str(output_path),
-            pagesize=A4,
-            leftMargin=left_margin,
-            rightMargin=right_margin,
-            topMargin=top_margin,
-            bottomMargin=bottom_margin,
-            title=(
-                f"{document_title} "
-                f"{invoice_no}"
-            ),
-            author=data["seller"]["name"],
-            subject=(
-                f"{document_title} "
-                f"{invoice_no}"
-            ),
-            keywords=(
-                f"{document_title}, "
-                "Tempo Instruments, "
-                f"{invoice_no}"
-            ),
+        canvas.drawCentredString(
+            page_width / 2,
+            footer_y,
+            "SUBJECT TO MUMBAI JURISDICTION",
         )
 
-        doc.addPageTemplates(
-            [
-                PageTemplate(
-                    id="invoice",
-                    frames=[frame],
-                    onPageEnd=draw_footer,
+        canvas.drawRightString(
+            page_width - right_margin,
+            footer_y,
+            f"Page {doc.page}",
+        )
+
+        canvas.restoreState()
+
+    @classmethod
+    def _table_style(
+        cls,
+        *,
+        valign="TOP",
+        padding=3,
+        grid=True,
+    ):
+        commands = []
+
+        if grid:
+            commands.append(
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.black,
                 )
+            )
+
+        commands.extend(
+            [
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    valign,
+                ),
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    padding,
+                ),
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    padding,
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    padding,
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    padding,
+                ),
             ]
         )
 
-        story = []
+        return TableStyle(commands)
 
-        # =================================================
-        # TITLE
-        # =================================================
+    # =====================================================
+    # Shared Tally-style header pieces
+    # =====================================================
 
-        story.append(
-            Paragraph(
-                (
-                    f"{escape(document_title)} "
-                    "- GENERATED FROM Internal-ERP"
-                ),
-                title,
-            )
-        )
-
-        story.append(
-            Spacer(
-                1,
-                2 * mm,
-            )
-        )
-
-        # =================================================
-        # SELLER + INVOICE METADATA
-        # =================================================
+    @classmethod
+    def _render_seller_and_metadata_header(
+        cls,
+        data,
+        story,
+        content_width,
+        styles,
+        left_title="Invoice No.",
+    ):
+        normal = styles["normal"]
+        header_label = styles["header_label"]
+        metadata_value = styles["metadata_value"]
+        metadata_value_bold = styles["metadata_value_bold"]
 
         seller_address = "<br/>".join(
             escape(line)
@@ -2157,18 +1814,14 @@ class BillingInvoiceService:
 
         metadata = data["invoice_metadata"]
 
-        invoice_meta_rows = [
+        metadata_rows = [
             [
                 markup_paragraph(
-                    "<b>Invoice No.</b>",
+                    f"<b>{escape(left_title)}</b>",
                     header_label,
                 ),
                 markup_paragraph(
-                    (
-                        f"<b>"
-                        f"{escape(str(metadata['invoice_no']))}"
-                        f"</b>"
-                    ),
+                    f"<b>{escape(str(metadata['invoice_no']))}</b>",
                     metadata_value_bold,
                 ),
             ],
@@ -2179,9 +1832,7 @@ class BillingInvoiceService:
                 ),
                 markup_paragraph(
                     (
-                        f"<b>"
-                        f"{escape(date_text(metadata['invoice_date']))}"
-                        f"</b>"
+                        f"<b>{escape(date_text(metadata['invoice_date']))}</b>"
                     ),
                     metadata_value_bold,
                 ),
@@ -2212,12 +1863,7 @@ class BillingInvoiceService:
                     header_label,
                 ),
                 markup_paragraph(
-                    escape(
-                        str(
-                            metadata["reference_no"]
-                            or ""
-                        )
-                    )
+                    escape(str(metadata["reference_no"] or ""))
                     + (
                         "<br/>"
                         + escape(
@@ -2257,9 +1903,7 @@ class BillingInvoiceService:
                     header_label,
                 ),
                 paragraph(
-                    date_text(
-                        metadata["buyers_order_date"]
-                    ),
+                    date_text(metadata["buyers_order_date"]),
                     metadata_value,
                 ),
             ],
@@ -2279,9 +1923,7 @@ class BillingInvoiceService:
                     header_label,
                 ),
                 paragraph(
-                    date_text(
-                        metadata["delivery_note_date"]
-                    ),
+                    date_text(metadata["delivery_note_date"]),
                     metadata_value,
                 ),
             ],
@@ -2318,131 +1960,37 @@ class BillingInvoiceService:
         ]
 
         metadata_table = Table(
-            invoice_meta_rows,
-            colWidths=[
-                38 * mm,
-                50 * mm,
-            ],
+            metadata_rows,
+            colWidths=[38 * mm, 50 * mm],
         )
-
         metadata_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        2,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        2,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        2,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        2,
-                    ),
-                ]
-            )
+            cls._table_style(padding=2)
         )
 
         top_header = Table(
-            [
-                [
-                    seller_block,
-                    metadata_table,
-                ]
-            ],
+            [[seller_block, metadata_table]],
             colWidths=[
                 content_width - 88 * mm,
                 88 * mm,
             ],
         )
-
         top_header.setStyle(
-            TableStyle(
-                [
-                    (
-                        "BOX",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "INNERGRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                ]
-            )
+            cls._table_style(padding=3)
         )
 
         story.append(top_header)
 
-        # =================================================
-        # PARTY BLOCKS
-        # =================================================
+    @classmethod
+    def _party_table(
+        cls,
+        data,
+        story,
+        content_width,
+        styles,
+    ):
+        normal = styles["normal"]
 
-        def party_block(
-            title_text,
-            party,
-        ):
+        def party_block(title_text, party):
             address = "<br/>".join(
                 escape(line)
                 for line in multiline_address(
@@ -2450,177 +1998,189 @@ class BillingInvoiceService:
                 )
             )
 
+            name = escape(str(party.get("name") or ""))
             text = (
                 f"<b>{escape(title_text)}</b><br/>"
-                f"<b>{escape(party['name'])}</b>"
+                f"<b>{name}</b>"
             )
 
             if address:
                 text += f"<br/>{address}"
 
-            if party["gstin"]:
+            if party.get("gstin"):
                 text += (
                     "<br/>GSTIN/UIN : "
-                    f"{escape(party['gstin'])}"
+                    f"{escape(str(party['gstin']))}"
                 )
 
-            if party["state"]:
+            if party.get("state"):
                 text += (
                     "<br/>State Name : "
-                    f"{escape(party['state'])}"
+                    f"{escape(str(party['state']))}"
                 )
-
-                if party["state_code"]:
+                if party.get("state_code"):
                     text += (
                         ", Code : "
-                        f"{escape(party['state_code'])}"
+                        f"{escape(str(party['state_code']))}"
                     )
 
-            return markup_paragraph(
-                text,
-                normal,
-            )
+            if party.get("pan"):
+                text += (
+                    "<br/>PAN : "
+                    f"{escape(str(party['pan']))}"
+                )
+
+            return markup_paragraph(text, normal)
 
         consignee = party_block(
             "Consignee (Ship to)",
             data["consignee"],
         )
-
         buyer = party_block(
             "Buyer (Bill to)",
             data["buyer"],
         )
 
         party_table = Table(
-            [
-                [
-                    consignee,
-                    buyer,
-                ]
-            ],
+            [[consignee, buyer]],
             colWidths=[
                 content_width / 2,
                 content_width / 2,
             ],
         )
-
         party_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "BOX",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "INNERGRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                ]
-            )
+            cls._table_style(padding=3)
         )
-
         story.append(party_table)
 
-        story.append(
-            Spacer(
-                1,
-                2 * mm,
-            )
+    # =====================================================
+    # Tax invoice renderer
+    # =====================================================
+
+    @classmethod
+    def _render_pdf(
+        cls,
+        data,
+        output_path: Path,
+        document_title: str,
+    ):
+        cls._find_fonts()
+        styles = cls._common_styles()
+
+        (
+            page_width,
+            page_height,
+            left_margin,
+            right_margin,
+            top_margin,
+            bottom_margin,
+            footer_height,
+            content_width,
+        ) = cls._page_geometry()
+
+        frame = cls._make_frame(
+            left_margin,
+            bottom_margin,
+            footer_height,
+            page_width,
+            page_height,
+            top_margin,
+            content_width,
         )
 
-        # =================================================
-        # ITEM TABLE
-        # =================================================
+        invoice_no = data["invoice_metadata"].get(
+            "invoice_no",
+            "",
+        )
 
+        doc = BaseDocTemplate(
+            str(output_path),
+            pagesize=A4,
+            leftMargin=left_margin,
+            rightMargin=right_margin,
+            topMargin=top_margin,
+            bottomMargin=bottom_margin,
+            title=f"{document_title} {invoice_no}",
+            author=data["seller"]["name"],
+            subject=f"{document_title} {invoice_no}",
+            keywords=(
+                f"{document_title}, Tempo Instruments, {invoice_no}"
+            ),
+        )
+
+        doc.addPageTemplates(
+            [
+                PageTemplate(
+                    id="erp_document",
+                    frames=[frame],
+                    onPageEnd=lambda canvas, current_doc: cls._draw_footer(
+                        canvas,
+                        current_doc,
+                        page_width,
+                        right_margin,
+                    ),
+                )
+            ]
+        )
+
+        story = []
+        title = styles["title"]
+        normal = styles["normal"]
+        center = styles["center"]
+        right = styles["right"]
+
+        # Title
+        story.append(
+            Paragraph(
+                (
+                    f"{escape(document_title)} "
+                    "- GENERATED FROM Internal-ERP"
+                ),
+                title,
+            )
+        )
+        story.append(Spacer(1, 2 * mm))
+
+        # Seller + metadata
+        cls._render_seller_and_metadata_header(
+            data=data,
+            story=story,
+            content_width=content_width,
+            styles=styles,
+            left_title="Invoice No.",
+        )
+
+        # Buyer/Consignee
+        cls._party_table(
+            data=data,
+            story=story,
+            content_width=content_width,
+            styles=styles,
+        )
+        story.append(Spacer(1, 2 * mm))
+
+        # Items
         item_rows = [
             [
-                markup_paragraph(
-                    "<b>Sl<br/>No.</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>Description of Goods</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>HSN/SAC</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>Quantity</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>Rate</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>per</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>Disc. %</b>",
-                    center,
-                ),
-                markup_paragraph(
-                    "<b>Amount</b>",
-                    center,
-                ),
+                markup_paragraph("<b>Sl<br/>No.</b>", center),
+                markup_paragraph("<b>Description of Goods</b>", center),
+                markup_paragraph("<b>HSN/SAC</b>", center),
+                markup_paragraph("<b>Quantity</b>", center),
+                markup_paragraph("<b>Rate</b>", center),
+                markup_paragraph("<b>per</b>", center),
+                markup_paragraph("<b>Disc. %</b>", center),
+                markup_paragraph("<b>Amount</b>", center),
             ]
         ]
 
-        for index, item in enumerate(
-            data["items"],
-            start=1,
-        ):
-            item_code = escape(
-                str(item["item_code"] or "")
-            )
-
+        for index, item in enumerate(data["items"], start=1):
+            item_code = escape(str(item["item_code"] or ""))
             description = f"<b>{item_code}</b>"
 
             if item["description"]:
                 description += (
                     "<br/><i>"
-                    + escape(
-                        str(item["description"])
-                    ).replace(
+                    + escape(str(item["description"])).replace(
                         "\n",
                         "<br/>",
                     )
@@ -2629,150 +2189,79 @@ class BillingInvoiceService:
 
             item_rows.append(
                 [
-                    paragraph(
-                        str(index),
-                        center,
-                    ),
-
-                    markup_paragraph(
-                        description,
-                        normal,
-                    ),
-
-                    paragraph(
-                        item["hsn"],
-                        center,
-                    ),
-
+                    paragraph(str(index), center),
+                    markup_paragraph(description, normal),
+                    paragraph(item["hsn"], center),
                     markup_paragraph(
                         (
-                            f"<b>"
-                            f"{item['quantity']:g} "
-                            f"{escape(str(item['um']))}"
-                            f"</b>"
+                            f"<b>{item['quantity']:g} "
+                            f"{escape(str(item['um']))}</b>"
                         ),
                         center,
                     ),
-
-                    paragraph(
-                        money_text(item["rate"]),
-                        right,
-                    ),
-
-                    paragraph(
-                        item["um"],
-                        center,
-                    ),
-
-                    paragraph(
-                        money_text(item["discount"]),
-                        center,
-                    ),
-
+                    paragraph(money_text(item["rate"]), right),
+                    paragraph(item["um"], center),
+                    paragraph(money_text(item["discount"]), center),
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(item['amount'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(item['amount'])}</b>",
                         right,
                     ),
                 ]
             )
-
-        # -------------------------------------------------
-        # Freight
-        # -------------------------------------------------
 
         if data["freight"]:
             item_rows.append(
                 [
                     "",
-                    markup_paragraph(
-                        "<b>Freight Charges</b>",
-                        right,
-                    ),
+                    markup_paragraph("<b>Freight Charges</b>", right),
                     "",
                     "",
                     "",
                     "",
                     "",
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['freight'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['freight'])}</b>",
                         right,
                     ),
                 ]
             )
-
-        # -------------------------------------------------
-        # Packing
-        # -------------------------------------------------
 
         if data["packing"]:
             item_rows.append(
                 [
                     "",
-                    markup_paragraph(
-                        "<b>Packing Charges</b>",
-                        right,
-                    ),
+                    markup_paragraph("<b>Packing Charges</b>", right),
                     "",
                     "",
                     "",
                     "",
                     "",
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['packing'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['packing'])}</b>",
                         right,
                     ),
                 ]
             )
 
-        # -------------------------------------------------
-        # Total row
-        # -------------------------------------------------
-
         total_quantity = sum(
-            (
-                item["quantity"]
-                for item in data["items"]
-            ),
+            (item["quantity"] for item in data["items"]),
             Decimal("0"),
         )
 
         item_rows.append(
             [
                 "",
-                markup_paragraph(
-                    "<b>Total</b>",
-                    right,
-                ),
+                markup_paragraph("<b>Total</b>", right),
                 "",
                 markup_paragraph(
-                    (
-                        f"<b>"
-                        f"{total_quantity:g} Nos."
-                        f"</b>"
-                    ),
+                    f"<b>{total_quantity:g} Nos.</b>",
                     center,
                 ),
                 "",
                 "",
                 "",
                 markup_paragraph(
-                    (
-                        f"<b>₹ "
-                        f"{money_text(data['grand_total'])}"
-                        f"</b>"
-                    ),
+                    f"<b>₹ {money_text(data['grand_total'])}</b>",
                     right,
                 ),
             ]
@@ -2793,88 +2282,27 @@ class BillingInvoiceService:
             repeatRows=1,
             splitByRow=1,
         )
-
         item_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        2,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        2,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                ]
-            )
+            cls._table_style(padding=2)
         )
-
         story.append(item_table)
 
-        # =================================================
-        # AMOUNT CHARGEABLE
-        # =================================================
-
-        story.append(
-            Spacer(
-                1,
-                1 * mm,
-            )
-        )
-
-        amount_words = amount_in_words(
-            data["grand_total"]
-        )
+        # Amount chargeable
+        story.append(Spacer(1, 1 * mm))
+        amount_words = amount_in_words(data["grand_total"])
 
         amount_table = Table(
             [
                 [
                     markup_paragraph(
-                        "<b>Amount Chargeable "
-                        "(in words)</b>",
+                        "<b>Amount Chargeable (in words)</b>",
                         normal,
                     ),
-                    markup_paragraph(
-                        "<b>E. &amp; O.E</b>",
-                        right,
-                    ),
+                    markup_paragraph("<b>E. &amp; O.E</b>", right),
                 ],
                 [
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{escape(amount_words)}"
-                            f"</b>"
-                        ),
+                        f"<b>{escape(amount_words)}</b>",
                         normal,
                     ),
                     "",
@@ -2885,177 +2313,59 @@ class BillingInvoiceService:
                 35 * mm,
             ],
         )
-
         amount_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "MIDDLE",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                ]
-            )
+            cls._table_style(padding=3, valign="MIDDLE")
         )
-
         story.append(amount_table)
 
-        # =================================================
-        # TAX TABLE
-        # =================================================
-
-        story.append(
-            Spacer(
-                1,
-                2 * mm,
-            )
-        )
+        # Tax table
+        story.append(Spacer(1, 2 * mm))
 
         if data["is_intrastate"]:
-
             tax_rows = [
                 [
-                    markup_paragraph(
-                        "<b>HSN/SAC</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>Taxable Value</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>CGST Rate</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>CGST Amount</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>SGST Rate</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>SGST Amount</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>Total Tax</b>",
-                        center,
-                    ),
+                    markup_paragraph("<b>HSN/SAC</b>", center),
+                    markup_paragraph("<b>Taxable Value</b>", center),
+                    markup_paragraph("<b>CGST Rate</b>", center),
+                    markup_paragraph("<b>CGST Amount</b>", center),
+                    markup_paragraph("<b>SGST Rate</b>", center),
+                    markup_paragraph("<b>SGST Amount</b>", center),
+                    markup_paragraph("<b>Total Tax</b>", center),
                 ],
                 [
                     paragraph(
-                        data["items"][0]["hsn"]
-                        if data["items"]
-                        else "",
+                        data["items"][0]["hsn"] if data["items"] else "",
                         center,
                     ),
-                    paragraph(
-                        money_text(
-                            data["taxable_value"]
-                        ),
-                        right,
-                    ),
-                    paragraph(
-                        (
-                            f"{money_text(data['cgst_rate'])}%"
-                        ),
-                        center,
-                    ),
-                    paragraph(
-                        money_text(data["cgst"]),
-                        right,
-                    ),
-                    paragraph(
-                        (
-                            f"{money_text(data['sgst_rate'])}%"
-                        ),
-                        center,
-                    ),
-                    paragraph(
-                        money_text(data["sgst"]),
-                        right,
-                    ),
-                    paragraph(
-                        money_text(data["tax_amount"]),
-                        right,
-                    ),
+                    paragraph(money_text(data["taxable_value"]), right),
+                    paragraph(f"{money_text(data['cgst_rate'])}%", center),
+                    paragraph(money_text(data["cgst"]), right),
+                    paragraph(f"{money_text(data['sgst_rate'])}%", center),
+                    paragraph(money_text(data["sgst"]), right),
+                    paragraph(money_text(data["tax_amount"]), right),
                 ],
                 [
+                    markup_paragraph("<b>Total</b>", right),
                     markup_paragraph(
-                        "<b>Total</b>",
-                        right,
-                    ),
-                    markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['taxable_value'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['taxable_value'])}</b>",
                         right,
                     ),
                     "",
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['cgst'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['cgst'])}</b>",
                         right,
                     ),
                     "",
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['sgst'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['sgst'])}</b>",
                         right,
                     ),
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['tax_amount'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['tax_amount'])}</b>",
                         right,
                     ),
                 ],
             ]
-
             tax_col_widths = [
                 24 * mm,
                 30 * mm,
@@ -3065,93 +2375,42 @@ class BillingInvoiceService:
                 27 * mm,
                 32 * mm,
             ]
-
         else:
-
             tax_rows = [
                 [
-                    markup_paragraph(
-                        "<b>HSN/SAC</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>Taxable Value</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>IGST Rate</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>IGST Amount</b>",
-                        center,
-                    ),
-                    markup_paragraph(
-                        "<b>Total Tax</b>",
-                        center,
-                    ),
+                    markup_paragraph("<b>HSN/SAC</b>", center),
+                    markup_paragraph("<b>Taxable Value</b>", center),
+                    markup_paragraph("<b>IGST Rate</b>", center),
+                    markup_paragraph("<b>IGST Amount</b>", center),
+                    markup_paragraph("<b>Total Tax</b>", center),
                 ],
                 [
                     paragraph(
-                        data["items"][0]["hsn"]
-                        if data["items"]
-                        else "",
+                        data["items"][0]["hsn"] if data["items"] else "",
                         center,
                     ),
-                    paragraph(
-                        money_text(
-                            data["taxable_value"]
-                        ),
-                        right,
-                    ),
-                    paragraph(
-                        (
-                            f"{money_text(data['igst_rate'])}%"
-                        ),
-                        center,
-                    ),
-                    paragraph(
-                        money_text(data["igst"]),
-                        right,
-                    ),
-                    paragraph(
-                        money_text(data["tax_amount"]),
-                        right,
-                    ),
+                    paragraph(money_text(data["taxable_value"]), right),
+                    paragraph(f"{money_text(data['igst_rate'])}%", center),
+                    paragraph(money_text(data["igst"]), right),
+                    paragraph(money_text(data["tax_amount"]), right),
                 ],
                 [
+                    markup_paragraph("<b>Total</b>", right),
                     markup_paragraph(
-                        "<b>Total</b>",
-                        right,
-                    ),
-                    markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['taxable_value'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['taxable_value'])}</b>",
                         right,
                     ),
                     "",
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['igst'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['igst'])}</b>",
                         right,
                     ),
                     markup_paragraph(
-                        (
-                            f"<b>"
-                            f"{money_text(data['tax_amount'])}"
-                            f"</b>"
-                        ),
+                        f"<b>{money_text(data['tax_amount'])}</b>",
                         right,
                     ),
                 ],
             ]
-
             tax_col_widths = [
                 32 * mm,
                 42 * mm,
@@ -3166,70 +2425,13 @@ class BillingInvoiceService:
             repeatRows=1,
             splitByRow=1,
         )
-
         tax_table.setStyle(
-            TableStyle(
-                [
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "MIDDLE",
-                    ),
-                    (
-                        "ALIGN",
-                        (1, 1),
-                        (-1, -1),
-                        "RIGHT",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                ]
-            )
+            cls._table_style(padding=3, valign="MIDDLE")
         )
-
         story.append(tax_table)
 
-        # =================================================
-        # TAX AMOUNT IN WORDS
-        # =================================================
-
-        story.append(
-            Spacer(
-                1,
-                3 * mm,
-            )
-        )
-
+        # Tax amount words
+        story.append(Spacer(1, 3 * mm))
         story.append(
             markup_paragraph(
                 (
@@ -3240,17 +2442,8 @@ class BillingInvoiceService:
             )
         )
 
-        # =================================================
         # PAN
-        # =================================================
-
-        story.append(
-            Spacer(
-                1,
-                3 * mm,
-            )
-        )
-
+        story.append(Spacer(1, 3 * mm))
         story.append(
             markup_paragraph(
                 (
@@ -3261,17 +2454,8 @@ class BillingInvoiceService:
             )
         )
 
-        # =================================================
-        # DECLARATION + SIGNATURE
-        # =================================================
-
-        story.append(
-            Spacer(
-                1,
-                4 * mm,
-            )
-        )
-
+        # Declaration
+        story.append(Spacer(1, 4 * mm))
         declaration = Table(
             [
                 [
@@ -3279,15 +2463,14 @@ class BillingInvoiceService:
                         "<b>Declaration</b><br/>"
                         "We declare that this invoice shows "
                         "the actual price of the goods described "
-                        "and that all particulars are true and "
-                        "correct.",
+                        "and that all particulars are true and correct.",
                         normal,
                     ),
                     markup_paragraph(
                         (
                             f"<b>for "
-                            f"{escape(data['seller']['name'])}"
-                            f"</b><br/><br/><br/>"
+                            f"{escape(data['seller']['name'])}</b>"
+                            "<br/><br/><br/>"
                             "Authorised Signatory"
                         ),
                         right,
@@ -3299,55 +2482,535 @@ class BillingInvoiceService:
                 80 * mm,
             ],
         )
-
         declaration.setStyle(
-            TableStyle(
-                [
-                    (
-                        "BOX",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.black,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP",
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        3,
-                    ),
-                ]
-            )
+            cls._table_style(padding=3)
         )
-
         story.append(declaration)
 
-        # =================================================
-        # BUILD
-        # =================================================
+        doc.build(story)
+
+    # =====================================================
+    # Quotation -> Order Booking renderer
+    # =====================================================
+
+    @classmethod
+    def _render_quotation_order_pdf(
+        cls,
+        data,
+        output_path: Path,
+        document_title: str,
+    ):
+        """
+        Render a quotation-derived preliminary Order Booking document.
+
+        IMPORTANT:
+        The current Quotation schema does not store quantity, rate, HSN,
+        discount, GST rate, payment terms, or other final-order fields.
+        Therefore this document intentionally does not invent them.
+        """
+        cls._find_fonts()
+        styles = cls._common_styles()
+
+        (
+            page_width,
+            page_height,
+            left_margin,
+            right_margin,
+            top_margin,
+            bottom_margin,
+            footer_height,
+            content_width,
+        ) = cls._page_geometry()
+
+        frame = cls._make_frame(
+            left_margin,
+            bottom_margin,
+            footer_height,
+            page_width,
+            page_height,
+            top_margin,
+            content_width,
+        )
+
+        title = styles["title"]
+        normal = styles["normal"]
+        small = styles["small"]
+        center = styles["center"]
+        right = styles["right"]
+        header_label = styles["header_label"]
+        metadata_value = styles["metadata_value"]
+        metadata_value_bold = styles["metadata_value_bold"]
+        section_title = styles["section_title"]
+
+        quote_number = data["quote_number"]
+        generated_text = date_text(data["generated_at"])
+
+        subject = f"{document_title} {quote_number}"
+
+        doc = BaseDocTemplate(
+            str(output_path),
+            pagesize=A4,
+            leftMargin=left_margin,
+            rightMargin=right_margin,
+            topMargin=top_margin,
+            bottomMargin=bottom_margin,
+            title=subject,
+            author=data["sales"]["name"] or data["seller"]["name"],
+            subject=subject,
+            keywords=(
+                f"{document_title}, Quotation, Tempo Instruments, "
+                f"{quote_number}"
+            ),
+        )
+
+        doc.addPageTemplates(
+            [
+                PageTemplate(
+                    id="quotation_order_booking",
+                    frames=[frame],
+                    onPageEnd=lambda canvas, current_doc: cls._draw_footer(
+                        canvas,
+                        current_doc,
+                        page_width,
+                        right_margin,
+                    ),
+                )
+            ]
+        )
+
+        story = []
+
+        # -------------------------------------------------
+        # Title
+        # -------------------------------------------------
+
+        story.append(
+            Paragraph(
+                (
+                    f"{escape(document_title)} "
+                    "- GENERATED FROM QUOTATION"
+                ),
+                title,
+            )
+        )
+        story.append(Spacer(1, 2 * mm))
+
+        # -------------------------------------------------
+        # Seller + quotation metadata
+        # -------------------------------------------------
+
+        seller_address = "<br/>".join(
+            escape(line)
+            for line in data["seller"]["address"]
+        )
+
+        seller_block = markup_paragraph(
+            "<b>Seller</b><br/>"
+            f"<b>{escape(data['seller']['name'])}</b><br/>"
+            f"{seller_address}<br/>"
+            f"MOB. {escape(data['seller']['mobile'])}<br/>"
+            "GSTIN/UIN : "
+            f"{escape(data['seller']['gstin'])}<br/>"
+            "State Name : "
+            f"{escape(data['seller']['state'])}, "
+            "Code : "
+            f"{escape(data['seller']['state_code'])}<br/>"
+            "CIN: "
+            f"{escape(data['seller']['cin'])}",
+            normal,
+        )
+
+        quotation_metadata_rows = [
+            [
+                markup_paragraph(
+                    "<b>Quotation No.</b>",
+                    header_label,
+                ),
+                markup_paragraph(
+                    f"<b>{escape(str(quote_number))}</b>",
+                    metadata_value_bold,
+                ),
+            ],
+            [
+                markup_paragraph(
+                    "<b>Enquiry Date</b>",
+                    header_label,
+                ),
+                markup_paragraph(
+                    f"<b>{escape(date_text(data['enquiry_date']))}</b>",
+                    metadata_value_bold,
+                ),
+            ],
+            [
+                markup_paragraph(
+                    "<b>Generated At</b>",
+                    header_label,
+                ),
+                paragraph(
+                    generated_text,
+                    metadata_value,
+                ),
+            ],
+            [
+                markup_paragraph(
+                    "<b>Quotation Status</b>",
+                    header_label,
+                ),
+                paragraph(
+                    data["status"],
+                    metadata_value,
+                ),
+            ],
+            [
+                markup_paragraph(
+                    "<b>Active</b>",
+                    header_label,
+                ),
+                paragraph(
+                    yes_no(data["is_active"]),
+                    metadata_value,
+                ),
+            ],
+            [
+                markup_paragraph(
+                    "<b>Tally Order</b>",
+                    header_label,
+                ),
+                paragraph(
+                    (
+                        str(data["converted_order_id"])
+                        if data["converted_order_id"] is not None
+                        else "Not yet converted"
+                    ),
+                    metadata_value,
+                ),
+            ],
+        ]
+
+        quotation_metadata_table = Table(
+            quotation_metadata_rows,
+            colWidths=[38 * mm, 50 * mm],
+        )
+        quotation_metadata_table.setStyle(
+            cls._table_style(padding=2)
+        )
+
+        top_header = Table(
+            [[seller_block, quotation_metadata_table]],
+            colWidths=[
+                content_width - 88 * mm,
+                88 * mm,
+            ],
+        )
+        top_header.setStyle(
+            cls._table_style(padding=3)
+        )
+        story.append(top_header)
+
+        story.append(Spacer(1, 2 * mm))
+
+        # -------------------------------------------------
+        # Customer / Buyer
+        # -------------------------------------------------
+
+        customer = data["customer"]
+        buyer = data["buyer"]
+
+        customer_text = (
+            "<b>Customer / Bill To</b><br/>"
+            f"<b>{escape(customer['company'])}</b><br/>"
+            f"{escape(customer['address'])}<br/>"
+            f"{escape(customer['city'])}"
+        )
+
+        if customer["postal_code"]:
+            customer_text += (
+                f" - {escape(customer['postal_code'])}"
+            )
+
+        if customer["email"]:
+            customer_text += (
+                f"<br/>Email: {escape(customer['email'])}"
+            )
+
+        customer_text += (
+            "<br/><br/>"
+            "<b>Buyer Contact</b><br/>"
+            f"{escape(buyer['name'])}"
+        )
+
+        if buyer["phone"]:
+            customer_text += (
+                f"<br/>Phone: {escape(buyer['phone'])}"
+            )
+
+        customer_table = Table(
+            [[markup_paragraph(customer_text, normal)]],
+            colWidths=[content_width],
+        )
+        customer_table.setStyle(
+            cls._table_style(padding=4)
+        )
+        story.append(customer_table)
+
+        story.append(Spacer(1, 2 * mm))
+
+        # -------------------------------------------------
+        # Product / order details
+        # -------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Order / Commercial Details",
+                section_title,
+            )
+        )
+        story.append(Spacer(1, 1 * mm))
+
+        product = data["product"]
+        commercial = data["commercial"]
+
+        details_rows = [
+            [
+                markup_paragraph("<b>Product</b>", header_label),
+                paragraph(product["name"], normal),
+            ],
+            [
+                markup_paragraph("<b>Supply</b>", header_label),
+                paragraph(commercial["supply"], normal),
+            ],
+            [
+                markup_paragraph("<b>Installation</b>", header_label),
+                paragraph(commercial["installation"], normal),
+            ],
+            [
+                markup_paragraph("<b>Freight</b>", header_label),
+                paragraph(commercial["freight"], normal),
+            ],
+        ]
+
+        details_table = Table(
+            details_rows,
+            colWidths=[
+                42 * mm,
+                content_width - 42 * mm,
+            ],
+        )
+        details_table.setStyle(
+            cls._table_style(padding=3)
+        )
+        story.append(details_table)
+
+        story.append(Spacer(1, 2 * mm))
+
+        # -------------------------------------------------
+        # Classification
+        # -------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Order Classification",
+                section_title,
+            )
+        )
+        story.append(Spacer(1, 1 * mm))
+
+        classification_table = Table(
+            [
+                [
+                    markup_paragraph("<b>Dealer</b>", header_label),
+                    paragraph(
+                        yes_no(data["flags"]["is_dealer"]),
+                        center,
+                    ),
+                    markup_paragraph(
+                        "<b>Special Model</b>",
+                        header_label,
+                    ),
+                    paragraph(
+                        yes_no(data["flags"]["is_special_model"]),
+                        center,
+                    ),
+                ]
+            ],
+            colWidths=[
+                35 * mm,
+                25 * mm,
+                40 * mm,
+                25 * mm,
+            ],
+        )
+        classification_table.setStyle(
+            cls._table_style(padding=3, valign="MIDDLE")
+        )
+        story.append(classification_table)
+
+        story.append(Spacer(1, 2 * mm))
+
+        # -------------------------------------------------
+        # Sales person - explicit provenance section
+        # -------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Sales Responsibility",
+                section_title,
+            )
+        )
+        story.append(Spacer(1, 1 * mm))
+
+        sales = data["sales"]
+
+        sales_table = Table(
+            [
+                [
+                    markup_paragraph(
+                        "<b>Sales Person</b>",
+                        header_label,
+                    ),
+                    markup_paragraph(
+                        f"<b>{escape(str(sales['name'] or ''))}</b>",
+                        normal,
+                    ),
+                ],
+                [
+                    markup_paragraph(
+                        "<b>Sales Email</b>",
+                        header_label,
+                    ),
+                    paragraph(
+                        sales["email"],
+                        normal,
+                    ),
+                ],
+            ],
+            colWidths=[
+                42 * mm,
+                content_width - 42 * mm,
+            ],
+        )
+        sales_table.setStyle(
+            cls._table_style(padding=3)
+        )
+        story.append(sales_table)
+
+        story.append(Spacer(1, 2 * mm))
+
+        # -------------------------------------------------
+        # Conversion / workflow section
+        # -------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "ERP Conversion Status",
+                section_title,
+            )
+        )
+        story.append(Spacer(1, 1 * mm))
+
+        if data["converted_order_id"] is None:
+            conversion_status = (
+                "This quotation has not yet been converted into an ERP order."
+            )
+        else:
+            conversion_status = (
+                "This quotation has already been converted into ERP order "
+                f"{data['converted_order_id']}."
+            )
+
+        conversion_table = Table(
+            [
+                [
+                    markup_paragraph(
+                        "<b>Quotation Reference</b>",
+                        header_label,
+                    ),
+                    paragraph(
+                        quote_number,
+                        normal,
+                    ),
+                ],
+                [
+                    markup_paragraph(
+                        "<b>Conversion Status</b>",
+                        header_label,
+                    ),
+                    paragraph(
+                        conversion_status,
+                        normal,
+                    ),
+                ],
+            ],
+            colWidths=[
+                42 * mm,
+                content_width - 42 * mm,
+            ],
+        )
+        conversion_table.setStyle(
+            cls._table_style(padding=3)
+        )
+        story.append(conversion_table)
+
+        story.append(Spacer(1, 3 * mm))
+
+        # -------------------------------------------------
+        # Disclaimer / operational note
+        # -------------------------------------------------
+
+        disclaimer = Table(
+            [
+                [
+                    markup_paragraph(
+                        "<b>Order Booking Note</b><br/>"
+                        "This document is generated from the stored quotation "
+                        "and is intended for internal order-booking and review. "
+                        "It is not a tax invoice and does not create commercial "
+                        "values that are not present in the quotation record.",
+                        small,
+                    )
+                ]
+            ],
+            colWidths=[content_width],
+        )
+        disclaimer.setStyle(
+            cls._table_style(padding=4)
+        )
+        story.append(disclaimer)
+
+        story.append(Spacer(1, 5 * mm))
+
+        # -------------------------------------------------
+        # Signature block
+        # -------------------------------------------------
+
+        signature = Table(
+            [
+                [
+                    markup_paragraph(
+                        "<b>Prepared By</b><br/>"
+                        f"{escape(str(sales['name'] or ''))}<br/>"
+                        f"{escape(str(sales['email'] or ''))}",
+                        normal,
+                    ),
+                    markup_paragraph(
+                        (
+                            f"<b>for "
+                            f"{escape(data['seller']['name'])}</b>"
+                            "<br/><br/><br/>"
+                            "Authorised Signatory"
+                        ),
+                        right,
+                    ),
+                ]
+            ],
+            colWidths=[
+                content_width - 80 * mm,
+                80 * mm,
+            ],
+        )
+        signature.setStyle(
+            cls._table_style(padding=4)
+        )
+        story.append(signature)
 
         doc.build(story)

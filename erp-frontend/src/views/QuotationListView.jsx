@@ -55,20 +55,11 @@ export default function QuotationListView({ state }) {
           quotations={quotations}
           onView={state.openQuotation}
           onEdit={state.editQuotation}
-          onOrder={(quotation) =>
-            state.updateQuotationStatus(
-              quotation,
-              "ORDERED"
-            )
-          }
-          onReject={(quotation) =>
-            state.updateQuotationStatus(
-              quotation,
-              "REJECTED"
-            )
-          }
+          onOrder={(quotation) =>state.updateQuotationStatus(quotation, "ORDERED")}
+          onReject={(quotation) =>state.updateQuotationStatus(quotation, "REJECTED")}
           onChanged={state.openQuotationChange}
           onDownload={state.downloadQuotation}
+          onOrderBooking={state.downloadQuotationOrderBooking}
         />
 
         <QuotationDeleteModal

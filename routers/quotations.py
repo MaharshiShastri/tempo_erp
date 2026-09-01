@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from security import verify_bearer_token
 from .dependencies import check_department
@@ -7,7 +7,7 @@ from database.repository import EDBR
 from schemas.quotations_schema import QuoteGenerationRequest, QuotationUpdateRequest, QuotationStatusUpdateRequest
 from services.quote_generator import generate_qoute_document
 from services.quotation_analytics import generate_today_quotation_pdf
-
+from services.billing_invoice_service import BillingInvoiceService
 router = APIRouter(prefix="/api/v1/quotations", tags=["Quotations"])
 
 def quotation_to_generation_request(quotation,) -> QuoteGenerationRequest:
@@ -98,6 +98,18 @@ def quotation_analytics_today(user: dict = Depends(verify_bearer_token),):
         print("Quotation analytics error:", str(exc),)
 
         raise HTTPException(status_code=500, detail="Unable to generate quotation analytics report.",)
+
+@router.get("/{qoute_number}/pdf", dependencies=[Depends(check_department("Sales Representative"))])
+def get_booking_pdf(qoute_number: str, user_profile: dict=Depends(verify_bearer_token)):
+    try:
+        pdf_path = BillingInvoiceService.get_or_generate_quotation_order_pdf(qoute_number, document_title="Order Booking",)
+        return FileResponse(path=pdf_path, media_type="application/pdf", filename=pdf_path.name)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate invoice: {str(e)}")
 
 @router.get("")
 def list_quotations(skip: int = 0, limit: int = 100, user: dict = Depends(verify_bearer_token),):
