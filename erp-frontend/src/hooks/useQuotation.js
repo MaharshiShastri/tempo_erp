@@ -31,6 +31,16 @@ export default function useQuotation({sessionToken, showErrorModal}){
     const [quoteInstallation, setQuoteInstallation] = useState("Extra Rs. 15000/- Per Single Visit + GST @ 18% Extra");
     const [quoteFreight, setQuoteFreight] = useState("Extra at Actual. (Material will be book on Freight to pay basis upto nearest transporter’s godown through our Transporter M/s. OM LOGISTIC TRANSPORT).");
 
+    const [quoteBaseModelPrice, setQuoteBaseModelPrice] = useState(0);
+
+    const [quotePackingMode, setQuotePackingMode] = useState("");
+    const [quotePackingAmount, setQuotePackingAmount] = useState(0);
+
+    const [quoteFreightMode, setQuoteFreightMode] = useState("");
+    const [quoteFreightAmount, setQuoteFreightAmount] = useState(0);
+
+    const [quoteTaxRate, setQuoteTaxRate] = useState(18);
+
     const [quoteDealer, setQuoteDealer] = useState(false);
 
     const [quoteSpecialModel, setQuoteSpecialModel] = useState(false);
@@ -123,49 +133,23 @@ export default function useQuotation({sessionToken, showErrorModal}){
                 selectedQuotation,
                 "CHANGED",
                 {
-                    quoted_product_name:
-                        quotationChangeForm.quoted_product_name,
+                    quoted_product_name: quotationChangeForm.quoted_product_name,
 
-                    quoted_item_code:
-                        quotationChangeForm.quoted_item_code || null,
+                    quoted_item_code: quotationChangeForm.quoted_item_code || null,
 
-                    quoted_quantity:
-                        quotationChangeForm.quoted_quantity
-                            ? Number(
-                                quotationChangeForm.quoted_quantity
-                            )
-                            : null,
+                    quoted_quantity: quotationChangeForm.quoted_quantity ? Number(quotationChangeForm.quoted_quantity) : null,
 
-                    quoted_rate:
-                        quotationChangeForm.quoted_rate
-                            ? Number(
-                                quotationChangeForm.quoted_rate
-                            )
-                            : null,
+                    quoted_rate: quotationChangeForm.quoted_rate ? Number(quotationChangeForm.quoted_rate) : null,
 
-                    ordered_product_name:
-                        quotationChangeForm.ordered_product_name,
+                    ordered_product_name: quotationChangeForm.ordered_product_name,
 
-                    ordered_item_code:
-                        quotationChangeForm.ordered_item_code || null,
+                    ordered_item_code: quotationChangeForm.ordered_item_code || null,
 
-                    ordered_quantity:
-                        quotationChangeForm.ordered_quantity
-                            ? Number(
-                                quotationChangeForm.ordered_quantity
-                            )
-                            : null,
+                    ordered_quantity: quotationChangeForm.ordered_quantity ? Number(quotationChangeForm.ordered_quantity) : null,
 
-                    ordered_rate:
-                        quotationChangeForm.ordered_rate
-                            ? Number(
-                                quotationChangeForm.ordered_rate
-                            )
-                            : null,
+                    ordered_rate: quotationChangeForm.ordered_rate ? Number(quotationChangeForm.ordered_rate) : null,
                 },
-                quotationChangeForm.order_id
-                    ? Number(quotationChangeForm.order_id)
-                    : null
+                quotationChangeForm.order_id ? Number(quotationChangeForm.order_id) : null
             );
 
             closeQuotationChange();
@@ -231,10 +215,7 @@ export default function useQuotation({sessionToken, showErrorModal}){
 
     const openQuotation = async (quotation) => {
         try {
-            const data = await API.getQuotation(
-                sessionToken,
-                quotation.id
-            );
+            const data = await API.getQuotation(sessionToken, quotation.id);
 
             setSelectedQuotation(data);
             setQuotationEditMode(false);
@@ -249,10 +230,7 @@ export default function useQuotation({sessionToken, showErrorModal}){
 
     const editQuotation = async (quotation) => {
         try {
-            const data = await API.getQuotation(
-                sessionToken,
-                quotation.id
-            );
+            const data = await API.getQuotation(sessionToken, quotation.id);
 
             setSelectedQuotation(data);
 
@@ -349,10 +327,7 @@ export default function useQuotation({sessionToken, showErrorModal}){
 
     const saveQuotationChanges = async () => {
         if (!selectedQuotation?.id) {
-            showErrorModal(
-                "Quotation",
-                "Quotation ID is missing."
-            );
+            showErrorModal("Quotation", "Quotation ID is missing.");
             return;
         }
 
@@ -482,6 +457,16 @@ export default function useQuotation({sessionToken, showErrorModal}){
                     special_columns: quoteSpecialColumns, 
                     special_rows: quoteSpecialRows.map(row=>({values: row})),
                     item_code: quoteSelectedItemCode?.[0] || null,
+
+                    base_model_price: Number(quoteBaseModelPrice),
+
+                    packing_mode: quotePackingMode,
+                    packing_amount: quotePackingMode === "ACTUAL" ? Number(quotePackingAmount) : null,
+
+                    freight_mode: quoteFreightMode,
+                    freight_amount: quoteFreightAmount === "ACTUAL" ? Number(quoteFreightAmount) : null,
+
+                    tax_rate: Number(quoteTaxRate),
             });
             
         const url = window.URL.createObjectURL(blob);
@@ -555,6 +540,8 @@ export default function useQuotation({sessionToken, showErrorModal}){
     setQuotationDeleteOpen, quotationSearch, setQuotationSearch, loadQuotations, openQuotation, closeQuotationModal, confirmDeleteQuotation, 
     deactivateQuotation, editQuotation, quotationEditMode, setQuotationEditMode, quotationEditForm, setQuotationEditForm, quotationSaving, updateQuotationField,
     saveQuotationChanges, downloadQuotation, updateQuotationStatus, openQuotationChange,  closeQuotationChange, quotationChangeOpen, quotationChangeForm,
-    updateQuotationChangeField, submitQuotationChange, downloadQuotationOrderBooking
+    updateQuotationChangeField, submitQuotationChange, downloadQuotationOrderBooking, quoteBaseModelPrice, setQuoteBaseModelPrice, 
+    quotePackingMode, setQuotePackingMode, quotePackingAmount, setQuotePackingAmount, quoteFreightMode, setQuoteFreightMode,
+    quoteFreightAmount, setQuoteFreightAmount, quoteTaxRate, setQuoteTaxRate,
     }
 }

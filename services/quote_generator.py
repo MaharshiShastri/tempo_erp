@@ -8,7 +8,7 @@ import re
 from difflib import SequenceMatcher
 
 from groq import Groq
-
+from decimal import Decimal, ROUND_HALF_UP
 from docx import Document
 from docx.document import Document as _Document
 from docx.table import Table
@@ -84,6 +84,34 @@ def safe_filename(value: str) -> str:
 
     return value
 
+def money(value):
+    if value is None:
+        return Decimal("0.00")
+
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def calculate_quotation_financials(request):
+    base = money(request.base_model_price)
+
+    packing = money(request.packing_amount) if request.packing_mode == "ACTUAL" else Decimal("0.00")
+
+    freight = money(request.freight_amount) if request.freight_mode == "ACTUAL" else Decimal("0.00")
+
+    taxable_value = money(base + packing + freight)
+
+    tax_amount = money(taxable_value * money(request.tax_rate) / Decimal("100"))
+
+    grand_total = money(taxable_value + tax_amount)
+
+    return {
+        "base_model_price": base,
+        "packing_amount": packing,
+        "freight_amount": freight,
+        "taxable_value": taxable_value,
+        "tax_rate": money(request.tax_rate),
+        "tax_amount": tax_amount,
+        "grand_total": grand_total,
+    }
 
 def normalize_text(value: str) -> str:
     """
@@ -2047,11 +2075,13 @@ def highlight_product_group_headers(
 def replace_product_group_with_content(
     target_doc,
     source_blocks,
+    item_code,
     placeholder="{product_group}",
 ):
     """
-    Replace {product_group} with a sequence of copied
-    paragraphs/tables while preserving their original order.
+    Replace {product_group} with copied paragraphs/tables.
+
+    Returns the exact inserted table containing the requested item code.
     """
 
     body = target_doc.element.body
@@ -2069,12 +2099,12 @@ def replace_product_group_with_content(
         if placeholder not in paragraph.text:
             continue
 
-        insert_index = list(body).index(
-            child
-        )
+        insert_index = list(body).index(child)
 
-        # Remove placeholder
+        # Remove placeholder paragraph
         body.remove(child)
+
+        inserted_tables = []
 
         # Insert copied product-group content
         for block_xml in source_blocks:
@@ -2084,14 +2114,334 @@ def replace_product_group_with_content(
                 block_xml,
             )
 
+            # Track inserted tables
+            if block_xml.tag == qn("w:tbl"):
+
+                inserted_tables.append(
+                    Table(
+                        block_xml,
+                        target_doc,
+                    )
+                )
+
             insert_index += 1
 
-        return
+        # ------------------------------------------------
+        # Find the EXACT product table containing item code
+        # ------------------------------------------------
+
+        for table in inserted_tables:
+
+            for row_index, row in enumerate(table.rows):
+
+                if row_index == 0:
+                    continue
+
+                if row_contains_item_code(
+                    row,
+                    item_code,
+                ):
+                    return table
+
+        # ------------------------------------------------
+        # Fallback:
+        # Find a 2-row table containing the product code
+        # ------------------------------------------------
+
+        for table in inserted_tables:
+
+            if len(table.rows) == 2:
+
+                if any(
+                    row_contains_item_code(
+                        row,
+                        item_code,
+                    )
+                    for row in table.rows[1:]
+                ):
+                    return table
+
+        raise ValueError(
+            f"Product table containing item "
+            f"'{item_code}' could not be identified "
+            f"after insertion."
+        )
 
     raise ValueError(
         f"Placeholder '{placeholder}' "
         f"not found in quotation template."
     )
+
+def format_inr(value):
+    value = money(value)
+
+    integer_part = int(value)
+    decimal_part = int(
+        (value - integer_part) * 100
+    )
+
+    s = str(integer_part)
+
+    if len(s) > 3:
+        last_three = s[-3:]
+        remaining = s[:-3]
+
+        groups = []
+
+        while len(remaining) > 2:
+            groups.insert(0, remaining[-2:])
+            remaining = remaining[:-2]
+
+        if remaining:
+            groups.insert(0, remaining)
+
+        formatted = ",".join(groups + [last_three])
+
+    else:
+        formatted = s
+
+    if decimal_part:
+        return f"{formatted}.{decimal_part:02d}"
+
+    return formatted
+
+def create_quotation_calculation_table(
+    target_doc,
+    financials,
+    packing_mode,
+    freight_mode,
+):
+    """
+    Create the quotation calculation section directly
+    below the product-details table.
+
+    No calculation placeholders are required.
+    """
+
+    table = target_doc.add_table(
+        rows=0,
+        cols=2,
+    )
+
+    table.style = "Table Grid"
+
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    def add_row(label, value, bold=False):
+        row = table.add_row()
+
+        row.cells[0].text = label
+        row.cells[1].text = value
+
+        row.cells[0].vertical_alignment = (
+            WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        )
+
+        row.cells[1].vertical_alignment = (
+            WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        )
+
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    run.font.name = "Aptos"
+
+                    if bold:
+                        run.bold = True
+
+        return row
+
+    # ----------------------------------------------------
+    # Packing
+    # ----------------------------------------------------
+
+    if packing_mode == "ACTUAL":
+        packing_text = (
+            f"₹ {format_inr(financials['packing_amount'])}"
+        )
+    else:
+        packing_text = "INCLUSIVE"
+
+    add_row(
+        "(+) Add : Packing Charges",
+        f"→ {packing_text}",
+    )
+
+    # ----------------------------------------------------
+    # Freight
+    # ----------------------------------------------------
+
+    if freight_mode == "ACTUAL":
+        freight_text = (
+            f"₹ {format_inr(financials['freight_amount'])}"
+        )
+    else:
+        freight_text = "INCLUSIVE"
+
+    add_row(
+        "(+) Add : Freight Charges",
+        f"→ {freight_text}",
+    )
+
+    # ----------------------------------------------------
+    # Gross total / taxable value
+    # ----------------------------------------------------
+
+    add_row(
+        "Gross Total",
+        f"→ ₹ {format_inr(financials['taxable_value'])}",
+        bold=True,
+    )
+
+    # ----------------------------------------------------
+    # GST
+    # ----------------------------------------------------
+
+    add_row(
+        f"(+) Add : GST {format_inr(financials['tax_rate'])}%",
+        f"→ ₹ {format_inr(financials['tax_amount'])}",
+    )
+
+    # ----------------------------------------------------
+    # Grand total
+    # ----------------------------------------------------
+
+    add_row(
+        "Gross Total Amount",
+        f"→ ₹ {format_inr(financials['grand_total'])}",
+        bold=True,
+    )
+
+    return table
+
+def add_financial_rows_to_product_table(product_table, financials, packing_mode, freight_mode,):
+    """
+    Append financial rows directly to the exact product table.
+
+    The product table may have multiple columns.
+    Financial rows are merged into:
+
+        [ Description spanning most columns ] [ Amount ]
+    """
+
+    if product_table is None:
+        raise ValueError("Product table is required for adding financial rows.")
+
+    column_count = len(product_table.columns)
+
+    if column_count < 2:
+        raise ValueError("Product table must contain at least 2 columns.")
+
+    # ====================================================
+    # Helper
+    # ====================================================
+
+    def add_financial_row(label, value, bold=False,):
+        row = product_table.add_row()
+
+        # ------------------------------------------------
+        # Merge all columns except the final column.
+        #
+        # Example for an 8-column product table:
+        #
+        # |              LABEL               | VALUE |
+        # | col0 col1 col2 col3 col4 col5 c6 | col7  |
+        # ------------------------------------------------
+
+        label_cell = row.cells[0]
+
+        if column_count > 2:
+
+            for index in range(1, column_count - 1,):
+                label_cell = label_cell.merge(row.cells[index])
+
+        value_cell = row.cells[-1]
+
+        # ------------------------------------------------
+        # Set label
+        # ------------------------------------------------
+
+        label_cell.text = str(label)
+
+        label_cell.vertical_alignment = (WD_CELL_VERTICAL_ALIGNMENT.CENTER)
+
+        # ------------------------------------------------
+        # Set value
+        # ------------------------------------------------
+
+        value_cell.text = str(value)
+
+        value_cell.vertical_alignment = (WD_CELL_VERTICAL_ALIGNMENT.CENTER)
+
+        # ------------------------------------------------
+        # Font formatting
+        # ------------------------------------------------
+
+        for cell in (label_cell, value_cell,):
+
+            for paragraph in cell.paragraphs:
+
+                for run in paragraph.runs:
+
+                    run.font.name = "Aptos"
+                    run.bold = bold
+
+        return row
+
+    # ====================================================
+    # Packing
+    # ====================================================
+
+    if packing_mode == "ACTUAL":
+
+        packing_text = (f"₹ {format_inr(financials['packing_amount'])}")
+
+    else:
+
+        packing_text = "INCLUSIVE"
+
+    add_financial_row("(+) Add : Packing Charges", f"→ {packing_text}",)
+
+    # ====================================================
+    # Freight
+    # ====================================================
+
+    if freight_mode == "ACTUAL":
+
+        freight_text = (f"₹ {format_inr(financials['freight_amount'])}")
+
+    else:
+
+        freight_text = "INCLUSIVE"
+
+    add_financial_row("(+) Add : Freight Charges", f"→ {freight_text}",)
+
+    # ====================================================
+    # Gross Total / Taxable Value
+    # ====================================================
+
+    add_financial_row("Gross Total", (f"→ ₹ " f"{format_inr(financials['taxable_value'])}"), bold=True,)
+
+    # ====================================================
+    # GST
+    # ====================================================
+
+    add_financial_row((f"(+) Add : GST " f"{format_inr(financials['tax_rate'])}%"), ( f"→ ₹ " f"{format_inr(financials['tax_amount'])}"),)
+
+    # ====================================================
+    # Grand Total
+    # ====================================================
+
+    add_financial_row(
+        "Gross Total Amount",
+        (
+            f"→ ₹ "
+            f"{format_inr(financials['grand_total'])}"
+        ),
+        bold=True,
+    )
+
+    return product_table
 
 # ============================================================
 # Special Model Table
@@ -2670,71 +3020,24 @@ def generate_qoute_document(
     authenticated_user=None,
     sales_user=None,
 ):
-    """
-    Generate the quotation Word document.
-
-    Complete workflow:
-
-        1. Validate authentication.
-        2. Validate sales role.
-        3. Load authenticated sales-user business contact.
-        4. Validate quotation request.
-        5. Load quotation template.
-        6. Load price-list document.
-        7. Get available product groups.
-        8. Locate requested product group.
-        9. Locate correct price-list table.
-        10. Locate requested item row.
-        11. Copy header + requested row only.
-        12. Insert filtered table into quotation.
-        13. Add dealer row if required.
-        14. Add special-model table if required.
-        15. Replace all normal quotation placeholders.
-        16. Save generated DOCX.
-        17. Return output path + sales-user data.
-
-    Groq is used only as a fallback classifier for ambiguous
-    table/row selection. It does not generate quotation content.
-    """
-
-    # ========================================================
-    # Authorization
-    # ========================================================
 
     if not authenticated_user:
 
-        raise PermissionError(
-            "Authentication is required "
-            "to generate quotations."
-        )
+        raise PermissionError("Authentication is required " "to generate quotations.")
 
-    allowed_roles = {
-        "Sales Representative",
-        "Admin",
-        "Chief Full Stack Developer",
-    }
+    allowed_roles = {"Sales Representative", "Admin", "Chief Full Stack Developer",}
 
-    user_role = authenticated_user.get(
-        "role"
-    )
+    user_role = authenticated_user.get("role")
 
     if user_role not in allowed_roles:
 
-        raise PermissionError(
-            "Only sales team can generate "
-            "quotations."
-        )
+        raise PermissionError("Only sales team can generate " "quotations.")
 
-    user_email = authenticated_user.get(
-        "email"
-    )
+    user_email = authenticated_user.get("email")
 
     if not user_email:
 
-        raise PermissionError(
-            "Authenticated user does not "
-            "have an email address."
-        )
+        raise PermissionError("Authenticated user does not " "have an email address.")
 
     # ========================================================
     # Sales User
@@ -2788,6 +3091,43 @@ def generate_qoute_document(
         raise ValueError(
             "Client company is required."
         )
+    if request.base_model_price is None:
+        raise ValueError(
+            "Base model price is required."
+        )
+
+    if request.base_model_price < 0:
+        raise ValueError(
+            "Base model price cannot be negative."
+        )
+
+    if request.packing_mode not in {
+        "INCLUSIVE",
+        "ACTUAL",
+    }:
+        raise ValueError(
+            "Invalid packing mode."
+        )
+
+    if request.freight_mode not in {
+        "INCLUSIVE",
+        "ACTUAL",
+    }:
+        raise ValueError(
+            "Invalid freight mode."
+        )
+
+    if request.packing_mode == "ACTUAL":
+        if request.packing_amount is None:
+            raise ValueError(
+                "Packing amount is required when packing mode is ACTUAL."
+            )
+
+    if request.freight_mode == "ACTUAL":
+        if request.freight_amount is None:
+            raise ValueError(
+                "Freight amount is required when freight mode is ACTUAL."
+            )
 
     quote_date = request.date_input
 
@@ -2796,6 +3136,8 @@ def generate_qoute_document(
         raise ValueError(
             "Quotation date is required."
         )
+
+    financials = calculate_quotation_financials(request)
 
     # ========================================================
     # File Validation
@@ -2859,11 +3201,10 @@ def generate_qoute_document(
     # Insert Product Table
     # ========================================================
 
-    replace_product_group_with_content(
-    target_doc=target_doc,
-    source_blocks=product_group_content,
-    )
+    product_table = replace_product_group_with_content(target_doc=target_doc, source_blocks=product_group_content, item_code=request.item_code,)
 
+    add_financial_rows_to_product_table(product_table=product_table, financials=financials, packing_mode=request.packing_mode, freight_mode=request.freight_mode,)
+    
     # ========================================================
     # Dealer
     # ========================================================

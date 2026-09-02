@@ -30,7 +30,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAsL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -2991,6 +2991,16 @@ class PostgresRepository:
                 document_path=(str(document_path) if document_path else None),
 
                 status="GENERATED",
+
+                base_model_price=request.base_model_price,
+
+                packing_mode=request.packing_mode,
+                packing_amount=request.packing_amount,
+
+                freight_mode=request.freight_mode,
+                freight_amount=request.freight_amount,
+
+                tax_rate=request.tax_rate
             )
 
             session.add(quotation)
@@ -3079,6 +3089,12 @@ class PostgresRepository:
                 "is_dealer",
                 "is_special_model",
                 "document_path",
+                "base_model_price",
+                "packing_mode",
+                "packing_amount",
+                "freight_mode",
+                "freight_amount",
+                "tax_rate",
             }
 
             for field, value in updates.items():

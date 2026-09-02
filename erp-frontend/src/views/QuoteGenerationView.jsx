@@ -1,19 +1,12 @@
 import { useMemo } from "react";
 import SearchableMultiselect from "../components/shared/SearchableMultiselect";
-
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 
 export default function QuoteGenerationView({ state }) {
   const productGroups = useMemo(
@@ -78,7 +71,9 @@ export default function QuoteGenerationView({ state }) {
                 label="Product Group"
                 options={productGroups}
                 value={state?.quoteSelectedGroup}
-                onChange={state?.setQuoteSelectedGroup}
+                onChange={(value) => {
+                  state?.setQuoteSelectedGroup(value);
+                  state?.setQuoteSelectedItemCode([]);}}
               />
 
               {state?.quoteSelectedGroup?.length === 1 && (
@@ -210,8 +205,130 @@ export default function QuoteGenerationView({ state }) {
                 Special Model
               </label>
             </div>
-          </section>
+            {/* Pricing Configuration */}
+            <div>
+              <h3 className="text-base font-semibold">Financials</h3>
 
+              <p className="text-sm text-muted-foreground">Configure pricing, packing, freight, and tax details.</p>
+            </div>
+
+            <div className="rounded-lg border">
+              <div className="grid grid-cols-2 border-b bg-muted/40">
+                <div className="px-4 py-3 text-sm font-semibold">
+                  Financial Input Details
+                </div>
+
+                <div className="border-l px-4 py-3 text-sm font-semibold">
+                  Amount
+                </div>
+              </div>
+
+              {/* Base Model Price */}
+              <div className="grid grid-cols-2 border-b">
+                <div className="flex items-center px-4 py-3 text-sm font-medium">
+                  Base Model Price
+                </div>
+
+                <div className="border-l p-2">
+                  <Input type="number" min="0" step="0.01" value={state?.quoteBaseModelPrice ?? ""} onChange={(e) =>state?.setQuoteBaseModelPrice(e.target.value)}
+                    placeholder="Enter base model price"
+                  />
+                </div>
+              </div>
+
+              {/* Packing */}
+              <div className="grid grid-cols-2 border-b">
+                <div className="p-2">
+                  <Select value={state?.quotePackingMode} onValueChange={state?.setQuotePackingMode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select packing mode" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="INCLUSIVE">
+                        Packing - Inclusive
+                      </SelectItem>
+
+                      <SelectItem value="ACTUAL">
+                        Packing - Actual
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="border-l p-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={state?.quotePackingAmount ?? ""}
+                    onChange={(e) =>
+                      state?.setQuotePackingAmount(e.target.value)
+                    }
+                    placeholder={state?.quotePackingMode === "ACTUAL" ? "Enter packing amount" : "Inclusive"}
+                    disabled={state?.quotePackingMode !== "ACTUAL"}
+                  />
+                </div>
+              </div>
+
+              {/* Freight */}
+              <div className="grid grid-cols-2 border-b">
+                <div className="p-2">
+                  <Select value={state?.quoteFreightMode} onValueChange={state?.setQuoteFreightMode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select freight mode" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="INCLUSIVE">
+                        Freight - Inclusive
+                      </SelectItem>
+
+                      <SelectItem value="ACTUAL">
+                        Freight - Actual
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="border-l p-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={state?.quoteFreightAmount ?? ""}
+                    onChange={(e) =>
+                      state?.setQuoteFreightAmount(e.target.value)
+                    }
+                    placeholder={state?.quoteFreightMode === "ACTUAL" ? "Enter freight amount" : "Inclusive"}
+                    disabled={state?.quoteFreightMode !== "ACTUAL"}
+                  />
+                </div>
+              </div>
+
+              {/* Tax Rate */}
+              <div className="grid grid-cols-2">
+                <div className="flex items-center px-4 py-3 text-sm font-medium">
+                  GST / Tax Rate (%)
+                </div>
+
+                <div className="border-l p-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={state?.quoteTaxRate ?? ""}
+                    onChange={(e) =>
+                      state?.setQuoteTaxRate(e.target.value)
+                    }
+                    placeholder="Enter tax rate"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+            
           {/* Special Model */}
           {state?.quoteSpecialModel && (
             <section className="space-y-4">

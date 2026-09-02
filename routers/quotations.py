@@ -10,10 +10,11 @@ from services.quotation_analytics import generate_today_quotation_pdf
 from services.billing_invoice_service import BillingInvoiceService
 router = APIRouter(prefix="/api/v1/quotations", tags=["Quotations"])
 
-def quotation_to_generation_request(quotation,) -> QuoteGenerationRequest:
-
+def quotation_to_generation_request(quotation) -> QuoteGenerationRequest:
     return QuoteGenerationRequest(
-        product_name=quotation.product_name,
+        product_group=quotation.product_name,
+
+        item_code=None,
 
         qoute_number=quotation.quote_number,
 
@@ -35,11 +36,19 @@ def quotation_to_generation_request(quotation,) -> QuoteGenerationRequest:
         dealer=quotation.is_dealer,
         special_model=quotation.is_special_model,
 
-        # These were not stored on Quotation,
-        # so default them.
-        item_code=None,
         special_columns=[],
         special_rows=[],
+
+        # Financial
+        base_model_price=quotation.base_model_price,
+
+        packing_mode=quotation.packing_mode,
+        packing_amount=quotation.packing_amount,
+
+        freight_mode=quotation.freight_mode,
+        freight_amount=quotation.freight_amount,
+
+        tax_rate=quotation.tax_rate,
     )
 
 def delete_quotation_document(document_path):

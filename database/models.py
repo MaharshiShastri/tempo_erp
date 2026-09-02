@@ -1028,7 +1028,42 @@ class Quotation(Base):
         nullable=False,
         server_default="false",
     )
+    base_model_price: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2),
+        nullable=False,
+        server_default="0.00"
+    )
 
+    packing_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default="INCLUSIVE",
+    )
+
+    packing_amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(15, 2),
+        nullable=True,
+        server_default="0.00",
+    )
+
+    freight_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default="INCLUSIVE",
+    )
+
+    freight_amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(15, 2),
+        nullable=True,
+        server_default="0.00"
+    )
+
+    tax_rate: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2),
+        nullable=False,
+        server_default="18.00",
+    )
+    
     sales_user_name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
