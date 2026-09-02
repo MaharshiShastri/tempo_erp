@@ -52,66 +52,17 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  PointElement,
-  LineElement
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
 
 export default function SalesAnalyticsView({ state }) {
-  const {
-    salesKpis,
-    rndKpis,
-    transportKpis,
-    gtmKpis,
-    errorLogs,
-    email,
-    prodKpis,
-    isLoading,
-    selectedAnalytics,
-    setSelectedAnalytics,
-    isExporting,
-    setIsExporting,
-    quarterlyTargets,
-    setQuarterlyTargets,
-    salesPerformanceChart,
-    transportChart,
-    faqAskedChart,
-    faqAnswerChart,
-    completionChart,
-    productionPieChart,
-    totalQueued,
-    conversionRatio,
-    total_completed,
-    totalCRM,
-    totalErrors,
-    totalFaqAnswered,
-    pendingFaqs,
-    setAlertMessage,
-    setIsAlertOpen,
-    showErrorModal,
-    user,
-    fromDate,
-    setFromDate,
-    toDate,
-    fetchAnalytics,
-  } = state;
+  const {salesKpis, rndKpis, transportKpis, gtmKpis, errorLogs, email, prodKpis, isLoading, selectedAnalytics,
+        setSelectedAnalytics, isExporting, setIsExporting, targetValues, setTargetValues, targetFromDates, 
+        setTargetFromDates, targetToDates, setTargetToDates, salesPerformanceChart, transportChart, faqAskedChart,
+        faqAnswerChart, completionChart, productionPieChart, totalQueued, conversionRatio, total_completed,
+        totalCRM, totalErrors, totalFaqAnswered, pendingFaqs, setAlertMessage, setIsAlertOpen, showErrorModal,
+        user, fromDate, setFromDate, toDate, fetchAnalytics,} = state;
 
-  const reportTabs = [
-    "overview",
-    "faq",
-    "performance",
-    "transport",
-    "gtm",
-    "production",
-    "health",
-  ];
+  const reportTabs = ["overview", "faq", "performance", "transport", "gtm", "production", "health",];
 
   const dashboardRef = useRef(null);
   const reportRef = useRef(null);
@@ -281,6 +232,23 @@ export default function SalesAnalyticsView({ state }) {
     }
   };
 
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(Number(value ?? 0));
+
+  const formatDate = (value) => {
+    if (!value) return "—";
+
+    return new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(`${value}T00:00:00`));
+  };
+
   if (isLoading) {
     return (
       <div className="mx-auto w-full max-w-[1200px] space-y-6">
@@ -300,34 +268,58 @@ export default function SalesAnalyticsView({ state }) {
   }
 
   const handleUpdateTarget = async (email) => {
-    const targetValue = quarterlyTargets[email];
+    const targetValue = Number(targetValues[email]);
+    const targetFromDate = targetFromDates[email] ?? fromDate;
+    const targetToDate = targetToDates[email] ?? toDate;
 
-    if (!targetValue || isNaN(targetValue)) {
+    if (!Number.isFinite(targetValue) || targetValue <= 0) {
       showErrorModal(
         "Validation Error",
-        "Please enter a valid target amount."
+        "Please enter a target amount greater than zero."
+      );
+      return;
+    }
+
+    if (!targetFromDate || !targetToDate) {
+      showErrorModal(
+        "Validation Error",
+        "Please select both target start and end dates."
+      );
+      return;
+    }
+
+    if (targetFromDate > targetToDate) {
+      showErrorModal(
+        "Validation Error",
+        "The target start date cannot be later than the end date."
       );
       return;
     }
 
     try {
-      await API.updateQuarterlyTarget(
-        state.sessionToken,
-        email,
-        parseFloat(targetValue)
-      );
+      await API.createSalesTarget(state.sessionToken, email, {
+        target_value: targetValue,
+        from_date: targetFromDate,
+        to_date: targetToDate,
+      });
 
-      await state.fetchAnalytics?.();
+      await fetchAnalytics(user.role, fromDate, toDate);
+
+      setTargetValues((previous) => ({
+        ...previous,
+        [email]: "",
+      }));
 
       setAlertMessage(
-        `✅ QTR Target set to ₹${targetValue} for ${email}`
+        `✅ Target of ₹${targetValue.toLocaleString("en-IN")} created for ${email}.`
       );
-
       setIsAlertOpen(true);
     } catch (error) {
-      state.showErrorModal(
-        "Update Failed",
-        error.message
+      showErrorModal(
+        "Target Creation Failed",
+        error.response?.data?.detail ??
+          error.message ??
+          "Unable to create the sales target."
       );
     }
   };
@@ -680,14 +672,7 @@ export default function SalesAnalyticsView({ state }) {
                   <div className="h-[300px]">
                     <Bar
                       data={salesPerformanceChart}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          title: {
-                            display: false,
-                          },
-                        },
+                      options={{responsive: true, maintainAspectRatio: false, plugins: {title: {display: false,},},
                       }}
                     />
                   </div>
@@ -704,19 +689,22 @@ export default function SalesAnalyticsView({ state }) {
                           Executive Name
                         </TableHead>
                         <TableHead className="text-center">
-                          Monthly Order Value
+                          Achieved Order Value
                         </TableHead>
                         <TableHead className="text-center">
                           Performance Score
                         </TableHead>
                         <TableHead className="text-center">
-                          Quarterly Target
+                          Sales Target
                         </TableHead>
                         <TableHead className="text-center">
-                          Achievement %
+                          Target Period
                         </TableHead>
                         <TableHead className="text-center">
-                          Set Quarterly Target
+                          Achievement
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Create Target
                         </TableHead>
                         <TableHead className="text-center">
                           Action
@@ -737,7 +725,7 @@ export default function SalesAnalyticsView({ state }) {
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {kpi.monthly_order_value}
+                              {formatCurrency(kpi.achieved_order_value)}
                             </TableCell>
 
                             <TableCell className="text-center font-semibold text-emerald-600">
@@ -745,49 +733,63 @@ export default function SalesAnalyticsView({ state }) {
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {
-                                kpi.quarterly_order_value_target
-                              }
+                              {kpi.target_id ? formatCurrency(kpi.target_value) : "No target"}
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {kpi.quarterly_order_value_target >
-                              0
-                                ? (
-                                    (Number(
-                                      kpi.monthly_order_value
-                                    ) /
-                                      Number(
-                                        kpi.quarterly_order_value_target
-                                      )) *
-                                    100
-                                  ).toFixed(1)
-                                : 0}
-                              %
+                              {kpi.target_id ? `${formatDate(kpi.target_from_date)} – ${formatDate(kpi.target_to_date)}` : "—"}
                             </TableCell>
 
                             <TableCell className="text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="Total QTR Value"
-                                defaultValue={
-                                  kpi.quarterly_target ||
-                                  ""
-                                }
-                                className="mx-auto w-[140px]"
-                                onChange={(e) =>
-                                  setQuarterlyTargets(
-                                    (prev) => ({
-                                      ...prev,
-                                      [kpi.email]:
-                                        e.target.value,
-                                    })
-                                  )
-                                }
-                              />
+                              {kpi.achievement_percentage == null ? (<Badge variant="secondary">No target</Badge>) : (
+                                <Badge variant={ Number(kpi.achievement_percentage) >= 100 ? "default" : "secondary"}>
+                                  {Number(kpi.achievement_percentage).toFixed(1)}%
+                                </Badge>
+                              )}
                             </TableCell>
 
+                            <TableCell className="min-w-[210px]">
+                              <div className="flex flex-col gap-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="Target amount (₹)"
+                                  value={targetValues[kpi.email] ?? ""}
+                                  onChange={(event) =>
+                                    setTargetValues((previous) => ({
+                                      ...previous,
+                                      [kpi.email]: event.target.value,
+                                    }))
+                                  }
+                                />
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <Input
+                                    type="date"
+                                    value={targetFromDates[kpi.email] ?? fromDate}
+                                    onChange={(event) =>
+                                      setTargetFromDates((previous) => ({
+                                        ...previous,
+                                        [kpi.email]: event.target.value,
+                                      }))
+                                    }
+                                  />
+
+                                  <Input
+                                    type="date"
+                                    value={targetToDates[kpi.email] ?? toDate}
+                                    onChange={(event) =>
+                                      setTargetToDates((previous) => ({
+                                        ...previous,
+                                        [kpi.email]: event.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            </TableCell>
+                            
                             <TableCell className="text-center">
                               <Button
                                 size="sm"

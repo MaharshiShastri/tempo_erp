@@ -3204,7 +3204,6 @@ def generate_qoute_document(
     product_table = replace_product_group_with_content(target_doc=target_doc, source_blocks=product_group_content, item_code=request.item_code,)
 
     add_financial_rows_to_product_table(product_table=product_table, financials=financials, packing_mode=request.packing_mode, freight_mode=request.freight_mode,)
-    
     # ========================================================
     # Dealer
     # ========================================================

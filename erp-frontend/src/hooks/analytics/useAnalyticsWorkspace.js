@@ -14,11 +14,14 @@ export default function useAnalyticsWorkspace(){
     const [selectedAnalytics, setSelectedAnalytics] = useState("overview");
     
     const [isExporting, setIsExporting] = useState(false);
-    
-    const [quarterlyTargets, setQuarterlyTargets] = useState({});
-    
-    return{fromDate, setFromDate, toDate, setToDate, quarterlyTargets, setQuarterlyTargets,
-        isExporting, setIsExporting, selectedAnalytics, setSelectedAnalytics,
+        
+    const [targetValues, setTargetValues] = useState({});
+    const [targetFromDates, setTargetFromDates] = useState({});
+    const [targetToDates, setTargetToDates] = useState({});
+
+    return{fromDate, setFromDate, toDate, setToDate, isExporting, setIsExporting, 
+        selectedAnalytics, setSelectedAnalytics, targetValues, setTargetValues,
+        targetFromDates, setTargetFromDates, targetToDates, setTargetToDates
     };
 
 }

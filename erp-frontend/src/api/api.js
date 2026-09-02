@@ -788,14 +788,14 @@ const API = {
 
     return r.json();
   },
-  updateQuarterlyTarget: async (token, email, targetValue) => {
+  createSalesTarget: async (token, email, payload) => {
         const response = await fetch(`/api/v1/analytics/admin/users/${email}/target`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ target: targetValue })
+            body: JSON.stringify(payload)
         });
         if (!response.ok) throw new Error("Failed to update target");
         return response.json();

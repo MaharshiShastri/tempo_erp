@@ -37,7 +37,6 @@ class User(Base):
 
     quarterly_order_value_target: Mapped[int] = mapped_column(Integer, server_default="0", nullable=True)
 
-
     # Relationships
     activity_logs: Mapped[list["ActivityLog"]] = relationship(back_populates="operator", passive_deletes=True)
 
@@ -45,6 +44,27 @@ class User(Base):
 
     grn_headers: Mapped[list["GRNHeader"]] = relationship(back_populates="operator", passive_deletes=True)
 
+    sales_targets: Mapped[list["SalesTarget"]] = relationship(back_populates="user", passive_deletes=True)
+
+class SalesTarget(Base):
+    __tablename__ = "sales_targets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True,)
+
+    user_email: Mapped[str] = mapped_column(ForeignKey("users.email", ondelete="CASCADE"), nullable=False, index=True,)
+
+    target_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False,)
+
+    from_date: Mapped[date] = mapped_column(Date, nullable=False,)
+
+    to_date: Mapped[date] = mapped_column(Date, nullable=False,)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False,)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False,)
+
+    user: Mapped["User"] = relationship(back_populates="sales_targets")
+    
 class ActivityLog(Base):
     #Done
     __tablename__ = "activity_logs"

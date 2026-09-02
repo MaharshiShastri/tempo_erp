@@ -17,7 +17,7 @@ from database.models import (
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
     SystemNotification, TestItemMaster, StockLedger, Quotation, ProductionStageHistory,
-    QuotationChangeSnapshot,
+    QuotationChangeSnapshot, SalesTarget,
 )
 from schemas.logistics_schema import FullPartnerProfile
 from services.item_matcher import resolve_item_code
@@ -30,7 +30,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAsL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1992,17 +1992,36 @@ class PostgresRepository:
                 
                 performance_score = (float(order_value or 0) / 1000 + (crm_leads * 10) + (dispatches * 8) + (faqs * 3) + actions)
 
+                target = session.scalar(
+                    select(SalesTarget).where(SalesTarget.user_email == user.email,
+                                              SalesTarget.from_date == from_date,
+                                              SalesTarget.to_date == to_date,)
+                )
+
+                target_value = float(target.target_value) if target else 0.0
+                achieved_value = float(order_value or 0)
+
+                achievement_percentage = round((achieved_value / target_value) * 100, 2) if target_value > 0 else None
 
                 result.append({
                     "email": user.email,
                     "name": user.name,
                     "role": user.role,
-                    "quarterly_order_value_target": float(user.quarterly_order_value_target or 0),
                     "total_spend": float(total_spend or 0),
 
                     "targets_queued": targets_queued,
 
-                    "monthly_order_value": float(order_value or 0),
+                    "target_id": target.id if target else None,
+
+                    "target_value": target_value,
+
+                    "target_from_date": target.from_date.isoformat() if target else None,
+
+                    "target_to_date": target.to_date.isoformat() if target else None,
+
+                    "achieved_order_value": achieved_value,
+
+                    "achievement_percentage": achievement_percentage,
 
                     "rejected": rejected,
 

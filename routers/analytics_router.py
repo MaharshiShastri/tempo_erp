@@ -3,7 +3,7 @@ from database.repository import EDBR, SessionLocal
 from security import verify_bearer_token
 from schemas.analytics_schema import SetTargetPayload
 from .dependencies import check_department
-from database.models import User
+from database.models import User, SalesTarget
 from sqlalchemy import update
 from datetime import date
 from fastapi.responses import FileResponse
@@ -62,19 +62,31 @@ def get_production_kpis(from_date: date = Query(...), to_date: date = Query(...)
         print(str(e), " error occured")
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.patch("/admin/users/{email}/target", dependencies=[Depends(check_department("Admin"))])
+@router.post("/admin/users/{email}/target", dependencies=[Depends(check_department("Admin"))])
 def update_user_target(email: str, payload: SetTargetPayload, user: dict = Depends(verify_bearer_token)):
     with SessionLocal() as session:
         user = session.get(User, email)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
 
-        if user:
-            user.quarterly_order_value_target = payload.target
-            session.commit()
-        
-        else:
-            raise ValueError("User not found")
+        overlapping_target = session.query(SalesTarget).filter(
+            SalesTarget.user_email == email,
+            SalesTarget.from_date <= payload.to_date,
+            SalesTarget.to_date >= payload.from_date
+            ).first()
 
-    return {"status": "success", "message": f"Quarterly target updated for {email}"}
+        if overlapping_target:
+            raise HTTPException(status_code=400, detail="This salesperson alread has a target for the specified period.")
+
+        target = SalesTarget(user_email=email, target_value=payload.target, from_date=payload.from_date, to_date=payload.to_date)
+
+        session.add(target)
+        session.commit()
+        session.refresh(target)
+
+
+    return {"status": "success", "message": f"Target created for {email}",
+            "target": {"id": target.id, "value": target.target_value, "from_date": target.from_date, "to_date": target.to_date},}
 
 @router.get("/qoutation/analytics/today")
 def quotation_analytics_today(user: dict = Depends(verify_bearer_token)):
