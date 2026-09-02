@@ -24,6 +24,51 @@ redis_cache = redis.Redis(host="redis", port=6379, decode_responses=True)
 SNOVIO_CLIENT_ID = os.getenv("SNOVIO_CLIENT", "")
 SNOVIO_CLIENT_SECRET = os.getenv("SNOVIO_SECRET", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+INDIA_SME_TITLE_FILTERS = [
+    "Production Manager",
+    "Manufacturing Manager",
+    "Plant Manager",
+    "Operations Manager",
+    "R&D Manager",
+    "Research and Development Manager",
+    "Engineering Manager",
+    "Purchase Manager",
+    "Procurement Manager",
+    "Sourcing Manager",
+    "Quality Manager",
+    "Quality Assurance Manager",
+    "Quality Control Manager",
+    "QA Manager",
+    "QC Manager",
+]
+
+ROLE_KEYWORDS = (
+    "production",
+    "manufacturing",
+    "plant",
+    "operations",
+    "r&d",
+    "research and development",
+    "engineering",
+    "purchase",
+    "purchasing",
+    "procurement",
+    "sourcing",
+    "quality",
+    "quality assurance",
+    "quality control",
+    "qa",
+    "qc",
+)
+
+DECISION_MAKER_KEYWORDS = (
+    "manager",
+    "head",
+    "director",
+    "vp",
+    "vice president",
+    "chief",
+)
 
 def save_raw_snovio(domain, prospects_raw, emails_raw):
     try:
@@ -46,13 +91,29 @@ def save_raw_snovio(domain, prospects_raw, emails_raw):
 
 def safe_request(method, url, **kwargs):
     kwargs.setdefault("timeout", 20)
+
     for attempt in range(3):
         try:
-            res = requests.request(method, url, **kwargs)
-            return res
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"[HTTP RETRY {attempt+1}] {url} | {e}")
-    logger.error(f"[HTTP FAILED] {url}")
+            response = requests.request(method, url, **kwargs)
+
+            logger.info(
+                "Snov.io request: %s %s -> HTTP %s",
+                method,
+                url.split("?")[0],
+                response.status_code,
+            )
+
+            return response
+
+        except requests.exceptions.RequestException as exc:
+            logger.warning(
+                "[HTTP RETRY %s/3] %s | %s",
+                attempt + 1,
+                url.split("?")[0],
+                exc,
+            )
+
+    logger.error("[HTTP FAILED] %s", url.split("?")[0])
     return None
 
 def get_snovio_token():
@@ -90,7 +151,7 @@ def poll_snovio_task(result_url, max_retries=15):
     logger.info(f"Polling Snovio task: {result_url}")
     for i in range(max_retries):
         res = safe_request("GET", result_url, headers=get_headers())
-        if not res:
+        if res is None:
             time.sleep(3)
             continue
         try:
@@ -100,74 +161,14 @@ def poll_snovio_task(result_url, max_retries=15):
             time.sleep(3)
             continue
 
-        logger.info(f"Poll {i+1}: {data}")
+        logger.info( "Poll %s: HTTP %s, status=%s", i + 1, res.status_code, data.get("status"),)
+
         if res.status_code == 200 and data.get("status") == "completed":
             logger.info("Snovio task completed")
             return data
         time.sleep(3)
     logger.warning("Snovio polling timeout")
     return None
-
-def ai_map_emails_to_prospects(prospects, emails):
-    if not prospects or not emails or not GROQ_API_KEY:
-        # Fallback mapping
-        return [
-            {
-                "full_name": f"{p.get('first_name','')} {p.get('last_name','')}".strip() or "Unknown Executive",
-                "designation": p.get("position", "Unknown Designation"),
-                "email": "",
-                "is_priority": True
-            }
-            for p in prospects
-        ]
-
-    try:
-        logger.info("Starting Groq mapping")
-        client = Groq(api_key=GROQ_API_KEY)
-        prompt = f"""
-        You are a data mapping assistant. I have a list of employees: {json.dumps(prospects)}. 
-        I also have a list of company emails: {json.dumps(emails)}.
-        Map the emails to the correct employees based on name patterns (e.g. john.doe@... matches John Doe).
-        Return ONLY a JSON array of objects. Each object must have:
-        'full_name' (string), 'designation' (string), 'email' (string, the matched email or empty if unknown), 'is_priority' (boolean, true if title contains purchase, quality, product, or r&d).
-        
-        Output a valid JSON array of objects under a key named 'mappings' like so:
-        {{
-            "mappings": [
-                {{
-                    "full_name": "Full Name",
-                    "designation": "Position",
-                    "email": "matched_email_or_empty_string",
-                    "is_priority": true_or_false
-                }}
-            ]
-        }}
-        """
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
-        )
-        logger.info("=" * 80)
-        logger.info("[STEP 3] SENDING TO GROQ")
-        logger.info(prompt)
-        logger.info("=" * 80)
-        time.sleep(3)
-
-        result = json.loads(completion.choices[0].message.content)
-        logger.info("=" * 80)
-        logger.info("[STEP 5] PARSED GROQ JSON")
-
-        pprint.pprint(result)
-
-        logger.info("=" * 80)
-        time.sleep(3)
-
-        logger.info("Groq mapping successful")
-        return result.get("mappings", result.get("data", []))
-    except Exception as e:
-        logger.error(f"Groq mapping error: {e}")
-        return []
 
 def clean_domain(domain: str) -> str:
     if not domain:
@@ -190,176 +191,339 @@ def clean_domain(domain: str) -> str:
         return f"{extracted.domain}.{extracted.suffix}"
 
     return host.replace("www.", "")
+def get_india_sme_decision_maker_score(prospect: dict) -> int:
+    title = (prospect.get("job_title") or "").strip().lower()
+
+    if not title:
+        return 0
+
+    role_match = any(keyword in title for keyword in ROLE_KEYWORDS)
+    decision_maker_match = any(
+        keyword in title
+        for keyword in DECISION_MAKER_KEYWORDS
+    )
+
+    if not role_match:
+        return 0
+
+    score = 60
+
+    if decision_maker_match:
+        score += 30
+
+    company = prospect.get("company") or {}
+    company_size = company.get("size")
+
+    if company_size in {"51-200", "201-500"}:
+        score += 10
+
+    return min(score, 100)
 
 
-def process_target_domain(domain: str):
-    try:
-        domain = clean_domain(domain)
-        logger.info(f"Processing domain: {domain}")
-        prospects_raw_response = None
-        emails_raw_response = None
-        prospects = []
-        emails = []
+def start_india_sme_database_search(page: int = 1):
+    token = get_snovio_token()
 
-        # ---- PROSPECTS ----
-        p_res = safe_request(
-            "POST",
-            "https://api.snov.io/v2/domain-search/prospects/start",
-            headers=get_headers(),
-            params={"domain": domain, "type": "personal", "limit": 10}
+    if not token:
+        raise RuntimeError("Unable to obtain a Snov.io access token.")
+
+    payload = {
+        # Included to follow Snov.io's documented Database Search example.
+        "access_token": token,
+
+        "page": page,
+
+        "filters": {
+            "prospect": {
+                "job_titles": {
+                    "include": INDIA_SME_TITLE_FILTERS,
+                },
+                "management_levels": {
+                    "include": [
+                        "manager_level",
+                        "director_level",
+                        "vp_level",
+                        "c_level",
+                    ],
+                },
+                "departments": {
+                    "include": [
+                        "operations",
+                        "engineering",
+                    ],
+                },
+            },
+            "company": {
+                "locations": {
+                    "include": {
+                        "locality": "India",
+                        "location_type": "country",
+                    },
+                },
+                "size": [
+                    "11-50",
+                    "51-200",
+                    "201-500",
+                ],
+            },
+        },
+    }
+
+    response = safe_request(
+        "POST",
+        "https://api.snov.io/v2/database-search/prospects/start",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+    )
+
+    # Important: test explicitly for None.
+    if response is None:
+        raise RuntimeError(
+            "Snov.io Database Search did not return an HTTP response."
         )
-        if p_res and p_res.status_code == 202:
-            p_data = poll_snovio_task(p_res.json()["links"]["result"])
-            logger.info("=" * 80)
-            logger.info("[DEBUG] RAW PROSPECT RESPONSE FROM SNOV.IO")
-            pprint.pprint(p_data)
-            logger.info("=" * 80)
-            time.sleep(3)
 
-            if p_data:
-                prospects_raw_response = p_data
-                prospects = p_data.get("data", [])
-                logger.info("=" * 80)
-                logger.info(f"[STEP 1] PROSPECTS FOUND: {len(prospects)}")
-
-                if prospects:
-                    pprint.pprint(prospects)
-                else:
-                    logger.warning("No prospects returned from Snov.io.")
-
-                logger.info("=" * 80)
-                time.sleep(3)
-
-        # ---- EMAILS ----
-        e_res = safe_request(
-            "POST",
-            "https://api.snov.io/v2/domain-search/domain-emails/start",
-            headers=get_headers(),
-            params={"domain": domain}
+    if response.status_code not in (200, 202):
+        logger.error(
+            "Database Search rejected the request. HTTP %s: %s",
+            response.status_code,
+            response.text[:2000],
         )
-        
-        if e_res and e_res.status_code == 202:
-            e_data = poll_snovio_task(e_res.json()["links"]["result"])
-            if e_data:
-                emails_raw_response = e_data
-                emails = [e["email"] for e in e_data.get("data", [])]
-                logger.info("=" * 80)
-                logger.info("[DEBUG] RAW EMAIL RESPONSE FROM SNOV.IO")
-                pprint.pprint(e_data)
-                logger.info("=" * 80)
-                time.sleep(3)
-                
-                logger.info("=" * 80)
-                logger.info(f"[STEP 2] DOMAIN EMAILS FOUND: {len(emails)}")
 
-                if emails:
-                    pprint.pprint(emails)
-                else:
-                    logger.warning("No domain emails returned from Snov.io.")
+        raise RuntimeError(
+            f"Database Search failed with HTTP "
+            f"{response.status_code}: {response.text[:500]}"
+        )
 
-                logger.info("=" * 80)
-                time.sleep(3)
+    search_data = response.json()
+    result_url = (search_data.get("links") or {}).get("result")
 
-        raw_file_path = save_raw_snovio(domain, prospects_raw_response, emails_raw_response)
+    if not result_url:
+        raise RuntimeError(
+            f"Database Search returned no result URL: {search_data}"
+        )
 
-        # ---- DATA ENRICHMENT CONSOLIDATION ----
-        mapped_data = ai_map_emails_to_prospects(prospects, emails)
+    return poll_snovio_task(result_url)
 
-        logger.info("=" * 80)
-        logger.info(f"[STEP 6] FINAL MAPPED CONTACTS ({len(mapped_data)})")
 
-        pprint.pprint(mapped_data)
+def reveal_prospect_email(reveal_url: str) -> list[dict]:
+    if not reveal_url:
+        return []
 
-        logger.info("=" * 80)
-        time.sleep(3)
+    start_response = safe_request(
+        "POST",
+        reveal_url,
+        headers=get_headers(),
+        json={},
+    )
 
-        # Self-healing logic: If mapping output is completely empty but we have raw emails, create placeholders
-        if not mapped_data and emails:
-            mapped_data = [
-                {
-                    "full_name": "Review Pending",
-                    "designation": "Awaiting Designation",
-                    "email": email,
-                    "is_priority": False
-                }
-                for email in emails
-            ]
-            
-        # Ensure that if mapping is present, we still include prospects that have no email mapped
-        # so they can be matched via dropdown on the frontend
-        if mapped_data and prospects and len(mapped_data) < len(prospects):
-            existing_names = {m.get("full_name", "").lower() for m in mapped_data}
-            for p in prospects:
-                fullname = f"{p.get('first_name','')} {p.get('last_name','')}".strip()
-                if fullname.lower() not in existing_names:
-                    mapped_data.append({
-                        "full_name": fullname,
-                        "designation": p.get("position", "Unknown Position"),
-                        "email": "",
-                        "is_priority": False
-                    })
+    if start_response is None:
+        return []
 
-        return {
-            "raw_emails": emails,
-            "mapped_contacts": mapped_data,
-            "raw_file": raw_file_path
-        }
-    except Exception as e:
-        logger.error(f"Domain failed: {domain} | {e}")
-        return {
-            "raw_emails": [],
-            "mapped_contacts": [],
-            "error": str(e)
-        }
+    if start_response.status_code not in (200, 202):
+        logger.warning(
+            "Email reveal failed: %s | %s",
+            start_response.status_code,
+            start_response.text,
+        )
+        return []
+
+    start_data = start_response.json()
+    result_url = (start_data.get("links") or {}).get("result")
+
+    if not result_url:
+        return []
+
+    result_data = poll_snovio_task(result_url)
+
+    if not result_data:
+        return []
+
+    return ((result_data.get("data") or {}).get("emails") or [])
+
+
+def process_indian_sme_decision_makers(page: int = 1):
+    search_result = start_india_sme_database_search(page)
+
+    search_data = (search_result or {}).get("data") or {}
+    prospects = search_data.get("prospects") or []
+
+    shortlisted = []
+
+    for prospect in prospects:
+        score = get_india_sme_decision_maker_score(prospect)
+
+        # Quality-first: skip weak or incorrectly titled profiles.
+        if score < 70:
+            continue
+
+        shortlisted.append({
+            "prospect": prospect,
+            "lead_score": score,
+        })
+
+    mapped_contacts = []
+    reveal_results = []
+
+    for item in shortlisted:
+        prospect = item["prospect"]
+        reveal_url = prospect.get("email_and_hidden_info_reveal")
+
+        emails = reveal_prospect_email(reveal_url)
+
+        # Keep verified emails only. Unknown/unverifiable emails are skipped.
+        valid_emails = [
+            email_data["email"]
+            for email_data in emails
+            if email_data.get("email")
+            and email_data.get("smtp_status") == "valid"
+        ]
+
+        reveal_results.append({
+            "prospect": prospect,
+            "emails": emails,
+        })
+
+        if not valid_emails:
+            continue
+
+        company = prospect.get("company") or {}
+
+        for email in valid_emails:
+            mapped_contacts.append({
+                "full_name": " ".join(
+                    filter(
+                        None,
+                        [
+                            prospect.get("first_name"),
+                            prospect.get("last_name"),
+                        ],
+                    )
+                ).strip() or "Unknown Contact",
+
+                "designation": prospect.get("job_title") or "Unknown Title",
+                "email": email,
+
+                "is_priority": item["lead_score"] >= 80,
+
+                # Extra metadata is safe for the current frontend to ignore.
+                "lead_score": item["lead_score"],
+                "linkedin_url": prospect.get("linkedin_url"),
+                "company_name": company.get("name"),
+                "company_domain": company.get("domain"),
+                "company_industry": company.get("industry"),
+                "company_size": company.get("size"),
+                "company_location": company.get("location"),
+            })
+
+    raw_file_path = save_raw_snovio(
+        "india_sme_decision_makers",
+        search_result,
+        reveal_results,
+    )
+
+    return {
+        "raw_emails": [
+            contact["email"]
+            for contact in mapped_contacts
+        ],
+        "mapped_contacts": mapped_contacts,
+        "raw_file": raw_file_path,
+        "search_page": page,
+        "total_prospects_found": search_data.get("total", 0),
+        "total_pages": search_data.get("total_pages", 0),
+        "shortlisted_count": len(shortlisted),
+    }
 
 def run_automated_job():
-    logger.info("===== START AUTOMATED JOB =====")
-    with SessionLocal() as session:
-        ranked = (select(LeadTarget.id, LeadTarget.domain, LeadTarget.requested_by, func.row_number().over(partition_by=LeadTarget.requested_by, order_by=LeadTarget.created_at).label("rn")).where(LeadTarget.status == "Pending").subquery())
-
-        stmt = (select(ranked.c.id, ranked.c.domain, ranked.c.requested_by).where(ranked.c.rn <= 10))
-
-        pending_targets = session.execute(stmt).mappings().all()
-    
-    logger.info(f"Found {len(pending_targets)} targets")
+    logger.info("===== START INDIA SME DECISION-MAKER JOB =====")
 
     with SessionLocal() as session:
-        for target in pending_targets:
-            try:
-                logger.info(f"Processing target {target['id']} | {target['domain']}")
-                staging_data = process_target_domain(target["domain"])
+        ranked = (
+            select(
+                LeadTarget.id,
+                LeadTarget.requested_by,
+                func.row_number()
+                .over(
+                    partition_by=LeadTarget.requested_by,
+                    order_by=LeadTarget.created_at,
+                )
+                .label("rn"),
+            )
+            .where(LeadTarget.status == "Pending")
+            .subquery()
+        )
 
-                lead_target = session.get(LeadTarget, target['id'])
+        pending_targets = session.execute(
+            select(
+                ranked.c.id,
+                ranked.c.requested_by,
+            ).where(ranked.c.rn <= 10)
+        ).mappings().all()
+
+    logger.info("Found %s pending lead-generation requests", len(pending_targets))
+
+    for target in pending_targets:
+        try:
+            # Each request receives another results page,
+            # avoiding the exact same first-page results repeatedly.
+            search_page = redis_cache.incr(
+                "snovio:india_sme_decision_makers:next_page"
+            )
+
+            logger.info(
+                "Processing target %s using Database Search page %s",
+                target["id"],
+                search_page,
+            )
+
+            staging_data = process_indian_sme_decision_makers(
+                page=search_page
+            )
+
+            with SessionLocal() as session:
+                lead_target = session.get(
+                    LeadTarget,
+                    target["id"],
+                )
+
                 if not lead_target:
-                    logger.warning(f"Target {target.id} disappeared")
+                    logger.warning(
+                        "Target %s no longer exists",
+                        target["id"],
+                    )
                     continue
-                        
-                logger.info("=" * 80)
-                logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
-                logger.info(f"Target ID {target['id']} committed successfully.")
-                logger.info("=" * 80)
-                time.sleep(3)
 
                 lead_target.status = "Awaiting Review"
                 lead_target.snovio_raw_data = staging_data
 
                 session.commit()
-                    
-                logger.info("=" * 80)
-                logger.info(f"[STEP 8] DATABASE UPDATE SUCCESSFUL")
-                logger.info(f"Target ID {target['id']} committed successfully.")
-                logger.info("=" * 80)
-                time.sleep(3)
 
-                logger.info(f"SUCCESS target {target['id']}")
-            except Exception as e:
-                logger.error(f"FAILED target {target['id']} | {e}")
-                with SessionLocal() as session:
-                    lead_target = session.get(LeadTarget, target.id)
+            logger.info(
+                "Target %s completed with %s verified decision-makers",
+                target["id"],
+                len(staging_data["mapped_contacts"]),
+            )
 
-                    if lead_target:
-                        lead_target.status = "Failed"
-                        session.commit()
+        except Exception as exc:
+            logger.exception(
+                "Lead generation failed for target %s: %s",
+                target["id"],
+                exc,
+            )
+
+            with SessionLocal() as session:
+                lead_target = session.get(
+                    LeadTarget,
+                    target["id"],
+                )
+
+                if lead_target:
+                    lead_target.status = "Failed"
+                    session.commit()
+
                         
 def run_automated_job_entry():
     return run_automated_job()
