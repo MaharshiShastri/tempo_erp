@@ -95,7 +95,7 @@ export default function useTasks({sessionToken, user, showErrorModal, addToast, 
             showErrorModal?.("Update Failed", err.message);
             throw err;
         }
-    }, [sessionToken, setAlertMessage, setIsAlertOpen, showErrorModal]);
+    }, [sessionToken, loadTasks, setAlertMessage, setIsAlertOpen, showErrorModal]);
 
     const deleteTask = useCallback(async (taskId) => {
 

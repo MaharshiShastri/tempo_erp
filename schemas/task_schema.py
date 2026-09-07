@@ -10,12 +10,12 @@ class TaskCreate(BaseModel):
 class TaskResponse(BaseModel):
     id: int
     title: str
-    details: str
-    direction: str
+    details: Optional[str] = None
+    direction: Optional[str] = None
     is_incomplete: bool  # True = Incomplete (ON), False = Completed (OFF)
-    created_at: str
-
-class TaskUpdatePayload(BaseModel):
-    title: str
-    details: str
+    assigned_by: Optional[str] = None
+    assigned_to: list[str] = []
+    created_at: Optional[datetime] = None
+    attachment_urls: list[str] = []
     deadline: Optional[datetime] = None
+    completed_at: Optional[datetime] = None

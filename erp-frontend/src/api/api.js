@@ -717,8 +717,9 @@ const API = {
     return await r.json();
   },
 
-  async updateTask(taskId, payload, token) {
-    const r = await fetch(`/api/v1/tasks/${taskId}`, { method: "PUT", headers: this.headers(token), body: JSON.stringify(payload) });
+  async updateTask(taskId, formData, sessionToken) {
+    const r = await fetch(`/api/v1/tasks/${taskId}`, 
+      {method: "PUT", headers: {Authorization: `Bearer ${sessionToken}`}, body: formData });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
     return r.json();
   },

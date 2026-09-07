@@ -1,3 +1,4 @@
+import shutil
 import os
 import json
 import logging
@@ -5,6 +6,8 @@ import re
 from datetime import datetime, date, timedelta, time
 from decimal import Decimal
 from collections import defaultdict
+from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy import create_engine, select, update, delete, or_, and_, func, any_, case, desc, text
 from sqlalchemy.orm import sessionmaker, joinedload, selectinload, aliased
@@ -31,7 +34,10 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAaL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+
+TASK_UPLOAD_DIR = Path("uploaded_task_attachments")
+TASK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -967,7 +973,7 @@ class PostgresRepository:
             session.refresh(task)
             return to_dict(task)
             
-    def update_task(self, task_id: int, title: str, details: str, deadline: str, user_email: str, user_role: str):
+    def update_task(self, task_id: int, title: str, details: str, deadline: str, attachments, removed_attachments: list[str] | None, user_email: str, user_role: str):
         with SessionLocal() as session:
             stmt = select(Task).where(Task.id == task_id)
             if user_role not in ['Admin', 'Chief Full Stack Developer']:
@@ -976,11 +982,69 @@ class PostgresRepository:
             task = session.scalars(stmt).first()
             if not task:
                 raise ValueError("Task not found or unauthorized to edit.")
-                
+            
+            current_attachments = [str(path) for path in (task.attachment_urls or []) if path]        
+            removed_attachments = [str(path) for path in (removed_attachments or []) if path]
+            
+            invalid_removals = [path for path in removed_attachments if path not in current_attachments]
+            
+            if invalid_removals:
+                raise ValueError(f"Files {invalid_removals} is not attached to current task")
+
+            remaining_attachments = [path for path in current_attachments if path not in removed_attachments]
+
+            valid_new_files = [file for file in (attachments or []) if file and file.filename]
+            total_attachment_count = len(remaining_attachments) + len(valid_new_files)
+
+            if total_attachment_count > 5:
+                raise ValueError("A Task can have maximum of 5 attachments.")
+
+            new_attachment_paths = []
+            try:
+                for upload in valid_new_files:
+                    original_name = Path(upload.filename).name
+                    extension = Path(original_name).suffix
+                    unique_filename = f"{uuid4().hex}_{original_name}"
+                    file_path = TASK_UPLOAD_DIR / unique_filename
+                    with file_path.open("wb") as buffer:
+                        shutil.copyfileobj(upload.file, buffer)
+
+                    new_attachment_paths.append(unique_filename)
+            except Exception:
+                for path in new_attachment_paths:
+                    try:
+                        (TASK_UPLOAD_DIR/path).unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                raise
+
+
             task.title = title
-            task.description = details
-            task.due_date = deadline if deadline else None
-            session.commit()
+            task.details = details
+            task.deadline = deadline if deadline else None
+            task.attachment_urls = remaining_attachments + new_attachment_paths
+            try:
+                session.commit()
+                session.refresh(task)
+
+            except Exception:
+                session.rollback()
+                for path in new_attachment_paths:
+                    try:
+                        (TASK_UPLOAD_DIR/path).unlink(missing_ok=True)
+
+                    except Exception:
+                        pass
+
+                raise
+
+            for path in removed_attachments:
+                try:
+                    (TASK_UPLOAD_DIR/path).unlink(missing_ok=True)
+
+                except Exception:
+                    pass
+
             return to_dict(task)
             
     def delete_task(self, task_id: int, user_email: str, user_role: str):
@@ -1001,7 +1065,7 @@ class PostgresRepository:
         with SessionLocal() as session:
             task = session.scalars(select(Task).where(Task.id == task_id)).first()
             if task:
-                task.status = "Completed" if task.status == "Pending" else "Pending"
+                task.is_incomplete = True if task.is_incomplete == False else False
                 session.commit()
                 return to_dict(task)
             return None

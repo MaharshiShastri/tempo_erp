@@ -8,11 +8,12 @@ from fastapi.responses import FileResponse, StreamingResponse
 from database.repository import EDBR
 from security import verify_bearer_token
 from .dependencies import check_department
-from schemas.task_schema import TaskUpdatePayload
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from io import BytesIO
 from zipfile import ZipFile, ZIP_DEFLATED
+import json
+from datetime import datetime
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["Task Manager Subsystem"])
 
@@ -76,6 +77,7 @@ async def create_new_task(title: str = Form(...), details: str = Form(...), dire
         EDBR.create_system_notification(user_email=email, title=f"New Task: {title}", message=details[:100] + "..." if len(details) > 100 else details,notif_type="TASK")
 
     return new_task
+
 @router.post("/{task_id}/toggle", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def toggle_task(task_id: int, user_profile: dict = Depends(verify_bearer_token)):
     try:
@@ -84,11 +86,45 @@ def toggle_task(task_id: int, user_profile: dict = Depends(verify_bearer_token))
         raise HTTPException(status_code=404, detail=str(e))
     
 @router.put("/{task_id}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
-def edit_task(task_id: int, payload: TaskUpdatePayload, user: dict = Depends(verify_bearer_token)):
+async def edit_task(task_id: int, title: str = Form(...), details: str = Form(""), deadline: str = Form(""), attachments: List[UploadFile] = File(default=[]), removed_attachments: str = Form(""), user: dict = Depends(verify_bearer_token),):
     try:
-        return EDBR.update_task(task_id, payload.title, payload.details, payload.deadline, user["email"], user["role"])
+        if not title.strip():
+            raise HTTPException(status_code=400, detail="Task Title is required.")
+
+        try:
+            removed_files = json.loads(removed_attachments)
+
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid removed_attachments payload.")
+
+        parsed_deadline = None
+
+        if deadline.strip():
+            try:
+                parsed_deadline = datetime.fromisoformat(deadline)
+
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid deadline format.")
+        print(removed_attachments)
+        return EDBR.update_task(
+            task_id = task_id,
+            title = title.strip(),
+            details=details,
+            deadline=parsed_deadline,
+            attachments=attachments,
+            removed_attachments=removed_files,
+            user_email=user["email"],
+            user_role=user["role"],
+        )
+
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload task: {str(e)}")
+
+    except HTTPException:
+        raise
 
 @router.delete("/{task_id}", dependencies=[Depends(check_department("Shop Floor Administrator"))])
 def remove_task(task_id: int, user: dict = Depends(verify_bearer_token)):
