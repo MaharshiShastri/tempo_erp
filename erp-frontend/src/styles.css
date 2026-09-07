@@ -3,10 +3,10 @@
 
 :root,
 [data-theme="light"] {
-    --bg-main: #fbe9d7;
-    --bg-sidebar: #f6d5f7;
-    --bg-surface: #fbe9d7;
-    --bg-muted: #d8ded6;
+    --bg-main: #E3F4F4;
+    --bg-sidebar: #D2E9E9;
+    --bg-surface: #9BE8D8;
+    --bg-muted: #C4DFDF;
     --text-primary: #1f2937;
     --text-muted: #4b5563;
 

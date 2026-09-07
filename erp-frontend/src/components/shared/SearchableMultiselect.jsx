@@ -27,12 +27,24 @@ export default function SearchableMultiSelect({
   options = [],
   value = [],
   onChange,
+  single=false
 }) {
   const [open, setOpen] = useState(false);
 
   const selected = value || [];
 
   const toggleOption = (option) => {
+    if (single) {
+      if (selected.includes(option)) {
+        onChange([]);
+      } else {
+        onChange([option]);
+      }
+
+      setOpen(false);
+      return;
+    }
+
     if (selected.includes(option)) {
       onChange(
         selected.filter((item) => item !== option)
@@ -47,12 +59,15 @@ export default function SearchableMultiSelect({
       return `Select ${label.toLowerCase()}...`;
     }
 
+    if (single) {
+      return selected[0];
+    }
     if (selected.length === 1) {
       return selected[0];
     }
 
     return `${selected.length} selected`;
-  }, [selected, label]);
+  }, [selected, label, single]);
 
   return (
     <div className="grid gap-2">
@@ -93,8 +108,7 @@ export default function SearchableMultiSelect({
 
               <CommandGroup>
                 {options.map((option) => {
-                  const isSelected =
-                    selected.includes(option);
+                  const isSelected = selected.includes(option);
 
                   return (
                     <CommandItem

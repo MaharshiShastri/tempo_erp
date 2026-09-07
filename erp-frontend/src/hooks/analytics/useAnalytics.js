@@ -1,3 +1,4 @@
+import { useState } from "react";
 import useAnalyticsWorkspace from "./useAnalyticsWorkspace";
 import useDispatchAnalytics from "./useDispatchAnalytics";
 import useExecutiveAnalytics from "./useExecutiveAnalytics";
@@ -8,8 +9,10 @@ import useProductionAnalytics from "./useProductionAnalytics";
 import useSalesAnalytics from "./useSalesAnalytics";
 import useSystemAnalytics from "./useSystemAnalytics";
 import useAnalyticsData from "./useAnalyticsData";
+import usePurchaseAnalytics from "./usePurchaseAnalytics";
 
 export default function useAnalytics(props){
+    const [selectedPurchaseItem, setSelectedPurchaseItem] = useState("");
 
     const workspace = useAnalyticsWorkspace();
 
@@ -21,10 +24,6 @@ export default function useAnalytics(props){
 
     const production = useProductionAnalytics({prodKpis: data.prodKpis, sessionToken: props?.sessionToken, showErrorModal: props?.showErrorModal});
 
-    //const inventory = useInventoryAnalytics({...props, ...workspace});
-
-    //const finance = useFinanceAnalytics({...props, ...workspace});
-
     const dispatch = useDispatchAnalytics({transportKpis: data.transportKpis});
     
     const faq = useFAQAnalytics({salesKpis: data.salesKpis, rndKpis: data.rndKpis});
@@ -35,8 +34,10 @@ export default function useAnalytics(props){
 
     const executive = useExecutiveAnalytics({salesKpis: data.salesKpis, rndKpis: data.rndKpis, gtmKpis: data.gtmKpis, errorLogs: data.errorLogs});
 
+    const purchase = usePurchaseAnalytics({purchaseKpis: data.purchaseKpis, selectedItemCode: selectedPurchaseItem});
+
     return{...workspace, ...data, ...personal, ...sales, ...faq, ...dispatch, ...production, ...gtm,
-        ...system, ...executive,
+        ...system, ...executive, ...purchase, selectedPurchaseItem, setSelectedPurchaseItem,
     };
 
 }

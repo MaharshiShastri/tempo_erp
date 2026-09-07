@@ -5,11 +5,12 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (Boolean, Date, DateTime, ForeignKey, Integer, BigInteger, Numeric, String, Text, 
-                        JSON, func, Computed, Float, Index, CheckConstraint, text)
+                        JSON, func, Computed, Float, Index, CheckConstraint, text, UniqueConstraint, literal
+                        , select)
 
 from sqlalchemy.dialects.postgresql import ARRAY
 
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, foreign
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, foreign, column_property
 
 class Base(DeclarativeBase):
     pass
@@ -696,10 +697,14 @@ class GRNHeader(Base):
 
     grand_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True,)
 
+    purchase_voucher_number: Mapped[str|None] = mapped_column(String(100), ForeignKey("purchase_bills.voucher_number"), nullable=True, index=True)
+
     items: Mapped[list["GRNItem"]] = relationship(back_populates="grn",cascade="all, delete-orphan")
 
     operator: Mapped["User | None"] = relationship(back_populates="grn_headers")
 
+    purchase_bill: Mapped["PurchaseBill | None"] = relationship(back_populates="grns",)
+    
 class GRNItem(Base):
     __tablename__ = "grn_items"
 
@@ -843,7 +848,87 @@ class SystemNotification(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=True)
-    
+
+class PurchaseBill(Base):
+    __tablename__ = "purchase_bills"
+
+    # Tally VOUCHERNUMBER.
+    # Used for Tally upsert identity and to link GRNs.
+    voucher_number: Mapped[str] = mapped_column(String(100), primary_key=True,)
+
+    # Tally DATE.
+    purchase_date: Mapped[date] = mapped_column(Date, nullable=False, index=True,)
+
+    # Tally REFERENCEDATE.
+    purchase_order_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True,)
+
+    # Tally PARTYNAME.
+    party_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True,)
+
+    # Tally PLACEOFSUPPLY.
+    place_of_supply: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True,)
+
+    is_cancelled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false",)
+
+    synced_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now(),)
+
+    items: Mapped[list["PurchaseBillItem"]] = relationship(back_populates="purchase_bill", cascade="all, delete-orphan", passive_deletes=True,)
+
+    grns: Mapped[list["GRNHeader"]] = relationship(back_populates="purchase_bill",)
+
+class PurchaseBillItem(Base):
+    __tablename__ = "purchase_bill_items"
+
+    __table_args__ = (
+        UniqueConstraint("purchase_voucher_number", "line_number", name="uq_purchase_bill_item_line", ),
+        CheckConstraint("billed_quantity > 0", name="purchase_bill_item_quantity_positive",),
+        CheckConstraint("rate >= 0", name="purchase_bill_item_rate_non_negative",),
+        CheckConstraint("amount >= 0", name="purchase_bill_item_amount_non_negative",),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True,)
+
+    purchase_voucher_number: Mapped[str] = mapped_column(String(100), ForeignKey("purchase_bills.voucher_number", ondelete="CASCADE",), nullable=False,index=True,)
+
+    line_number: Mapped[int] = mapped_column(Integer, nullable=False,)
+
+    item_code: Mapped[str] = mapped_column(String(7), ForeignKey("test_items_master.item_code"), nullable=False,index=True,)
+
+    # Remainder of STOCKITEMNAME after its seven-character item code.
+    item_specification: Mapped[str | None] = mapped_column(Text, nullable=True,)
+
+    # Tally BILLEDQTY; used for purchased inventory.
+    billed_quantity: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False,)
+
+    # Parsed from BILLEDQTY, e.g. "Nos."
+    unit_measure: Mapped[str | None] = mapped_column(String(20), nullable=True,)
+
+    # Parsed from RATE, e.g. "45.00/Nos." -> 45.00.
+    # This is already the final rate after discount.
+    rate: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False,)
+
+    # Absolute value of Tally AMOUNT.
+    # Preserve Tally's final line amount rather than recalculating it.
+    amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False,)
+
+    # Derived from the item's RATEDETAILS.LIST.
+    # E.g. CGST 9% + SGST 9% = 18%.
+    gst_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="0.00",)
+
+    purchase_bill: Mapped["PurchaseBill"] = relationship(back_populates="items",)
+
+    purchased_item: Mapped["TestItemMaster"] = relationship(back_populates="purchase_bill_items",)
+
+PurchaseBill.bill_value = column_property(
+    select(func.coalesce(
+        func.sum(PurchaseBillItem.amount),
+        literal(Decimal("0.00"), type_=Numeric(15,2)),
+    ))
+    .where(PurchaseBillItem.purchase_voucher_number == PurchaseBill.voucher_number)
+    .correlate_except(PurchaseBillItem)
+    .scalar_subquery()
+)
+
 class TestItemMaster(Base):
     __tablename__ = "test_items_master"
 
@@ -856,6 +941,8 @@ class TestItemMaster(Base):
     created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now(), nullable=True)
 
     grn_items: Mapped[list["GRNItem"]] = relationship(back_populates="item")
+
+    purchase_bill_items: Mapped[list["PurchaseBillItem"]] = relationship(back_populates="purchased_item")
 
 class StockLedger(Base):
     __tablename__ = "stock_ledger"

@@ -11,6 +11,7 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
     const [gtmKpis, setGtmKpis] = useState([]);
     const [prodKpis, setProdKpis] = useState([]);
     const [errorLogs, setErrorLogs] = useState([]);
+    const [purchaseKpis, setPurchaseKpis] = useState({});
 
     async function fetchAnalytics(role, fromDate, toDate){
         
@@ -21,14 +22,15 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
 
         case "Admin":
             case "Chief Full Stack Developer": {
-                const [sales, transport, rnd, gtm, errors, production] =
+                const [sales, transport, rnd, gtm, errors, production, purchase] =
                     await Promise.all([
                         API.fetchSalesKPIs(sessionToken, fromDate, toDate),
                         API.fetchTransportKPIs(sessionToken, fromDate, toDate),
                         API.fetchRnDKPIs(sessionToken, fromDate, toDate),
                         API.fetchGtmAnalytics(sessionToken, fromDate, toDate),
                         API.fetchSystemHealth(sessionToken, fromDate, toDate),
-                        API.fetchProductionKPIs(sessionToken, fromDate, toDate)
+                        API.fetchProductionKPIs(sessionToken, fromDate, toDate),
+                        API.fetchPurchaseKPIs(sessionToken, fromDate, toDate),
                     ]);
 
                 setSalesKpis(sales);
@@ -37,12 +39,15 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
                 setGtmKpis(gtm);
                 setErrorLogs(errors);
                 setProdKpis(production);
+                setPurchaseKpis(purchase);
                 break;
             }
 
             case "Shop Floor Administrator": {
                 const production = await API.fetchProductionKPIs(sessionToken, fromDate, toDate);
+                const purchase = await API.fetchPurchaseKPIs(sessionToken, fromDate, toDate);
                 setProdKpis(production);
+                setPurchaseKpis(purchase);
                 break;
             }
 
@@ -82,6 +87,6 @@ export default function useAnalyticsData({sessionToken, showErrorModal}) {
 
     };
 
-    return{isLoading, salesKpis, rndKpis, transportKpis, gtmKpis, prodKpis, errorLogs, fetchAnalytics };
+    return{isLoading, salesKpis, rndKpis, transportKpis, gtmKpis, prodKpis, purchaseKpis, errorLogs, fetchAnalytics };
 
 }

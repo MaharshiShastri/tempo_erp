@@ -33,7 +33,7 @@ from services.tally_service import (
 # Configuration
 # ---------------------------------------------------------------------------
 
-FROM_DATE = "20260401"
+FROM_DATE = "20260305"
 TO_DATE = "20260824"
 
 ITEM_NAME_PREFIX = "TI"
@@ -41,7 +41,6 @@ ITEM_NAME_PREFIX = "TI"
 DATASETS = (
     ("sales_orders", "Sales Order"),
     ("sales", ("Sales", "Sales Amazon",),),
-    ("purchase_orders", "Purchase Order"),
     ("purchase", "Purchase"),
 )
 

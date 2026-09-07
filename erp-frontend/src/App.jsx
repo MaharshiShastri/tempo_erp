@@ -1485,8 +1485,7 @@ function App() {
                             {isFactory &&
                                 state.activeTab ===
                                     "audit" && (
-                                    <InventoryAuditLogsView
-                                        state={state}
+                                    <InventoryAuditLogsView state={state}
                                     />
                                 )}
 

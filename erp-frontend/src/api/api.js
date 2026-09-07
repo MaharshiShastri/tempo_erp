@@ -706,6 +706,17 @@ const API = {
     return r.json();
   },
 
+  async fetchPurchaseKPIs(token, fromDate, toDate){
+    const r = await fetch(`/api/v1/analytics/purchase?from_date=${fromDate}&to_date=${toDate}`, {headers:{Authorization: `Bearer ${token}`}});
+    
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail || "Failed to load purchase analytics");
+    }
+
+    return await r.json();
+  },
+
   async updateTask(taskId, payload, token) {
     const r = await fetch(`/api/v1/tasks/${taskId}`, { method: "PUT", headers: this.headers(token), body: JSON.stringify(payload) });
     if (!r.ok) { const err = await r.json(); throw new Error(err.detail); }
@@ -956,6 +967,21 @@ const API = {
     return await r.json();
   },
 
+  async fetchPurchaseLedger(token){
+    const r = await fetch("/api/v1/master/items/purchase-ledger",
+      {
+        headers: {Authorization: `Bearer ${token}`,},
+      }
+    );
+
+    if (!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail);
+    }
+
+    return await r.json();
+  },
+  
   async generateQuote(sessionToken, payload){
     const response = await fetch("/api/v1/quotations/quotation",
       {

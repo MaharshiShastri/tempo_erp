@@ -14,6 +14,8 @@ export default function useItemMaster({sessionToken, setAlertMessage, setIsAlert
 
     const [stockLedger, setStockLedger] = useState([]);
 
+    const [purchaseLedger, setPurchaseLedger] = useState([]);
+
     const refreshItems = async() =>{
         try{
             const items = await API.fetchItemMaster(sessionToken);
@@ -64,12 +66,27 @@ export default function useItemMaster({sessionToken, setAlertMessage, setIsAlert
     }
     
     async function refreshStockLedger(){
+        try{
         const logs = await API.fetchStockLedger(sessionToken);
         setStockLedger(logs);
+        }catch(err){
+            setAlertMessage(err.message || "Failed to load stock ledger");
+            setIsAlertOpen(true);
+        }
+    }
+
+    async function refreshPurchaseLedger(){
+        try{
+            const purchases = await API.fetchPurchaseLedger(sessionToken);
+            setPurchaseLedger(Array.isArray(purchases) ? purchases : []);
+        }catch(err){
+            setAlertMessage(err.message || "Failed to load Purchase Ledger");
+            setIsAlertOpen(true);
+        }
     }
     return {itemsMaster, refreshItems, commitItemSubmit, defaultItemForm, setItemsMaster, itemForm,
         setItemForm, selectedItem, setSelectedItem, itemDetail, setItemDetail, isEditingItem, setIsEditingItem, 
         stockModal, setStockModal, stockModalOpen, openStockModal, closeStockModal, saveStockAdjustment,
-        stockLedger, refreshStockLedger,
+        stockLedger, refreshStockLedger, refreshPurchaseLedger, purchaseLedger, 
     };
 }

@@ -1,57 +1,3 @@
-"""
-Application service for the Tally synchronization pipeline.
-
-## Architecture
-
-tally_fetcher
-    -> tally_service
-        -> tally_client
-            -> Tally HTTP / XML / JSON helpers
-
-The service owns:
-
-    Tally response
-        -> raw XML persistence
-        -> normalized JSON
-        -> application mapping
-        -> ItemMaster upsert
-        -> OrderHeader upsert
-        -> OrderItem replacement
-        -> cancellation handling
-
-NOT responsible for:
-
-    - Tally HTTP implementation;
-    - XML parsing;
-    - ClientCompany creation/update;
-    - Sales/client master data;
-    - client contact information;
-    - client address maintenance.
-
-IMPORTANT CLIENT OWNERSHIP RULE
---------------------------------
-
-ClientCompany is maintained exclusively by the Sales team.
-
-Tally synchronization MUST NOT:
-
-    - create ClientCompany records;
-    - update ClientCompany records;
-    - populate client contact information;
-    - populate client address information;
-    - infer client city/pincode/contact details;
-    - delete ClientCompany records.
-
-Tally data is used only for ERP/order synchronization.
-
-The staging order may contain Tally-provided customer/order fields
-such as customer_code, billing_name, billing_address, state_name,
-buyer_gstin, etc. These fields belong to the Tally order snapshot and
-must NOT be treated as ClientCompany master-data updates.
-
-Database persistence belongs to this service.
-"""
-
 from __future__ import annotations
 
 import re
@@ -68,6 +14,9 @@ from database.models import (
     BillItem,
     OrderHeader,
     OrderItem,
+    PurchaseBill,
+    PurchaseBillItem,
+    TestItemMaster
 )
 
 from services.tally_client import (
@@ -144,7 +93,75 @@ def _parse_integer(value, default: int = 0,) -> int:
 
     return int(parsed)
 
+def _split_purchase_stock_item_name(stock_item_name: str | None) -> tuple[str|None, str|None]:
+    name = _clean_text(stock_item_name)
 
+    if not name or len(name) < 7:
+        return None, None
+
+    item_code = name[:7].strip()
+    item_specification = name[7:].strip()
+
+    return item_code, item_specification
+
+def _parse_quantity_and_unit(value)->tuple[Decimal, str|None]:
+    raw = _clean_text(value)
+
+    if not raw:
+        return Decimal("0"), None
+
+    quantity = _parse_decimal(raw, default=Decimal("0")) or Decimal("0")
+
+    unit_match = re.search(r"([A-Za-z]+)\.?\s*$", raw)
+
+    unit_measure = unit_match.group(1).upper() if unit_match else None
+
+    return quantity, unit_measure
+
+def _extract_purchase_gst_rate(inventory: dict) -> Decimal:
+    cgst_rate = Decimal("0")
+    sgst_rate = Decimal("0")
+    igst_rate = Decimal("0")
+
+    for rate_detail in _as_list(inventory.get("ratedetails")):
+        if not isinstance(rate_detail, dict):
+            continue
+
+        duty_head = (_clean_text(rate_detail.get("gstratedutyhead")) or "").upper()
+
+        rate = _parse_decimal(rate_detail.get("gstrate"), default=Decimal("0")) or Decimal("0")
+
+        if duty_head == "CGST":
+            cgst_rate = rate
+
+        elif duty_head == "SGST":
+            sgst_rate = rate
+
+        elif duty_head == "IGST":
+            igst_rate = rate
+
+    return max(cgst_rate + sgst_rate, igst_rate)
+
+def ensure_test_item_master(session, item_code: str, item_specification: str | None, unit_measure: str | None) -> TestItemMaster:
+    item = session.scalar(
+        select(TestItemMaster).where(TestItemMaster.item_code == item_code)
+    )
+
+    if item is None:
+        item = TestItemMaster(
+            item_code = item_code,
+            item_specification = item_specification,
+        )
+
+        session.add(item)
+        session.flush()
+
+        return item
+
+    if not item.item_specification and item_specification:
+        item.item_specification = item_specification
+
+    return item
 # ===========================================================================
 # Item Master persistence
 # ===========================================================================
@@ -1347,49 +1364,52 @@ def sync_voucher_dataset(
     # Do not silently put these into Sales Order tables.
     # ---------------------------------------------------------------
 
-    print(
-        f"{dataset}: no application persistence "
-        f"implemented for {voucher_type}; "
-        f"data retained only as normalized XML/JSON."
-    )
+    if dataset == "purchase":
+        mapped_path = save_json({"tallymessage": vouchers}, dataset=dataset, suffix="purchase_bills")
 
-    session.flush()
+        for raw_voucher in vouchers:
+            voucher_number =_clean_text(raw_voucher.get("vouchernumber"))
 
-    return {
-        "dataset": dataset,
-        "received": received,
-        "upserted": 0,
-        "cancelled": 0,
-        "skipped": received,
-        "items_written": 0,
-        "items_skipped": 0,
-        "xml_path": xml_path,
-        "normalized_path": normalized_path,
-    }
+            if _is_cancelled_voucher(raw_voucher):
+                cancelled += 1
 
-def voucher_to_bill(
-    session,
-    voucher: dict,
-) -> dict:
-    """
-    Upsert one Tally Sales voucher into:
+                changed = cancel_purchase_bill(session, voucher_number)
 
-        BillHeader
-        BillItem
+                print(f"{dataset}: cancelled\n{voucher_number!r} |\n marked_cancelled={changed}")
 
-    Tally Sales semantics:
+                continue
 
-        VOUCHERNUMBER -> bill_num
-        DATE          -> bill_date
-        REFERENCE     -> Sales Order OA ID
+            result = voucher_to_purchase_bill(session, raw_voucher)
 
-    Unknown ItemMaster items are skipped rather than violating
-    the BillItem -> ItemMaster FK.
-    """
+            if result["status"] == "skipped":
+                skipped += 1
 
-    bill_num = _clean_text(
-        voucher.get("vouchernumber")
-    )
+                print(f"{dataset}: skipped\n{voucher_number!r} |\n{result['reason']}")
+
+                continue
+
+            upserted += 1
+
+            items_written += result["items_written"]
+            items_skipped += result["items_skipped"]
+
+        session.flush()
+
+        return{
+            "dataset": dataset,
+            "received": received,
+            "upserted": upserted,
+            "cancelled": cancelled,
+            "skipped": skipped,
+            "items_written": items_written,
+            "items_skipped": items_skipped,
+            "xml_path": xml_path,
+            "normalized_path": normalized_path,
+           "mapped_path": mapped_path
+        }
+
+def voucher_to_bill(session, voucher: dict,) -> dict:
+    bill_num = _clean_text(voucher.get("vouchernumber"))
 
     if not bill_num:
         return {
@@ -1401,9 +1421,7 @@ def voucher_to_bill(
             "items_skipped": 0,
         }
 
-    bill_date = _parse_date(
-        voucher.get("date")
-    )
+    bill_date = _parse_date(voucher.get("date"))
 
     if not bill_date:
         return {
@@ -1415,51 +1433,23 @@ def voucher_to_bill(
             "items_skipped": 0,
         }
 
-    # ---------------------------------------------------------------
-    # Sales voucher:
-    #
-    # VOUCHERNUMBER = Bill number
-    # REFERENCE     = Sales Order OA ID
-    # ---------------------------------------------------------------
-
-    order_acceptance_id = _clean_text(
-        voucher.get("reference")
-    )
+    order_acceptance_id = _clean_text(voucher.get("reference"))
 
     order = None
 
     if order_acceptance_id:
         order = session.scalar(
-            select(OrderHeader).where(
-                OrderHeader.order_acceptance_id
-                == order_acceptance_id
-            )
+            select(OrderHeader).where(OrderHeader.order_acceptance_id == order_acceptance_id)
         )
 
-    # ---------------------------------------------------------------
-    # BILL HEADER
-    # ---------------------------------------------------------------
-
-    bill = session.get(
-        BillHeader,
-        bill_num,
-    )
+    bill = session.get(BillHeader, bill_num,)
 
     if bill is None:
         bill = BillHeader(
             bill_num=bill_num,
             bill_date=bill_date,
-            order_id=(
-                order.order_id
-                if order
-                else None
-            ),
-            indian_state=(
-                _clean_text(
-                    voucher.get("statename")
-                )
-                or None
-            ),
+            order_id=(order.order_id if order else None),
+            indian_state=(_clean_text(voucher.get("statename")) or None),
         )
 
         session.add(bill)
@@ -1467,60 +1457,31 @@ def voucher_to_bill(
     else:
         bill.bill_date = bill_date
 
-        bill.order_id = (
-            order.order_id
-            if order
-            else None
-        )
+        bill.order_id = (order.order_id if order else None)
 
-        bill.indian_state = (
-            _clean_text(
-                voucher.get("statename")
-            )
-            or None
-        )
+        bill.indian_state = (_clean_text(voucher.get("statename")) or None)
 
     session.flush()
 
-    # ---------------------------------------------------------------
-    # Replace existing BillItem snapshot
-    # ---------------------------------------------------------------
-
     session.execute(
-        delete(BillItem).where(
-            BillItem.bill_num == bill_num
-        )
+        delete(BillItem).where(BillItem.bill_num == bill_num)
     )
 
     items_written = 0
     items_skipped = 0
 
-    for inventory in _as_list(
-        voucher.get("allinventoryentries")
-    ):
+    for inventory in _as_list(voucher.get("allinventoryentries")):
 
-        if not isinstance(
-            inventory,
-            dict,
-        ):
+        if not isinstance(inventory, dict,):
             continue
 
-        item_code = _clean_text(
-            inventory.get("stockitemname")
-        )
+        item_code = _clean_text(inventory.get("stockitemname"))
 
         if not item_code:
             items_skipped += 1
             continue
 
-        # -----------------------------------------------------------
-        # ItemMaster FK protection
-        # -----------------------------------------------------------
-
-        item_master = session.get(
-            ItemMaster,
-            item_code,
-        )
+        item_master = session.get(ItemMaster, item_code,)
 
         if item_master is None:
             items_skipped += 1
@@ -1533,57 +1494,30 @@ def voucher_to_bill(
 
             continue
 
-        quantity = _parse_integer(
-            inventory.get("actualqty"),
-            default=0,
-        )
+        quantity = _parse_integer(inventory.get("actualqty"), default=0,)
 
         if quantity <= 0:
             items_skipped += 1
             continue
 
-        rate = _parse_decimal(
-            inventory.get("rate")
-        )
+        rate = _parse_decimal(inventory.get("rate"))
 
-        amount = abs(
-            _parse_decimal(
-                inventory.get("amount")
-            )
-            or Decimal("0")
-        )
-
-        # -----------------------------------------------------------
-        # Try to link the bill line to the corresponding OrderItem.
-        # This is optional.
-        # -----------------------------------------------------------
+        amount = abs(_parse_decimal(inventory.get("amount")) or Decimal("0"))
 
         order_item = None
 
         if order:
             order_item = session.scalar(
                 select(OrderItem)
-                .where(
-                    OrderItem.order_id
-                    == order.order_id,
-
-                    OrderItem.item_code
-                    == item_code,
-                )
-                .order_by(
-                    OrderItem.order_item_id
-                )
+                .where(OrderItem.order_id == order.order_id, OrderItem.item_code == item_code,)
+                .order_by(OrderItem.order_item_id)
             )
 
         session.add(
             BillItem(
                 bill_num=bill_num,
 
-                order_item_id=(
-                    order_item.order_item_id
-                    if order_item
-                    else None
-                ),
+                order_item_id=(order_item.order_item_id if order_item else None),
 
                 item_code=item_code,
 
@@ -1602,12 +1536,120 @@ def voucher_to_bill(
     return {
         "status": "upserted",
         "bill_num": bill_num,
-        "order_id": (
-            order.order_id
-            if order
-            else None
-        ),
+        "order_id": (order.order_id if order else None),
         "order_match": bool(order),
         "items_written": items_written,
         "items_skipped": items_skipped,
     }
+
+def voucher_to_purchase_bill(session, voucher: dict) -> dict:
+    voucher_number = _clean_text(voucher.get("vouchernumber"))
+
+    purchase_date = _parse_date(voucher.get("date"))
+
+    if not voucher_number:
+        return {
+            'status': "skipped",
+            "reason": "missing voucher number",
+            "items_written": 0,
+            "items_skipped": 0
+        }
+
+    if not purchase_date:
+        return{
+            "status": "skipped",
+            "reason": "missing purchase date",
+            "items_written": 0,
+            "items_skipped": 0,
+        }
+
+    party_name = _clean_text(voucher.get("partyname"))
+
+    if not party_name:
+        return {
+            "status": "skipped",
+            "reason": "missing party name",
+            "items_written": 0,
+            "items_skipped": 0,
+        }
+
+    purchase_bill = session.get(PurchaseBill, voucher_number)
+
+    if purchase_bill is None:
+        purchase_bill = PurchaseBill(voucher_number = voucher_number, purchase_date = purchase_date, party_name = party_name)
+
+        session.add(purchase_bill)
+
+    purchase_bill.purchase_date = purchase_date
+    purchase_bill.purchase_order_date = _parse_date(voucher.get("referencedate"))
+
+    purchase_bill.party_name = party_name
+    purchase_bill.place_of_supply = _clean_text(voucher.get("placeofsupply"))
+
+    purchase_bill.is_cancelled = False
+
+    session.flush()
+
+    session.execute(delete(PurchaseBillItem).where(PurchaseBillItem.purchase_voucher_number == voucher_number))
+
+    items_written = 0
+    items_skipped = 0
+
+    for line_number, inventory in enumerate(_as_list(voucher.get("allinventoryentries")), start=1):
+        if not isinstance(inventory, dict):
+            items_skipped += 1
+            continue
+
+        item_code, item_specification = _split_purchase_stock_item_name(inventory.get("stockitemname"))
+
+        if not item_code:
+            items_skipped += 1
+            continue
+
+        billed_quantity, unit_measure = _parse_quantity_and_unit(inventory.get("billedqty"))
+
+        if billed_quantity <= 0:
+            items_skipped += 1
+            continue
+
+        rate = _parse_decimal(inventory.get("rate"), default=Decimal("0")) or Decimal("0")
+
+        amount = abs(_parse_decimal(inventory.get("amount"), default=Decimal("0")) or Decimal("0"))
+
+        purchased_item = ensure_test_item_master(session=session, item_code=item_code, item_specification=item_specification, unit_measure=unit_measure)
+
+        session.add(
+            PurchaseBillItem(
+                purchase_voucher_number = voucher_number,
+                line_number = line_number,
+                item_code = item_code,
+                item_specification = item_specification,
+                billed_quantity = billed_quantity,
+                unit_measure = unit_measure,
+                rate=rate,
+                amount=amount,
+                gst_rate = _extract_purchase_gst_rate(inventory),
+                )
+            )
+
+        items_written += 1
+
+    return{
+        "status": "upserted",
+        "voucher_number": voucher_number,
+        "items_written": items_written,
+        "items_skipped": items_skipped,
+    }
+
+def cancel_purchase_bill(session, voucher_number: str | None) -> bool:
+    if not voucher_number:
+        return False
+
+    purchase_bill = session.get(PurchaseBill, voucher_number)
+
+    if purchase_bill is None:
+        return False
+
+    purchase_bill.is_cancelled = True
+
+    return True

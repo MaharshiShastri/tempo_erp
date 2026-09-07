@@ -3,14 +3,8 @@ import { Line, Bar, Doughnut } from "react-chartjs-2";
 
 import GeoMapCanvas from "../components/geo/GeoMapCanvas";
 import SearchableMultiSelect from "../components/shared/SearchableMultiselect";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import PurchaseRateBoxPlot from "@/components/charts/PurchaseRateBoxPlot";
+import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
 
 import { Button } from "@/components/ui/button";
 
@@ -18,70 +12,27 @@ import { Input } from "@/components/ui/input";
 
 import { Label } from "@/components/ui/label";
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import {Tabs, TabsContent, TabsList, TabsTrigger,} from "@/components/ui/tabs";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 
 import { Badge } from "@/components/ui/badge";
 
 import { Separator } from "@/components/ui/separator";
 
 export default function ProductionAnalyticsView({ state }) {
-  const {
-    productionBarChart,
-    productionPieChart,
-    productionLineChart,
-    prodKpis,
-    fetchAnalytics,
-    fromDate,
-    toDate,
-    setFromDate,
-    setToDate,
-    downloadPendingOrdersExcel,
-    isDownloadingPendingOrders,
-
-    indiaMap,
-    visibleMap,
-    isLoading,
-
-    selectedStates,
-    setSelectedStates,
-
-    selectedItems,
-    setSelectedItems,
-
-    selectedGroups,
-    setSelectedGroups,
-  } = state;
+  const {productionBarChart, productionPieChart, productionLineChart, prodKpis, fetchAnalytics, fromDate,
+        toDate, setFromDate, setToDate, downloadPendingOrdersExcel, isDownloadingPendingOrders, indiaMap,
+        visibleMap, isLoading, selectedStates, setSelectedStates, selectedItems, setSelectedItems, selectedGroups,
+        setSelectedGroups, summary, batches, supplierAnalysis, itemAnalysis, rateTrend, rateDistribution, 
+        mostExpensiveBatch, cheapestBatch, largestBatches, getBoxStats, purchaseItemCodes, selectedPurchaseItem,
+        setSelectedPurchaseItem} = state;
 
   const [activeView, setActiveView] = useState("statistics");
 
-  const orderSummary =
-    prodKpis?.order_quantity_summary || {
-      ordered: 0,
-      shipped: 0,
-      pending: 0,
-    };
+  const orderSummary = prodKpis?.order_quantity_summary || {ordered: 0, shipped: 0, pending: 0,};
 
-  const fulfillmentPercentage =
-    orderSummary.ordered > 0
-      ? (
-          (orderSummary.shipped / orderSummary.ordered) *
-          100
-        ).toFixed(1)
-      : "0.0";
+  const fulfillmentPercentage = orderSummary.ordered > 0 ? ((orderSummary.shipped / orderSummary.ordered) * 100).toFixed(1) : "0.0";
 
   // ------------------------------------------------------------
   // Geographic data
@@ -196,7 +147,7 @@ export default function ProductionAnalyticsView({ state }) {
           100
         ).toFixed(1)
       : "0.0";
-
+  
   // ------------------------------------------------------------
   // Loading
   // ------------------------------------------------------------
@@ -225,11 +176,11 @@ export default function ProductionAnalyticsView({ state }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            🏭 Production Dashboard
+            📦 Purchase Analytics
           </h2>
 
           <p className="text-sm text-muted-foreground">
-            Shop Floor Performance Analytics
+            Purchased material cost, supplier pricing and batch-rate analysis
           </p>
         </div>
 
@@ -266,11 +217,7 @@ export default function ProductionAnalyticsView({ state }) {
 
           <Button
             onClick={() =>
-              fetchAnalytics(
-                "Shop Floor Administrator",
-                fromDate,
-                toDate
-              )
+              fetchAnalytics("Shop Floor Administrator", fromDate, toDate)
             }
           >
             Refresh
@@ -297,7 +244,7 @@ export default function ProductionAnalyticsView({ state }) {
           </TabsTrigger>
 
           <TabsTrigger value="shopfloor">
-            Shop Floor
+            Purchase
           </TabsTrigger>
 
           <TabsTrigger value="geo">
@@ -850,22 +797,316 @@ export default function ProductionAnalyticsView({ state }) {
 
         <TabsContent
           value="shopfloor"
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          className="space-y-6"
         >
-          <KpiCard
-            title="Machine Utilization"
-            value="92%"
-          />
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Purchase Item Analysis
+              </CardTitle>
 
-          <KpiCard
-            title="Downtime"
-            value="1.8%"
-          />
+              <CardDescription>
+                Select one purchased item to analyse its
+                purchase rates, suppliers and batch history.
+              </CardDescription>
+            </CardHeader>
 
-          <KpiCard
-            title="Efficiency"
-            value="97%"
-          />
+            <CardContent>
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                <SearchableMultiSelect
+                  label="Purchased Item"
+                  options={purchaseItemCodes}
+                  value={selectedPurchaseItem ? [selectedPurchaseItem] : []}
+                  onChange={(values) => setSelectedPurchaseItem(values[0] || "")}
+                  single
+                />
+
+                {selectedPurchaseItem && (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setSelectedPurchaseItem("")
+                    }
+                  >
+                    Clear Selection
+                  </Button>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  {purchaseItemCodes.length.toLocaleString("en-IN")} purchased items
+                </Badge>
+
+                {selectedPurchaseItem && (
+                  <Badge>Analysing: {selectedPurchaseItem}</Badge>
+                )}
+              </div>
+
+            </CardContent>
+          </Card>
+          {/* ======================================================
+              PURCHASE KPIs
+          ====================================================== */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="Total Purchase Value"
+              value={`₹${summary.totalPurchaseValue.toLocaleString(
+                "en-IN",
+                {
+                  maximumFractionDigits: 0,
+                }
+              )}`}
+              description="Total purchased value"
+            />
+
+            <KpiCard
+              title="Purchase Batches"
+              value={summary.batchCount}
+              description="Purchase bill lines"
+            />
+
+            <KpiCard
+              title="Suppliers"
+              value={summary.supplierCount}
+              description="Unique suppliers"
+            />
+
+            <KpiCard
+              title="Items Purchased"
+              value={summary.itemCount}
+              description="Unique item codes"
+            />
+          </div>
+
+
+          {/* ======================================================
+              RATE KPIs
+          ====================================================== */}
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="Average Batch Rate"
+              value={`₹${summary.averageBatchRate.toFixed(2)}`}
+              description="Simple average purchase rate"
+            />
+
+            <KpiCard
+              title="Weighted Average Rate"
+              value={`₹${summary.weightedAverageRate.toFixed(2)}`}
+              description="Quantity-weighted purchase rate"
+            />
+
+            <KpiCard
+              title="Cheapest Batch"
+              value={`₹${summary.minimumBatchRate.toFixed(2)}`}
+              description={
+                cheapestBatch
+                  ? cheapestBatch.supplier
+                  : "No data"
+              }
+              valueClassName="text-emerald-600"
+            />
+
+            <KpiCard
+              title="Most Expensive Batch"
+              value={`₹${summary.maximumBatchRate.toFixed(2)}`}
+              description={
+                mostExpensiveBatch
+                  ? mostExpensiveBatch.supplier
+                  : "No data"
+              }
+              valueClassName="text-destructive"
+            />
+          </div>
+
+
+          {/* ======================================================
+              EXTREME BATCHES
+          ====================================================== */}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <PurchaseBatchCard
+              title="Most Expensive Batch"
+              batch={mostExpensiveBatch}
+              variant="expensive"
+            />
+
+            <PurchaseBatchCard
+              title="Cheapest Batch"
+              batch={cheapestBatch}
+              variant="cheap"
+            />
+          </div>
+
+
+          {/* ======================================================
+              BOX & WHISKER ANALYSIS
+          ====================================================== */}
+
+          <div className="grid gap-6 xl:grid-cols-2">
+
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Supplier Rate Distribution
+                </CardTitle>
+
+                <CardDescription>
+                  Purchase rate variation across suppliers.
+                  The box represents the middle 50% of rates,
+                  while whiskers show the spread.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent>
+                <div className="h-[450px]">
+                  <PurchaseRateBoxPlot
+                    batches={batches}
+                    groupBy="supplier"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Item Rate Distribution
+                </CardTitle>
+
+                <CardDescription>
+                  Compare purchase rate variability across
+                  different material items.
+                </CardDescription>
+              </CardHeader>
+
+            </Card>
+
+          </div>
+
+
+          {/* ======================================================
+              SUPPLIER ANALYSIS
+          ====================================================== */}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Supplier Price Analysis
+              </CardTitle>
+
+              <CardDescription>
+                Compare supplier pricing, purchase volume,
+                and total spend.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        Supplier
+                      </TableHead>
+
+                      <TableHead className="text-right">
+                        Batches
+                      </TableHead>
+
+                      <TableHead className="text-right">
+                        Quantity
+                      </TableHead>
+
+                      <TableHead className="text-right">
+                        Spend
+                      </TableHead>
+
+                      <TableHead className="text-right">
+                        Avg Rate
+                      </TableHead>
+
+                      <TableHead className="text-right">
+                        Min Rate
+                      </TableHead>
+
+                      <TableHead className="text-right">
+                        Max Rate
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+
+                  <TableBody>
+                    {supplierAnalysis?.length ? (
+                      supplierAnalysis.map((supplier) => (
+                        <TableRow
+                          key={supplier.supplier}
+                        >
+                          <TableCell className="font-medium">
+                            {supplier.supplier}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            {supplier.batch_count}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            {Number(
+                              supplier.quantity || 0
+                            ).toLocaleString()}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            ₹{Number(
+                              supplier.total_spend || 0
+                            ).toLocaleString(
+                              "en-IN",
+                              {
+                                maximumFractionDigits: 0,
+                              }
+                            )}
+                          </TableCell>
+
+                          <TableCell className="text-right font-semibold">
+                            ₹{Number(
+                              supplier.average_rate || 0
+                            ).toFixed(2)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-emerald-600">
+                            ₹{Number(
+                              supplier.minimum_rate || 0
+                            ).toFixed(2)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-destructive">
+                            ₹{Number(
+                              supplier.maximum_rate || 0
+                            ).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="py-10 text-center text-muted-foreground"
+                        >
+                          No supplier purchase data available.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
         </TabsContent>
 
         {/* ====================================================
@@ -1126,4 +1367,103 @@ function KpiCard({
       </CardContent>
     </Card>
   );
+}
+
+function PurchaseBatchCard({
+    title,
+    batch,
+    variant,
+}) {
+    if (!batch) {
+        return (
+            <Card>
+                <CardContent className="py-10 text-center text-muted-foreground">
+                    No purchase data available.
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{title}</CardTitle>
+
+                <CardDescription>
+                    Single purchase batch with the
+                    {variant === "expensive"
+                        ? " highest"
+                        : " lowest"} recorded rate
+                </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+
+                <div className="text-3xl font-bold">
+                    ₹{Number(batch.rate).toFixed(2)}
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                        / {batch.unit_measure || "unit"}
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+
+                    <div>
+                        <p className="text-xs text-muted-foreground">
+                            Supplier
+                        </p>
+                        <p className="font-medium">
+                            {batch.supplier}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-muted-foreground">
+                            Item
+                        </p>
+                        <p className="font-mono font-medium">
+                            {batch.item_code}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-muted-foreground">
+                            Quantity
+                        </p>
+                        <p>
+                            {batch.quantity.toLocaleString()}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-muted-foreground">
+                            Batch Value
+                        </p>
+                        <p>
+                            ₹{batch.amount.toLocaleString(
+                                "en-IN"
+                            )}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-muted-foreground">
+                            Purchase Date
+                        </p>
+                        <p>{batch.purchase_date}</p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-muted-foreground">
+                            Voucher
+                        </p>
+                        <p className="font-mono">
+                            {batch.voucher_number}
+                        </p>
+                    </div>
+
+                </div>
+            </CardContent>
+        </Card>
+    );
 }

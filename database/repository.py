@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime, date, timedelta, time
 from decimal import Decimal
+from collections import defaultdict
 
 from sqlalchemy import create_engine, select, update, delete, or_, and_, func, any_, case, desc, text
 from sqlalchemy.orm import sessionmaker, joinedload, selectinload, aliased
@@ -17,7 +18,7 @@ from database.models import (
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
     SystemNotification, TestItemMaster, StockLedger, Quotation, ProductionStageHistory,
-    QuotationChangeSnapshot, SalesTarget,
+    QuotationChangeSnapshot, SalesTarget, PurchaseBillItem, PurchaseBill,
 )
 from schemas.logistics_schema import FullPartnerProfile
 from services.item_matcher import resolve_item_code
@@ -30,7 +31,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAaL", f"postgresql://{USER}:{PASSWORD}@host.docker.internal:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL_LCOAL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -1431,6 +1432,52 @@ class PostgresRepository:
                 }
                 for log, operator_name, item_name in logs
             ]
+
+    def get_purchase_ledger(self):
+        with SessionLocal() as session:
+            purchases = (session.query(
+                PurchaseBill.voucher_number,
+                PurchaseBill.purchase_date,
+                PurchaseBill.purchase_order_date,
+                PurchaseBill.party_name,
+                PurchaseBill.place_of_supply,
+                PurchaseBill.is_cancelled,
+
+                PurchaseBillItem.id.label("line_id"),
+                PurchaseBillItem.line_number,
+                PurchaseBillItem.item_code,
+                PurchaseBillItem.item_specification,
+                PurchaseBillItem.billed_quantity,
+                PurchaseBillItem.unit_measure,
+                PurchaseBillItem.rate,
+                PurchaseBillItem.amount,
+                PurchaseBillItem.gst_rate
+            )
+            .join(PurchaseBillItem, PurchaseBillItem.purchase_voucher_number == PurchaseBill.voucher_number)
+            .order_by(PurchaseBill.purchase_date.desc(), PurchaseBill.voucher_number.desc(), PurchaseBillItem.line_number.asc())
+            .all()
+            )
+
+            return [
+                {
+                    "id": row.line_id,
+                    "voucher_number": row.voucher_number,
+                    "purchase_date": row.purchase_date,
+                    "purchase_order_date": row.purchase_order_date,
+                    "supplier": row.party_name,
+                    "place_of_supply": row.place_of_supply,
+                    "is_cancelled": row.is_cancelled,
+                    "line_number": row.line_number,
+                    "item_code": row.item_code,
+                    "item_specification": row.item_specification,
+                    "billed_quantity": float(row.billed_quantity),
+                    "unit_measure": row.unit_measure,
+                    "rate": float(row.rate),
+                    "amount": float(row.amount),
+                    "gst_rate": float(row.gst_rate),
+                }
+                for row in purchases
+            ]
     # --- ITEM MASTERY end---
     
     # --- CONTEXTUAL ACCOUNTABILITY HUB (ACTIVITY LOGS) start---
@@ -2798,7 +2845,213 @@ class PostgresRepository:
                 "ordered_and_billed":
                     ordered_and_billed,
             }
-    
+
+    def get_purchase_analytics(self, from_date, to_date):
+        with SessionLocal() as session:
+            rows = session.execute(
+                select(
+                    PurchaseBill.voucher_number,
+                    PurchaseBill.purchase_date,
+                    PurchaseBill.party_name,
+                    PurchaseBill.is_cancelled,
+
+                    PurchaseBillItem.id.label("purchase_item_id"),
+                    PurchaseBillItem.line_number,
+                    PurchaseBillItem.item_code,
+                    PurchaseBillItem.item_specification,
+                    PurchaseBillItem.billed_quantity,
+                    PurchaseBillItem.unit_measure,
+                    PurchaseBillItem.rate, 
+                    PurchaseBillItem.amount,
+                    PurchaseBillItem.gst_rate
+                )
+                .join(PurchaseBillItem, PurchaseBillItem.purchase_voucher_number == PurchaseBill.voucher_number,)
+                .where(
+                    PurchaseBill.purchase_date.between(from_date, to_date),
+                    PurchaseBill.is_cancelled.is_(False)
+                )
+                .order_by(
+                    PurchaseBill.purchase_date, 
+                    PurchaseBill.voucher_number,
+                    PurchaseBillItem.line_number,
+                )
+        ).all()
+
+        batches = []
+
+        for row in rows:
+            batches.append(
+                {
+                    "purchase_item_id": row.purchase_item_id,
+                    "voucher_number": row.voucher_number,
+                    "purchase_date": str(row.purchase_date) if row.purchase_date else None,
+                    "supplier": row.party_name,
+                    "item_code": row.item_code,
+                    "item_specification": row.item_specification if row.item_specification else None,
+                    "line_number": row.line_number,
+                    "quantity": float(row.billed_quantity or 0),
+                    "unit_measure": row.unit_measure or "",
+                    "rate": float(row.rate or 0),
+                    "amount": float(row.amount or 0),
+                    "gst_rate": float(row.gst_rate or 0),
+                }
+            )
+
+        if not batches:
+            return {
+                "summary":{
+                    "total_voucher_value": 0,
+                    "total_quantity": 0,
+                    "batch_count": 0,
+                    "supplier_count": 0,
+                    "item_count": 0,
+                    "average_batch_rate": 0,
+                    "weighted_average_rate": 0,
+                    "minimum_batch_rate": 0,
+                    "maximum_batch_rate": 0,
+                },
+                "purchase_item_codes": [],
+                "rate_distribution": [],
+                "supplier_analysis": [],
+                "item_analysis": [],
+                "rate_trend": [],
+                "largest_batches": [],
+                "most_expensive_batch": None,
+                "cheapest_batch": None,
+            }
+
+        purchase_item_codes = sorted({batch["item_code"] for batch in batches if batch.get("item_code")})
+
+        rates = [float(x["rate"]) for x in batches if x["rate"] is not None]
+
+        total_purchase_value = sum(x["amount"] for x in batches)
+
+        total_quantity = sum(x["quantity"] for x in batches)
+
+        total_rate_quantity = sum(x["rate"] * x["quantity"] for x in batches)
+
+        average_batch_rate = sum(rates) / len(rates) if rates else 0
+
+        weighted_average_rate = total_rate_quantity / total_quantity if total_quantity else 0
+
+        most_expensive_batch = max(batches, key=lambda x: x["rate"], default=None)
+
+        cheapest_batch = min(batches, key=lambda x: x["rate"], default=None)
+
+        rate_distribution = sorted(rates)
+
+        supplier_map = defaultdict(lambda: {
+            "batch_count": 0,
+            "quantity": 0,
+            "total_spend": 0, 
+            "rate_values": [],
+        })
+
+        for batch in batches:
+            supplier = batch["supplier"]
+            data = supplier_map[supplier]
+            data["batch_count"] += 1
+            data["quantity"] += batch["quantity"]
+            data["total_spend"] += batch["amount"]
+            data["rate_values"].append(batch["rate"])
+
+        supplier_analysis = []
+
+        for supplier, data in supplier_map.items():
+            supplier_rates = data["rate_values"]
+            supplier_analysis.append(
+                {
+                    "supplier": supplier,
+                    "batch_count": data["batch_count"],
+                    "quantity": data["quantity"],
+                    "total_spend": data["total_spend"],
+                    "average_rate": sum(supplier_rates)/len(supplier_rates) if supplier_rates else 0,
+                    "minimum_rate": min(supplier_rates) if supplier_rates else 0,
+                    "maximum_rate": max(supplier_rates) if supplier_rates else 0,
+                }
+            )
+
+        supplier_analysis.sort(key=lambda x: x["total_spend"],  reverse=True,)
+
+        item_map = defaultdict(
+            lambda: {
+                "batch_count": 0,
+                "quantity": 0,
+                "total_spend": 0,
+                "rate_values": [],
+            }
+        )
+
+        for batch in batches:
+            item_code = batch["item_code"]
+            data = item_map[item_code]
+
+            data["batch_count"] += 1
+            data["quantity"] += batch["quantity"]
+            data["total_spend"] += batch["amount"]
+            data["rate_values"].append(batch["rate"])
+
+        item_analysis = []
+
+        for item_code, data in item_map.items():
+            item_rates = data["rate_values"]
+            item_analysis.append({
+                "item_code": item_code,
+                "batch_count": data["batch_count"],
+                "quantity": data["quantity"],
+                "total_spend": data["total_spend"],
+                "average_rate": sum(item_rates) / len(item_rates) if item_rates else 0,
+                "minimum_rate": min(item_rates) if item_rates else 0,
+                "maximum_rate": max(item_rates) if item_rates else 0,
+            })
+
+        item_analysis.sort(key=lambda x: x["total_spend"], reverse = True)
+
+        daily_rates = defaultdict(list)
+
+        for batch in batches:
+            daily_rates[batch["purchase_date"]].append(batch["rate"])
+
+        rate_trend = []
+
+        for day, day_rates in sorted(daily_rates.items()):
+            rate_trend.append({
+                "date": day,
+                "average_rate": sum(day_rates)/len(day_rates),
+                "minimum_rate": min(day_rates),
+                "maximum_rate": max(day_rates),
+                "batch_count": len(day_rates),
+            })
+
+        largest_batches = sorted(batches, key=lambda x: x["amount"], reverse=True)[:10]
+
+        return{
+            "summary": {
+                "total_purchase_value": total_purchase_value,
+                "total_quantity": total_quantity,
+                "batch_count": len(batches),
+
+                "supplier_count": len(supplier_map),
+                "item_count": len(item_map),
+                "average_batch_rate": average_batch_rate,
+                "weighted_average_rate": weighted_average_rate,
+                "minimum_batch_rate": min(rates) if rates else 0,
+                "maximum_batch_rate": max(rates) if rates else 0,
+            },
+
+            "purchase_item_codes": purchase_item_codes,
+
+            "rate_distribution": rate_distribution,
+            "most_expensive_batch": most_expensive_batch,
+            "cheapest_batch": cheapest_batch,
+
+            "supplier_analysis": supplier_analysis,
+            "item_analysis": item_analysis,
+            "rate_trend": rate_trend,
+            "largest_batches": largest_batches,
+            "batches": batches
+        }
+        
     def get_gtm_analytics(self, from_date, to_date):
         with SessionLocal() as session:
 

@@ -183,7 +183,6 @@ export default function useERPState() {
         production.loadPulse?.();
         analytics.fetchAnalytics?.(core.user.role, analytics.fromDate, analytics.toDate);
         core.getUsers?.(core.sessionToken);
-        indiaMap.loadIndia?.();//loading map
 
         if (salesRoles.includes(core.user.role)) { //Sales module refresh
             companies.refreshCompanies?.();
@@ -196,6 +195,7 @@ export default function useERPState() {
 
         if (transportRoles.includes(core.user.role)) { //Transport module refresh
             dispatch.loadPartners?.();
+            indiaMap.loadIndia?.();//loading map
         }
 
         if (factoryRoles.includes(core.user.role)) { //Shop floor module refresh
@@ -205,6 +205,7 @@ export default function useERPState() {
 
         if(adminRoles.includes(core.user.role)){
             admin.loadUsers?.();
+            indiaMap.loadIndia?.();//loading map
         }
     }, [core.user, core.sessionToken]);
 
