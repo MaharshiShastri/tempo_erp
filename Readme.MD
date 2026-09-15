@@ -2,12 +2,12 @@
 
 > An integrated, AI-assisted enterprise platform for Sales, CRM, Quotations, Orders, Manufacturing, Inventory, Logistics, Billing, Tally synchronization and operational analytics.
 
-**Status:** Active internal development / production-oriented ERP
-**Backend:** FastAPI + SQLAlchemy + PostgreSQL
-**Frontend:** React + Vite
-**Infrastructure:** Docker + Nginx + Redis + Celery
-**AI:** Groq-powered LLM services + ChromaDB
-**Accounting Integration:** Tally
+**Status:** Active internal development / production-oriented ERP\
+**Backend:** FastAPI + SQLAlchemy + PostgreSQL\
+**Frontend:** React + Vite\
+**Infrastructure:** Docker + Nginx + Redis + Celery\
+**AI:** Groq-powered LLM services + ChromaDB\
+**Accounting Integration:** Tally\
 **Database Migrations:** Alembic
 
 ---
@@ -49,25 +49,25 @@ The long-term objective is to evolve the platform into an **AI-assisted operatin
 
 ```text
                     ┌──────────────────────────┐
-                    │       React Frontend      │
-                    │      React + Vite         │
+                    │       React Frontend     │
+                    │      React + Vite        │
                     └────────────┬─────────────┘
                                  │
                               HTTPS
                                  │
                     ┌────────────▼─────────────┐
-                    │          Nginx            │
-                    │     Reverse Proxy         │
+                    │          Nginx           │
+                    │     Reverse Proxy        │
                     └────────────┬─────────────┘
                                  │
                     ┌────────────▼─────────────┐
-                    │        FastAPI            │
-                    │      REST API Layer       │
+                    │        FastAPI           │
+                    │      REST API Layer      │
                     └────────────┬─────────────┘
                                  │
              ┌───────────────────┼────────────────────┐
              │                   │                    │
-     ┌───────▼───────┐   ┌──────▼───────┐    ┌──────▼───────┐
+     ┌───────▼───────┐   ┌───────▼──────┐    ┌────────▼─────┐
      │   PostgreSQL  │   │    Redis     │    │   File Store │
      │   ERP Data    │   │ Queue/Cache  │    │ Documents    │
      └───────────────┘   └──────┬───────┘    └──────────────┘
@@ -79,9 +79,9 @@ The long-term objective is to evolve the platform into an **AI-assisted operatin
                          └──────────────┘
 
         ┌──────────────────────────────────────────────┐
-        │                 External Systems              │
+        │                 External Systems             │
         │                                              │
-        │  Tally   │   Groq AI   │   Snov.io   │ etc. │
+        │  Tally   │   Groq AI   │   Snov.io   │ etc.  │
         └──────────────────────────────────────────────┘
 ```
 
@@ -773,7 +773,7 @@ Introduce:
 ```text
 Finished Product
       ↓
-BOM
+     BOM
       ↓
 Subassemblies
       ↓
@@ -822,7 +822,7 @@ The long-term goal is to evolve the ERP into an intelligent operational platform
                        │
         ┌──────────────┼──────────────┐
         │              │              │
-     Humans          Rules           AI
+     Humans          Rules            AI
         │              │              │
         └──────────────┼──────────────┘
                        │
