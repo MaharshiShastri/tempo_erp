@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from schemas.auth_schema import LoginInput, UserProfileResponse, UserCreateInput, UserUpdateInput, PromptGeneratorRequest
 from database.repository import EDBR
-from security import verify_bearer_token, SECRET_KEY
+from security import verify_bearer_token, SECRET_KEY, ALGORITHM
 import jwt
 import logging
 from datetime import datetime, timedelta, timezone
@@ -25,7 +25,7 @@ def login_session_gate(payload: LoginInput):
         logger.info(f"User validated successfully.")
 
         jwt_payload = {"email": user['email'], "role": user['role'], "department": user.get('department', 'General'), "exp": datetime.now(timezone.utc) + timedelta(hours=9.5)}
-        token = jwt.encode(jwt_payload, SECRET_KEY, algorithm="HS256")
+        token = jwt.encode(jwt_payload, SECRET_KEY, algorithm=ALGORITHM)
 
         if user:
             return{

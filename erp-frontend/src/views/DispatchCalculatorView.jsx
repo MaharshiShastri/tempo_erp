@@ -347,7 +347,7 @@ export default function DispatchCalculatorView({
           </CardHeader>
 
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <FormField label="Total Invoice Value (₹)">
                 <IndianCurrencyInput
                   className="w-full"
@@ -380,10 +380,7 @@ export default function DispatchCalculatorView({
                   required
                   value={state?.dim?.destination_city}
                   onChange={(e) =>
-                    state?.setDim({
-                      ...state?.dim,
-                      destination_city: e.target.value,
-                    })
+                    state?.setDim({...state?.dim, destination_city: e.target.value,})
                   }
                 />
               </FormField>
@@ -402,6 +399,11 @@ export default function DispatchCalculatorView({
                     })
                   }
                 />
+              </FormField>
+
+              <FormField label="Fuel Price(₹/L)">
+                  <Input type="number" min="0" step="0.01" required value={state?.dim?.fuel_price ?? 0}
+                  onChange={(e)=> state?.setDim({...state?.dim, fuel_price: Number(e.target.value)})} />
               </FormField>
             </div>
           </CardContent>

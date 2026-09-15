@@ -8,7 +8,7 @@ from decimal import Decimal
 from collections import defaultdict
 from pathlib import Path
 from uuid import uuid4
-
+from security import verify_password, hash_password
 from sqlalchemy import create_engine, select, update, delete, or_, and_, func, any_, case, desc, text
 from sqlalchemy.orm import sessionmaker, joinedload, selectinload, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -34,7 +34,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAaL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/testing_DB")
+DB_DSN = os.getenv("DATABASE_URrL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/tempo_erp_backup")
 
 TASK_UPLOAD_DIR = Path("uploaded_task_attachments")
 TASK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,21 +79,24 @@ class PostgresRepository:
     def get_user(self, email: str, password: str = None):
         with SessionLocal() as session:
             if password:
-                stmt = select(User).where(User.email == email, User.password_hash == password)
-                logger.info(f"{email} {password}")
+                stmt = select(User).where(User.email == email)
             else:
                 # Removed password_hash from return dictionary intentionally based on old behavior
                 stmt = select(User).where(User.email == email)
             
             user = session.scalars(stmt).first()
             if not user: return None
-            
+
+            if password is not None:
+                if not verify_password(user.password_hash, password,):
+                    return None
             # Formatting similarly to old RealDictCursor selected fields
             return {
-                "email": user.email, "name": user.name, "role": user.role, 
-                "regions": user.regions, "password_hash": user.password_hash
-            } if password else {
-                "email": user.email, "name": user.name, "role": user.role, "regions": user.regions
+                "email": user.email,
+                "name": user.name,
+                "role": user.role,
+                "regions": user.regions,
+                "department": user.department,
             }
 
     def get_all_users(self):
@@ -108,7 +111,7 @@ class PostgresRepository:
             new_user = User(
                 email=user_data['email'],
                 name=user_data['name'],
-                password_hash=user_data['password'],
+                password_hash=hash_password(user_data['password']),
                 role=user_data['role'],
                 dob=user_data.get('dob'),
                 phone_personal=user_data.get('phone_personal'),
@@ -127,8 +130,10 @@ class PostgresRepository:
                 
             user.name = user_data['name']
             user.role = user_data['role']
+
             if user_data.get('password'):
-                user.password_hash = user_data['password']
+                user.password_hash = hash_password(user_data['password'])
+
             user.dob = user_data.get('dob')
             user.phone_personal = user_data.get('phone_personal')
             user.phone_business = user_data.get('phone_business')

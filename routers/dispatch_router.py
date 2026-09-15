@@ -4,13 +4,13 @@ from security import verify_bearer_token
 from services.dispatch_calculator import execute_dispatch_algorithm
 from .dependencies import check_department
 import logging
-from schemas.logistics_schema import FullPartnerProfile, LogisticsPartnerCreate
+from schemas.logistics_schema import FullPartnerProfile
 import traceback
 import shutil
 import PyPDF2
 from pathlib import Path
 from services.ai_contract_parser import extract_logistics_profile_from_text
-from services.ai_region_classifier import classify_city_zone
+
 
 router = APIRouter(prefix="/api/v1/dispatch", tags=["Dispatch Logistics Engine"])
 
@@ -22,25 +22,6 @@ def get_partners(user: dict = Depends(verify_bearer_token)):
 def get_partners(user: dict = Depends(verify_bearer_token)):
     return EDBR.get_logistics_partners()
 
-"""@router.post("/pre-identify-zones")
-def pre_identify_zones(payload: dict, user: dict = Depends(verify_bearer_token)):
-    city = payload.get("city")
-    state = payload.get("state")
-    partners =  EDBR.get_logistics_partners()
-
-    identified_zones = {}
-    for p in partners:
-        zone_data = EDBR.get_partner_zones(p["id"])
-
-        zone = classify_city_zone(city, zone_data["zones"])
-        if isinstance(zone, list) and len(zone) > 0:
-            identified_zones[str(p['id'])] = zone[0]
-        elif isinstance(zone, str):
-            identified_zones[str(p['id'])] = zone
-        
-    print(identified_zones)
-    return identified_zones
-"""
 @router.post("/evaluate")
 def evaluate_costs(payload: dict, user: dict = Depends(verify_bearer_token)):
     evaluation_session = { "started": True, "options": [], "failed_providers": 0 }

@@ -48,7 +48,7 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
         basic_freight = max(basic_freight, float(partner["minimum_freight_value"]))
 
         # Step 5: Surcharges and ODA
-        fuel_percentage = float(EDBR.get_fuel_surcharge(partner_id, float(shipment["diesel_price"])) or 0)
+        fuel_percentage = float(EDBR.get_fuel_surcharge(partner_id, float(shipment["fuel_price"])) or 0)
         fuel_charge = (basic_freight * fuel_percentage / 100)
         
 
@@ -62,16 +62,38 @@ def execute_dispatch_algorithm(shipment: dict, partner: dict) -> dict:
             partner_distances = shipment.get("partner_distances", {})
             distance = float(partner_distances.get(str(partner["id"]), partner_distances.get(partner["id"], 0)))
 
-        #SSP UNIQUE LOGIC CALCULATION
+        #UNIQUE LOGIC CALCULATION
         if partner_name == "SSP EXPRESS":
             if chargeable_weight > 191:
                 oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0) * chargeable_weight
             else:
-                oda_charge = oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
+                oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
 
             hamali_cost =  float(shipment["weight"]) * 3 if float(shipment["weight"]) > 60 else 0
             hamali_detail = "SSP(> 60KG) chrgs" if hamali_cost > 0 else ''
 
+        elif partner_name == "MSK INTERNATIONAL CARGO":
+            if chargeable_weight > 171:
+                oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0) * chargeable_weight
+            else:
+                oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0) 
+
+            hamali_cost = float(shipment["weight"]) * 3 if float(shipment["weight"]) > 75 else 0
+            hamali_detail = "MKS(> 75KG) chrgs" if hamali_cost > 0 else ''
+
+        elif partner_name == "SafeExpress":
+            if chargeable_weight > 300 :
+                oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0) * chargeable_weight
+
+            else:
+                oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
+
+            price_delta = int(shipment["fuel_price"] - 95)
+            escalation_percent = 0.4 * price_delta
+            fov_charge = float((shipment["invoice_value"])) * (float(partner["fov_percentage"] + escalation_percent) / 100)
+            hamali_cost = float(shipment.get("hamali_cost", 0))
+            hamali_detail = shipment.get("hamali_detail", "")
+            
         else:
             oda_charge = float(EDBR.get_oda_charge(partner_id, distance, chargeable_weight) or 0)
             hamali_cost = float(shipment.get("hamali_cost", 0))
