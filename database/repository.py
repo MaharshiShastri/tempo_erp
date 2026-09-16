@@ -34,7 +34,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URrL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/tempo_erp_backup")
+DB_DSN = os.getenv("DATABASE_URrL", f"postgresql://{USER}:{PASSWORD}@host.docker.internal:5433/tempo_erp_backup")
 
 TASK_UPLOAD_DIR = Path("uploaded_task_attachments")
 TASK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
