@@ -20,7 +20,8 @@ def login_session_gate(payload: LoginInput):
         user = EDBR.get_user(payload.email, payload.password)
 
         if not user:
-            raise ValueError("No user matched these credentials.")
+            logger.warning("Invalid email or password")
+            raise HTTPException(status_code=401, detail="Invalid corporate credentials")
         
         logger.info(f"User validated successfully.")
 
@@ -33,13 +34,12 @@ def login_session_gate(payload: LoginInput):
                 "access_token": token
             }
     
-    except ValueError as ve:
-        logger.warning(f"Login failed: {str(ve)}")
-        raise HTTPException(status_code=401, detail="Invalid corporate credentials")
-    except Exception as e:  
-        print("User lookup failed")  
-        logger.warning("User lookup failed")
-        raise HTTPException(status_code=401, detail="Invalid corporate credentials parameter profile.")
+    except HTTPException:  
+        raise
+
+    except Exception as e:
+        logger.exception("Unexpected error during login")
+        raise HTTPException(status_code=500, detail=f"Internal Authentication error: {str(e)}")
 
 @router.get("/users")
 def get_system_users(user_profile: dict = Depends(verify_bearer_token)):

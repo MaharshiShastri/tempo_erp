@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 config = context.config
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAsL", f"postgresql://{USER}:{PASSWORD}@host.docker.internal:5433/tempo_erp_backup")
+DB_DSN = os.getenv("DATABASE_URL_LCOAsL", f"postgresql://{USER}:{PASSWORD}@localhost:5433/tempo_erp_backup")
 
 config.set_main_option("sqlalchemy.url", DB_DSN)
 # Interpret the config file for Python logging.

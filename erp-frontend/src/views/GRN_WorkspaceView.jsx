@@ -436,7 +436,7 @@ export default function GRN_WorkspaceView({ state }) {
                 className="gap-2"
               >
                 <FiSave className="h-4 w-4" />
-                Confirm & Log BOM Receipt
+                Confirm & Log GRN
               </Button>
             </div>
           </CardContent>

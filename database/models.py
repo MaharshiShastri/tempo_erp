@@ -944,6 +944,46 @@ class TestItemMaster(Base):
 
     purchase_bill_items: Mapped[list["PurchaseBillItem"]] = relationship(back_populates="purchased_item")
 
+class BOMHeader(Base):
+    __tablename__="bom_headers"
+    __table_args__ = (
+        UniqueConstraint("item_code", "revision_no", name="uq_bom_item_revision",),
+        CheckConstraint("output_quantity > 0", name="ck_bom_item_quantity_positive"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    item_code: Mapped[str] = mapped_column(String(100), ForeignKey("items_master.item_code"), nullable=False, index=True)
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    bom_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="Draft")
+    output_quantity: Mapped[Decimal] = mapped_column(Numeric(25,4), nullable=False, server_default="1")
+    uom: Mapped[str] = mapped_column(String(20), nullable=False, server_default="NOS")
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True, server_default=func.current_date())
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), server_onupdate=func.now(), nullable=True)
+    components: Mapped[list["BOMComponent"]] = relationship(back_populates="bom", cascade="all, delete-orphan", order_by="BOMComponent.line_number")
+    finished_item: Mapped["ItemMaster"] = relationship()
+
+class BOMComponent(Base):
+    __tablename__="bom_components"
+    __table_args__=(
+        UniqueConstraint("bom_id", "line_number", name="uq_bom_component_line",),
+        CheckConstraint("quantity > 0", name="ck_bom_component_quantity_positive"),
+        CheckConstraint("scrap_percent >= 0", name="ck_bom_component_scrap_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bom_id: Mapped[int] = mapped_column(Integer, ForeignKey("bom_headers.id", ondelete="CASCADE"), nullable=False, index=True)
+    line_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    item_code: Mapped[str] = mapped_column(String(8), ForeignKey("test_items_master.item_code"), nullable=False, index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(15,4), nullable=False)
+    uom: Mapped[str | None] = mapped_column(String(20), nullable=False, server_default="NOS")
+    scrap_percent: Mapped[Decimal] = mapped_column(Numeric(7,3), nullable=False, server_default="0")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bom: Mapped["BOMHeader"] = relationship(back_populates="components")
+    item: Mapped["TestItemMaster"] = relationship()
+    
 class StockLedger(Base):
     __tablename__ = "stock_ledger"
 

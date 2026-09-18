@@ -1525,6 +1525,79 @@ const API = {
 
         return response.json();
   },
+
+  async getBOMCostRange(componets, sessionToken){
+    const response = await fetch("/api/v1/bom/cost-range", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "Authorization": `Bearer ${sessionToken}`,},
+      body: JSON.stringify({componets}),
+    });
+
+    if(!response.ok){
+      const error = await response.json();
+      throw new Error (err.detail || "Failed to calculate BOM cost");
+    }
+
+    return response.json();
+  },
+
+  async saveBOM(payload, sessionToken){
+    const response = await fetch(
+      "/api/v1/bom",
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${sessionToken}`},
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok){
+      const error = await json.response();
+      throw new Error(error.detail || "Failed to save BOM");
+    }
+
+    return response.json();
+  },
+  async fetchMaterials(sessionToken){
+    const response = await fetch(
+      "/api/v1/bom/raw-material", {
+        method: "GET",
+        headers: {"Content-Type": "application/json", "Authorization": `Bearer ${sessionToken}`},
+      }
+    );
+
+    if(!response.ok){
+      const err = await response.json();
+      throw new Error(err.detail || "Failed to load raw materials from backend");
+    }
+
+    return response.json();
+  },
+  
+  async getBOMPdf(bomId, sessionToken) {
+    const response = await fetch(
+        `/api/v1/bom/${bomId}/pdf`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const error = await response
+            .json()
+            .catch(() => ({}));
+
+        throw new Error(
+            error.detail ||
+            "Failed to generate BOM PDF"
+        );
+    }
+
+    return response.blob();
+  },
 };
 
 export default API;

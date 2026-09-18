@@ -21,7 +21,7 @@ from database.models import (
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
     SystemNotification, TestItemMaster, StockLedger, Quotation, ProductionStageHistory,
-    QuotationChangeSnapshot, SalesTarget, PurchaseBillItem, PurchaseBill,
+    QuotationChangeSnapshot, SalesTarget, PurchaseBillItem, PurchaseBill, BOMHeader, BOMComponent
 )
 from schemas.logistics_schema import FullPartnerProfile
 from services.item_matcher import resolve_item_code
@@ -34,7 +34,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URrL", f"postgresql://{USER}:{PASSWORD}@host.docker.internal:5433/tempo_erp_backup")
+DB_DSN = os.getenv("DATABASE_URrL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
 
 TASK_UPLOAD_DIR = Path("uploaded_task_attachments")
 TASK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -76,19 +76,19 @@ def resolve_state(address: str):
 class PostgresRepository:
     
     # --- AUTH & RBAC start---
-    def get_user(self, email: str, password: str = None):
+    def get_user(self, email: str, password: str):
+        
         with SessionLocal() as session:
-            if password:
-                stmt = select(User).where(User.email == email)
-            else:
-                # Removed password_hash from return dictionary intentionally based on old behavior
-                stmt = select(User).where(User.email == email)
-            
+            stmt = select(User).where(User.email == email)
             user = session.scalars(stmt).first()
-            if not user: return None
-
+            
+            if not user:
+                print("User not found")
+                return None
+            
             if password is not None:
-                if not verify_password(user.password_hash, password,):
+                if not verify_password(stored_hash=user.password_hash, password=password):
+                    print("Unable to verify password")
                     return None
             # Formatting similarly to old RealDictCursor selected fields
             return {
@@ -3771,4 +3771,162 @@ class PostgresRepository:
 
 
     # --- Quotations end ---
+    # --- Bill of Material start ---
+    def get_bom_cost_range(self, components: list[dict]) -> dict:
+        with SessionLocal() as session:
+
+            item_codes = {
+                str(component.get("item_code", "")).strip()
+                for component in components
+                if component.get("item_code")
+            }
+
+            if not item_codes:
+                return {
+                    "components": [],
+                    "minimum_material_cost": 0,
+                    "maximum_material_cost": 0,
+                }
+
+            rows = session.execute(
+                select(
+                    PurchaseBillItem.item_code,
+                    func.min(PurchaseBillItem.rate).label("minimum_rate"),
+                    func.max(PurchaseBillItem.rate).label("maximum_rate"),
+                )
+                .join(PurchaseBill, PurchaseBill.voucher_number == PurchaseBillItem.purchase_voucher_number,)
+                .where(PurchaseBillItem.item_code.in_(item_codes), PurchaseBill.is_cancelled.is_(False),)
+                .group_by(PurchaseBillItem.item_code,)
+            ).all()
+
+            rate_map = {
+                row.item_code: {
+                    "minimum_rate": float(row.minimum_rate or 0),
+                    "maximum_rate": float(row.maximum_rate or 0),
+                }
+                for row in rows
+            }
+
+            result = []
+
+            minimum_total = 0
+            maximum_total = 0
+
+            for component in components:
+
+                item_code = str(component.get("item_code", "")).strip()
+
+                quantity = float(component.get("quantity") or 0)
+
+                scrap_percent = float(component.get("scrap_percent") or 0)
+
+                # Quantity including scrap/wastage.
+                effective_quantity = quantity * (1 + scrap_percent / 100)
+
+                rates = rate_map.get(
+                    item_code,
+                    {"minimum_rate": 0, "maximum_rate": 0,},
+                )
+
+                minimum_rate = rates["minimum_rate"]
+                maximum_rate = rates["maximum_rate"]
+
+                minimum_cost = effective_quantity * minimum_rate
+
+                maximum_cost = effective_quantity * maximum_rate
+
+                minimum_total += minimum_cost
+                maximum_total += maximum_cost
+
+                result.append({
+                    "item_code": item_code,
+                    "quantity": quantity,
+                    "scrap_percent": scrap_percent,
+                    "effective_quantity": effective_quantity,
+                    "minimum_rate": minimum_rate,
+                    "maximum_rate": maximum_rate,
+                    "minimum_cost": round(minimum_cost, 2),
+                    "maximum_cost": round(maximum_cost, 2),
+                    "has_purchase_history": item_code in rate_map,
+                })
+
+            return {
+                "components": result,
+                "minimum_material_cost": round(minimum_total, 2,),
+                "maximum_material_cost": round(maximum_total, 2,),
+            }
+
+    def create_bom(self, payload: dict) -> dict:
+        with SessionLocal() as session:
+            bom = BOMHeader(
+                item_code=payload["item_code"],
+                revision_no=int(payload.get("revision_no", 1)),
+                bom_name=payload.get("bom_name"),
+                status=payload.get("status", "DRAFT"),
+                output_quantity=Decimal(str(payload.get("output_quantity", 1))),
+                uom=payload.get("uom", "NOS"),
+                effective_from=payload.get("effective_from"),
+                effective_to=payload.get("effective_to"),
+            )
+
+            session.add(bom)
+            session.flush()
+
+            for index, component in enumerate(payload.get("components", []), start=1):
+                bom.components.append(
+                    BOMComponent(
+                        line_number=index,
+                        item_code=component["item_code"],
+                        quantity=Decimal(str(component["quantity"])),
+                        uom=component.get("uom", "NOS"),
+                        scrap_percentile=Decimal(str(component.get("scrap_percent", 0))),
+                        notes=component.get("notes"),
+                    )
+                )
+
+            session.commit()
+            session.refresh(bom)
+
+            return {
+                "id": bom.id,
+                "item_code": bom.item_code,
+                "revision_no": bom.revision_no,
+                "status": bom.status
+            }
+
+    def get_bom(self, bom_id: int) -> dict | None:
+        with SessionLocal() as session:
+            bom = session.get(BOMHeader, bom_id)
+            if not bom:
+                return None
+
+            return{
+                "id": bom.id,
+                "item_code": bom.item_code,
+                "bom_name": bom.bom_name,
+                "revision_no": bom.revision_no,
+                "status": bom.status,
+                "output_quantity": bom.output_quantity,
+                "uom": bom.uom,
+                "effective_from": bom.effective_from if bom.effective_from else None,
+                "effective_to": bom.effective_to if bom.effective_to else None,
+                "components": [
+                    {
+                        "id": component.id,
+                        "line_number": component.line_number,
+                        "item_code": component.item_code,
+                        "quantity": float(component.quantity or 0),
+                        "uom": component.uom,
+                        "scrap_percent": float(component.scrap_percent or 0),
+                        "notes": component.notes,
+                    }
+                    for component in bom.components
+                ]
+            }
+
+    def get_all_raw_materials(self):
+            with SessionLocal() as session:
+                items = session.scalars(select(TestItemMaster)).all()
+                return [to_dict(i) for i in items]
+    
 EDBR = PostgresRepository()

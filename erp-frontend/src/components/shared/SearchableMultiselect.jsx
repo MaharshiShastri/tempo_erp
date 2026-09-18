@@ -2,140 +2,170 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
-
 import { Button } from "@/components/ui/button";
 
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from "@/components/ui/command";
 
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/components/ui/popover";
 
 import { Label } from "@/components/ui/label";
 
 export default function SearchableMultiSelect({
-  label,
-  options = [],
-  value = [],
-  onChange,
-  single=false
+    label,
+    options = [],
+    value = [],
+    onChange,
+    single = false,
 }) {
-  const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(false);
 
-  const selected = value || [];
+    const selected = value || [];
 
-  const toggleOption = (option) => {
-    if (single) {
-      if (selected.includes(option)) {
-        onChange([]);
-      } else {
-        onChange([option]);
-      }
+    // Support both:
+    // ["ABC", "DEF"]
+    // and:
+    // [{ value: "ABC", label: "ABC - Item" }]
+    const normalizedOptions = useMemo(() => {
+        return options.map((option) => {
+            if (typeof option === "string") {
+                return {
+                    value: option,
+                    label: option,
+                };
+            }
 
-      setOpen(false);
-      return;
-    }
+            return {
+                value: option.value,
+                label: option.label ?? option.value,
+            };
+        });
+    }, [options]);
 
-    if (selected.includes(option)) {
-      onChange(
-        selected.filter((item) => item !== option)
-      );
-    } else {
-      onChange([...selected, option]);
-    }
-  };
+    const toggleOption = (optionValue) => {
+        if (single) {
+            if (selected.includes(optionValue)) {
+                onChange([]);
+            } else {
+                onChange([optionValue]);
+            }
 
-  const buttonText = useMemo(() => {
-    if (!selected.length) {
-      return `Select ${label.toLowerCase()}...`;
-    }
+            setOpen(false);
+            return;
+        }
 
-    if (single) {
-      return selected[0];
-    }
-    if (selected.length === 1) {
-      return selected[0];
-    }
+        if (selected.includes(optionValue)) {
+            onChange(
+                selected.filter((item) => item !== optionValue)
+            );
+        } else {
+            onChange([
+                ...selected,
+                optionValue,
+            ]);
+        }
+    };
 
-    return `${selected.length} selected`;
-  }, [selected, label, single]);
+    const buttonText = useMemo(() => {
+        if (!selected.length) {
+            return `Select ${label?.toLowerCase() || "item"}...`;
+        }
 
-  return (
-    <div className="grid gap-2">
-      <Label>{label}</Label>
+        const firstSelected = normalizedOptions.find(
+            (option) => option.value === selected[0]
+        );
 
-      <Popover
-        open={open}
-        onOpenChange={setOpen}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between font-normal"
-          >
-            <span className="truncate">
-              {buttonText}
-            </span>
+        if (single) {
+            return firstSelected?.label || selected[0];
+        }
 
-            <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
+        if (selected.length === 1) {
+            return firstSelected?.label || selected[0];
+        }
 
-        <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0"
-          align="start"
-        >
-          <Command>
-            <CommandInput
-              placeholder={`Search ${label.toLowerCase()}...`}
-            />
+        return `${selected.length} selected`;
+    }, [selected, normalizedOptions, label, single]);
 
-            <CommandList>
-              <CommandEmpty>
-                No {label.toLowerCase()} found.
-              </CommandEmpty>
+    return (
+        <div className="grid gap-2">
+            {label && <Label>{label}</Label>}
 
-              <CommandGroup>
-                {options.map((option) => {
-                  const isSelected = selected.includes(option);
-
-                  return (
-                    <CommandItem
-                      key={option}
-                      value={option}
-                      onSelect={() =>
-                        toggleOption(option)
-                      }
+            <Popover
+                open={open}
+                onOpenChange={setOpen}
+            >
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        className="w-full justify-between font-normal"
                     >
-                      <Check
-                        className={cn(
-                          "mr-2 size-4",
-                          isSelected
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
+                        <span className="truncate">
+                            {buttonText}
+                        </span>
 
-                      {option}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
+                        <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+
+                <PopoverContent
+                    className="w-[--radix-popover-trigger-width] p-0"
+                    align="start"
+                >
+                    <Command>
+                        <CommandInput
+                            placeholder={`Search ${
+                                label?.toLowerCase() || "item"
+                            }...`}
+                        />
+
+                        <CommandList>
+                            <CommandEmpty>
+                                No {label?.toLowerCase() || "item"} found.
+                            </CommandEmpty>
+
+                            <CommandGroup>
+                                {normalizedOptions.map((option) => {
+                                    const isSelected =
+                                        selected.includes(option.value);
+
+                                    return (
+                                        <CommandItem
+                                            key={option.value}
+                                            value={option.label}
+                                            onSelect={() =>
+                                                toggleOption(option.value)
+                                            }
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    "mr-2 size-4",
+                                                    isSelected
+                                                        ? "opacity-100"
+                                                        : "opacity-0"
+                                                )}
+                                            />
+
+                                            {option.label}
+                                        </CommandItem>
+                                    );
+                                })}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+        </div>
+    );
 }

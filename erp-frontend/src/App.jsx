@@ -1,27 +1,10 @@
 import { useEffect, useState } from "react";
 
-import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    SidebarProvider,
-    SidebarRail,
-    SidebarTrigger,
-    SidebarInset,
+import {Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
+    SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger, SidebarInset,
 } from "@/components/ui/sidebar";
 
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import {DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,} from "@/components/ui/dropdown-menu";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,30 +12,9 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import {
-    Bell,
-    FileText,
-    Globe,
-    Package,
-    RefreshCw,
-    LogOut,
-    Moon,
-    Sun,
-    Truck,
-    Users,
-    CalendarDays,
-    ClipboardList,
-    Database,
-    BarChart3,
-    BookOpen,
-    Calculator,
-    Factory,
-    FileSpreadsheet,
-    Map,
-    ShieldCheck,
-    Target,
-    Upload,
-} from "lucide-react";
+import {Bell, Target, FileText, Globe, Package, RefreshCw, LogOut, Moon, Sun, Truck, Users, CalendarDays, ClipboardList,
+    FileClock, Database, BarChart3, BookOpen, Calculator, Factory, FileSpreadsheet, Map, ShieldCheck, Upload,
+    ReceiptIndianRupee} from "lucide-react";
 
 import useERPState from "./hooks/useERPState";
 import packageJson from "../package.json";
@@ -118,6 +80,7 @@ import ExerciseGenerator from "./views/ExerciseGeneratorView";
 import ProductionCalendar from "./components/production/ProductionCalendar";
 import ProductionScheduleModal from "./components/production/ProductionScheduleModal";
 import PromptGeneratorView from "./views/PromptGenerator";
+import BOM_WorkspaceView from "./views/BOM_WorkSpaceView";
 
 function App() {
     const state = useERPState();
@@ -740,7 +703,7 @@ function App() {
                                         />
 
                                         <NavItem
-                                            icon={ClipboardList}
+                                            icon={FileClock}
                                             label="Legacy Logs"
                                             iconClassName="text-slate-500"
                                             shortcut="Alt+P"
@@ -782,6 +745,11 @@ function App() {
                                                 state.setActiveTab("audit")
                                             }
                                         />
+                                        
+                                        <NavItem icon={ReceiptIndianRupee} label="Bill of materials"
+                                        iconClassName="text-orange-500" active={state.activeTab === "bom-create"}
+                                        onClick={()=>state.setActiveTab("bom-create")}
+                                        />
 
                                         <NavItem
                                             icon={BarChart3}
@@ -792,6 +760,7 @@ function App() {
                                                 state.setActiveTab("prod-stats")
                                             }
                                         />
+
                                     </SidebarMenu>
                                 </SidebarGroupContent>
                             </SidebarGroup>
@@ -1543,6 +1512,7 @@ function App() {
                                         state={state}
                                     />
                                 )}
+                            {isFactory && state.activeTab === "bom-create" && (<BOM_WorkspaceView state={state}/>)}
                         </div>
                     </main>
                 </SidebarInset>

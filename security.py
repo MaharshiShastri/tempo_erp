@@ -21,6 +21,8 @@ def hash_password(password: str)->str:
 
 def verify_password(stored_hash: str, password: str) -> bool:
     try:
+        print("Stored hash: ", stored_hash, " password from input: ", password)
+        print(ph.verify(stored_hash, password))
         return ph.verify(stored_hash, password)
     except (VerificationError, InvalidHashError):
         return False

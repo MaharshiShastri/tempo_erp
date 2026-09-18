@@ -23,6 +23,7 @@ import useQuotation from "./useQuotation";
 import useExerciseGenerator from "./useExerciseGenerator";
 import useProductionCalendar from "./useProductionCalendar";
 import { usePromptGenerator } from "./usePromptGenerator";
+import useBOM from "./useBOM";
 
 const API_HOST = window.location.hostname;
 
@@ -155,6 +156,7 @@ export default function useERPState() {
     const tasks = useTasks({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, dispatchSystemNotification, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const activity = useActivityHub({sessionToken: core.sessionToken, user: core.user, showErrorModal: core.showErrorModal, addToast: core.addToast, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
     const grn = useGRN({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, itemsMaster: items.itemsMaster});
+    const bom = useBOM({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen});
 
     //all the sales business state
     const companies = useCompanyMaster({sessionToken: core.sessionToken, setAlertMessage: core.setAlertMessage, setIsAlertOpen: core.setIsAlertOpen, activeTab: core.activeTab ,setActiveTab: core.setActiveTab});
@@ -355,7 +357,7 @@ export default function useERPState() {
     return {
         ...companies, ...orders, ...billing, ...crm, ...leadTargets, ...qoutation, //Sales Business states unwinding
         dispatchPlanner,  ...logistics, ...dispatch, //Logistics business states
-        ...tasks, ...activity, ...grn, //Shop floor business states
+        ...tasks, ...activity, ...grn, ...bom,//Shop floor business states
         ...admin, ...indiaMap, ...exerciseGenerator,//Admin business states
         ...faq, ...items, ...production, ...login, ...analytics, ...core, ...productionCalendar, ...promptGenerator, //Global business states
         isProductionScheduleModalOpen, productionScheduleForm, setProductionScheduleForm, isEditingProductionSchedule,

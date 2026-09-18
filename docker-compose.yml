@@ -8,12 +8,13 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
-    
     depends_on:
-      - web
+      web:
+        condition: service_healthy   # Waits for web app + migrations to finish
     environment:
       RUN_MIGRATIONS: "false"
       TZ: Asia/Kolkata
+
   web:
     build: .
     image: tempo-erp-app:v1.5.0
@@ -29,6 +30,12 @@ services:
     environment:
       RUN_MIGRATIONS: "true"
       TZ: Asia/Kolkata
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8500/')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   worker:
     build: .
