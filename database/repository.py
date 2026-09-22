@@ -20,7 +20,7 @@ from database.models import (
     LogisticsZone, LogisticsZoneRate, LogisticsFuelMatrix, LogisticsODAMatrix, 
     DispatchRecord, Task, CRMLead, ClientCompany, GRNHeader, GRNItem, 
     LeadTarget, LeadContact, FAQQuery, SystemAuditLog, SystemErrorLog, 
-    SystemNotification, TestItemMaster, StockLedger, Quotation, ProductionStageHistory,
+    SystemNotification, RawMaterial, StockLedger, Quotation, ProductionStageHistory,
     QuotationChangeSnapshot, SalesTarget, PurchaseBillItem, PurchaseBill, BOMHeader, BOMComponent
 )
 from schemas.logistics_schema import FullPartnerProfile
@@ -1758,7 +1758,7 @@ class PostgresRepository:
         with SessionLocal() as session:
             for item in items_list:
                 # Assuming additional_spec_text maps to item_specification from dicts
-                stmt = pg_insert(TestItemMaster).values(
+                stmt = pg_insert(RawMaterial).values(
                     item_code=item['item_code'],
                     additional_spec_text=item.get('item_specification')
                 ).on_conflict_do_nothing(index_elements=['item_code'])
@@ -1767,12 +1767,12 @@ class PostgresRepository:
     
     def get_test_items(self):
         with SessionLocal() as session:
-            items = session.scalars(select(TestItemMaster)).all()
+            items = session.scalars(select(RawMaterial)).all()
             return [to_dict(i) for i in items]
     
     def get_test_item_by_code(self, item_code: str):
         with SessionLocal() as session:
-            item = session.scalars(select(TestItemMaster).where(TestItemMaster.item_code == item_code)).first()
+            item = session.scalars(select(RawMaterial).where(RawMaterial.item_code == item_code)).first()
             return to_dict(item)
     # --- Testing END ---
 
@@ -3879,7 +3879,7 @@ class PostgresRepository:
                         item_code=component["item_code"],
                         quantity=Decimal(str(component["quantity"])),
                         uom=component.get("uom", "NOS"),
-                        scrap_percentile=Decimal(str(component.get("scrap_percent", 0))),
+                        scrap_percent=Decimal(str(component.get("scrap_percent", 0))),
                         notes=component.get("notes"),
                     )
                 )
@@ -3894,7 +3894,7 @@ class PostgresRepository:
                 "status": bom.status
             }
 
-    def get_bom(self, bom_id: int) -> dict | None:
+    def get_bom_id(self, bom_id: int) -> dict | None:
         with SessionLocal() as session:
             bom = session.get(BOMHeader, bom_id)
             if not bom:
@@ -3910,6 +3910,7 @@ class PostgresRepository:
                 "uom": bom.uom,
                 "effective_from": bom.effective_from if bom.effective_from else None,
                 "effective_to": bom.effective_to if bom.effective_to else None,
+                "created_at": (bom.created_at.isoformat() if bom.created_at else None),
                 "components": [
                     {
                         "id": component.id,
@@ -3919,14 +3920,27 @@ class PostgresRepository:
                         "uom": component.uom,
                         "scrap_percent": float(component.scrap_percent or 0),
                         "notes": component.notes,
+                        "item_specification": component.item.item_specification if component.item else None
                     }
                     for component in bom.components
                 ]
             }
 
     def get_all_raw_materials(self):
-            with SessionLocal() as session:
-                items = session.scalars(select(TestItemMaster)).all()
-                return [to_dict(i) for i in items]
+        with SessionLocal() as session:
+            items = session.scalars(select(RawMaterial)).all()
+            return [to_dict(i) for i in items]
     
+    def get_bom(self):
+        with SessionLocal() as session:
+            stmt = select(BOMHeader).order_by(BOMHeader.created_at.desc())
+            headers = session.scalars(stmt).unique().all()
+                        
+            result = []
+            for h in headers:
+                h_dict = to_dict(h)
+                h_dict['components'] = [to_dict(i) for i in h.components]
+                result.append(h_dict)
+            
+            return result
 EDBR = PostgresRepository()

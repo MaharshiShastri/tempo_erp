@@ -1526,16 +1526,16 @@ const API = {
         return response.json();
   },
 
-  async getBOMCostRange(componets, sessionToken){
+  async getBOMCostRange(components, sessionToken){
     const response = await fetch("/api/v1/bom/cost-range", {
       method: "POST",
       headers: {"Content-Type": "application/json", "Authorization": `Bearer ${sessionToken}`,},
-      body: JSON.stringify({componets}),
+      body: JSON.stringify({components}),
     });
 
     if(!response.ok){
       const error = await response.json();
-      throw new Error (err.detail || "Failed to calculate BOM cost");
+      throw new Error (error.detail || "Failed to calculate BOM cost");
     }
 
     return response.json();
@@ -1552,7 +1552,7 @@ const API = {
     );
 
     if (!response.ok){
-      const error = await json.response();
+      const error = await response.json();
       throw new Error(error.detail || "Failed to save BOM");
     }
 
@@ -1598,6 +1598,56 @@ const API = {
 
     return response.blob();
   },
+
+  async fetchBOMs(sessionToken){
+    const response = await fetch(
+      "/api/v1/bom/list",
+      {
+        method: "GET",
+        headers: {Authorization: `Bearer ${sessionToken}`,},
+      }
+    );
+
+    if(!response.ok){
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || "Failed to load BOMs in api");
+    }
+
+    return response.json();
+  },
+  async getBOM(bomID, sessionToken){
+    const response = await fetch(
+      `/api/v1/bom/${bomID}`,
+      {
+        method: 'GET',
+        headers: {Authorization: `Bearer ${sessionToken}`},
+      }
+    );
+
+    if (!response.ok){
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || "Failed to get BOM");
+    }
+
+    return response.json();
+  },
+
+  async deleteBOM(bomID, sessionToken){
+    const result = await fetch(
+      `/api/v1/bom/${bomID}`,
+      {
+        method: "DELETE",
+        headers: {Authorization: `Bearer ${sessionToken}`},
+      }
+    );
+
+    if(!response.ok){
+      const error = await response.json().catch(()=>({}));
+      throw new Error(error.detail || "Unable to delete BOM");
+    }
+
+    return response.json();
+  }
 };
 
 export default API;

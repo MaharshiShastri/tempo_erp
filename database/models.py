@@ -712,7 +712,7 @@ class GRNItem(Base):
 
     grn_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("grn_headers.id", ondelete="CASCADE"), nullable=True)
 
-    item_code: Mapped[str | None] = mapped_column(String(100), ForeignKey("test_items_master.item_code"), nullable=True)
+    item_code: Mapped[str | None] = mapped_column(String(100), ForeignKey("raw_materials.item_code"), nullable=True)
 
     quantity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True,)
 
@@ -722,7 +722,7 @@ class GRNItem(Base):
 
     grn: Mapped["GRNHeader | None"] = relationship(back_populates="items",)
 
-    item: Mapped["TestItemMaster"] = relationship(back_populates="grn_items")
+    item: Mapped["RawMaterial"] = relationship(back_populates="grn_items")
 
 
 class LeadTarget(Base):
@@ -892,7 +892,7 @@ class PurchaseBillItem(Base):
 
     line_number: Mapped[int] = mapped_column(Integer, nullable=False,)
 
-    item_code: Mapped[str] = mapped_column(String(7), ForeignKey("test_items_master.item_code"), nullable=False,index=True,)
+    item_code: Mapped[str] = mapped_column(String(7), ForeignKey("raw_materials.item_code"), nullable=False,index=True,)
 
     # Remainder of STOCKITEMNAME after its seven-character item code.
     item_specification: Mapped[str | None] = mapped_column(Text, nullable=True,)
@@ -917,7 +917,7 @@ class PurchaseBillItem(Base):
 
     purchase_bill: Mapped["PurchaseBill"] = relationship(back_populates="items",)
 
-    purchased_item: Mapped["TestItemMaster"] = relationship(back_populates="purchase_bill_items",)
+    purchased_item: Mapped["RawMaterial"] = relationship(back_populates="purchase_bill_items",)
 
 PurchaseBill.bill_value = column_property(
     select(func.coalesce(
@@ -929,8 +929,8 @@ PurchaseBill.bill_value = column_property(
     .scalar_subquery()
 )
 
-class TestItemMaster(Base):
-    __tablename__ = "test_items_master"
+class RawMaterial(Base):
+    __tablename__ = "raw_materials"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
@@ -963,7 +963,7 @@ class BOMHeader(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), server_onupdate=func.now(), nullable=True)
     components: Mapped[list["BOMComponent"]] = relationship(back_populates="bom", cascade="all, delete-orphan", order_by="BOMComponent.line_number")
-    finished_item: Mapped["ItemMaster"] = relationship()
+    finished_item: Mapped["ItemMaster"] = relationship("ItemMaster", foreign_keys=[item_code])
 
 class BOMComponent(Base):
     __tablename__="bom_components"
@@ -976,13 +976,13 @@ class BOMComponent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     bom_id: Mapped[int] = mapped_column(Integer, ForeignKey("bom_headers.id", ondelete="CASCADE"), nullable=False, index=True)
     line_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    item_code: Mapped[str] = mapped_column(String(8), ForeignKey("test_items_master.item_code"), nullable=False, index=True)
+    item_code: Mapped[str] = mapped_column(String(8), ForeignKey("raw_materials.item_code"), nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(15,4), nullable=False)
     uom: Mapped[str | None] = mapped_column(String(20), nullable=False, server_default="NOS")
     scrap_percent: Mapped[Decimal] = mapped_column(Numeric(7,3), nullable=False, server_default="0")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     bom: Mapped["BOMHeader"] = relationship(back_populates="components")
-    item: Mapped["TestItemMaster"] = relationship()
+    item: Mapped["RawMaterial"] = relationship()
     
 class StockLedger(Base):
     __tablename__ = "stock_ledger"

@@ -10,10 +10,9 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/
 
 export default function BOM_WorkspaceView({state,}) {
     const {bom, updateBOM, addComponent, updateComponent, removeComponent, costRange, calculateCostRange, 
-        isCalculating, saveBOM, refreshRawMaterials, rawItemMaster, itemsMaster, selectedItems,
-        setSelectedItems} = state;
+        isCalculating, saveBOM, refreshRawMaterials, rawItemMaster, itemsMaster,} = state;
 
-    const itemOptions = (rawItemMaster ?? []).filter((item) => item.item_code).map((item) => ({value: item.item_code, label: `${item.item_code} — ${item.item_specification || "Unnamed Item"}`,}));
+    const itemOptions = (rawItemMaster ?? []).map((item) => item.item_code).filter(Boolean);
     const productCodes = (itemsMaster ?? []).map((item) => item.item_code).filter(Boolean);
     
     return (
@@ -91,8 +90,8 @@ export default function BOM_WorkspaceView({state,}) {
                                     <SearchableMultiSelect
                                     label=""
                                     options={productCodes}
-                                    value={selectedItems}
-                                    onChange={setSelectedItems}
+                                    value={bom?.item_code ? [bom.item_code] : []}
+                                    onChange={(values)=>updateBOM("item_code", values?.[0] || "")}
                                     single={true}
                                     />
                                 </div>

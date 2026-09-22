@@ -16,8 +16,8 @@ from database.models import (
     OrderItem,
     PurchaseBill,
     PurchaseBillItem,
-    TestItemMaster
-)
+    RawMaterial
+    )
 
 from services.tally_client import (
     fetch_item_master,
@@ -142,13 +142,13 @@ def _extract_purchase_gst_rate(inventory: dict) -> Decimal:
 
     return max(cgst_rate + sgst_rate, igst_rate)
 
-def ensure_test_item_master(session, item_code: str, item_specification: str | None, unit_measure: str | None) -> TestItemMaster:
+def ensure_test_item_master(session, item_code: str, item_specification: str | None, unit_measure: str | None) -> RawMaterial:
     item = session.scalar(
-        select(TestItemMaster).where(TestItemMaster.item_code == item_code)
+        select(RawMaterial).where(RawMaterial.item_code == item_code)
     )
 
     if item is None:
-        item = TestItemMaster(
+        item = RawMaterial(
             item_code = item_code,
             item_specification = item_specification,
         )

@@ -33,16 +33,20 @@ def calculate_bom_cost_range(payload: dict, user: dict = Depends(verify_bearer_t
 
     return EDBR.get_bom_cost_range(components)
 
+@router.get("/list")
+def get_bom_list(user: dict= Depends(verify_bearer_token)):
+    return EDBR.get_bom()
+
 @router.get("/{bom_id}/pdf")
 def get_bom_pdf(bom_id: int, user: dict = Depends(verify_bearer_token),):
-    bom = EDBR.get_bom(bom_id)
+    bom = EDBR.get_bom_id(bom_id)
 
     if not bom:
         raise HTTPException(status_code=404, detail=f"BOM {bom_id} not found",)
 
     cost_range = EDBR.get_bom_cost_range(bom.get("components", []))
 
-    generated_by = (user.get("name") or user.get("username") or "Tempo ERP User")
+    generated_by = EDBR.get_user_business_contact(user.get("email"), user.get("role")).get("name")
 
     pdf_buffer = generate_bom_pdf(bom=bom, cost_range=cost_range, generated_by=generated_by,)
 

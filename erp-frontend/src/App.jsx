@@ -80,7 +80,7 @@ import ExerciseGenerator from "./views/ExerciseGeneratorView";
 import ProductionCalendar from "./components/production/ProductionCalendar";
 import ProductionScheduleModal from "./components/production/ProductionScheduleModal";
 import PromptGeneratorView from "./views/PromptGenerator";
-import BOM_WorkspaceView from "./views/BOM_WorkSpaceView";
+import BOMListView from "./views/BOMListView";
 
 function App() {
     const state = useERPState();
@@ -747,8 +747,8 @@ function App() {
                                         />
                                         
                                         <NavItem icon={ReceiptIndianRupee} label="Bill of materials"
-                                        iconClassName="text-orange-500" active={state.activeTab === "bom-create"}
-                                        onClick={()=>state.setActiveTab("bom-create")}
+                                        iconClassName="text-orange-500" active={state.activeTab === "bom-list"}
+                                        onClick={()=>state.setActiveTab("bom-list")}
                                         />
 
                                         <NavItem
@@ -1505,14 +1505,8 @@ function App() {
                                     />
                                 )}
 
-                            {isSales &&
-                                state.activeTab ===
-                                    "quote-generation" && (
-                                    <QuoteGenerationView
-                                        state={state}
-                                    />
-                                )}
-                            {isFactory && state.activeTab === "bom-create" && (<BOM_WorkspaceView state={state}/>)}
+                            {isSales && state.activeTab === "quote-generation" && (<QuoteGenerationView state={state}/>)}
+                            {isFactory && state.activeTab === "bom-list" && (<BOMListView state={state}/>)}
                         </div>
                     </main>
                 </SidebarInset>

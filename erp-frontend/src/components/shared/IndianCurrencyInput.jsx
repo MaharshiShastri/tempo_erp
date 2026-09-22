@@ -1,30 +1,67 @@
 import { useEffect, useState } from "react";
-export default function IndianCurrencyInput ({ value, onChange, className }){
-    const [displayValue, setDisplayValue] = useState("");
+import { Input } from "@/components/ui/input";
 
-    // On mount or prop change, format the raw number to Indian style
-    useEffect(() => {
-        if (value === 0 || value === "" || value === null) {
-            setDisplayValue("");
-            return;
-        }
-        const formatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
-        setDisplayValue(formatter.format(value));
-    }, [value]);
+export default function IndianCurrencyInput({
+  value,
+  onChange,
+  className,
+}) {
+  const [displayValue, setDisplayValue] = useState("");
 
-    const handleBlur = (e) => {
-        const rawNum = parseFloat(e.target.value.replace(/,/g, '')) || 0;
-        const formatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
-        setDisplayValue(formatter.format(rawNum));
-        onChange(rawNum); // Send raw number to parent state
-    };
+  useEffect(() => {
+    if (value === 0 || value === "" || value === null || value === undefined) {
+      setDisplayValue("");
+      return;
+    }
 
-    const handleChange = (e) => {
-        // Allow user to type freely (stripping letters)
-        setDisplayValue(e.target.value.replace(/[^0-9.]/g, ''));
-    };
-
-    return (
-        <input type="text" className={className} value={displayValue} onChange={handleChange} onBlur={handleBlur} placeholder="e.g., 1,50,000"/>
+    setDisplayValue(
+      new Intl.NumberFormat("en-IN", {
+        maximumFractionDigits: 2,
+      }).format(value)
     );
-};
+  }, [value]);
+
+  const handleChange = (e) => {
+    let input = e.target.value.replace(/[^0-9.]/g, "");
+
+    // Allow only one decimal point
+    const parts = input.split(".");
+    if (parts.length > 2) {
+      input = `${parts[0]}.${parts.slice(1).join("")}`;
+    }
+
+    setDisplayValue(input);
+  };
+
+  const handleBlur = () => {
+    const rawNum = parseFloat(displayValue.replace(/,/g, "")) || 0;
+
+    setDisplayValue(
+      rawNum
+        ? new Intl.NumberFormat("en-IN", {
+            maximumFractionDigits: 2,
+          }).format(rawNum)
+        : ""
+    );
+
+    onChange(rawNum);
+  };
+
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+        ₹
+      </span>
+
+      <Input
+        type="text"
+        inputMode="decimal"
+        value={displayValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder="1,50,000"
+        className={`pl-8 ${className || ""}`}
+      />
+    </div>
+  );
+}

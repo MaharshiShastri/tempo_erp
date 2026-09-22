@@ -1,7 +1,10 @@
 from io import BytesIO
 from decimal import Decimal
 from datetime import datetime
+from pathlib import Path
 
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
@@ -9,6 +12,56 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether,)
 
+def _find_fonts():
+    font_paths = [
+        "./services/DejaVuSans.ttf",
+        "./services/DejaVuSans-Bold.ttf",
+    ]
+
+    regular_font = next(
+        (
+            path
+            for path in font_paths
+            if "DejaVuSans.ttf" in path
+            and "Bold" not in path
+            and Path(path).exists()
+        ),
+        None,
+    )
+
+    bold_font = next(
+        (
+            path
+            for path in font_paths
+            if "DejaVuSans-Bold.ttf" in path
+            and Path(path).exists()
+        ),
+        None,
+    )
+
+    if not regular_font or not bold_font:
+        raise RuntimeError(
+            "A Unicode TTF font supporting the ₹ glyph is required "
+            "to render ERP PDFs. Expected files: "
+            "./services/DejaVuSans.ttf and "
+            "./services/DejaVuSans-Bold.ttf"
+        )
+
+    return regular_font, bold_font
+
+
+def _register_fonts():
+    regular_font, bold_font = _find_fonts()
+
+    if "DejaVuSans" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(
+            TTFont("DejaVuSans", regular_font)
+        )
+
+    if "DejaVuSans-Bold" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(
+            TTFont("DejaVuSans-Bold", bold_font)
+        )
 
 def _money(value) -> str:
     try:
@@ -41,12 +94,12 @@ def _format_datetime(value) -> str:
 
 
 def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO:
-
+    _register_fonts()
     buffer = BytesIO()
 
     document = SimpleDocTemplate(
         buffer,
-        pagesize=landscape(A4),
+        pagesize=A4,
         rightMargin=10 * mm,
         leftMargin=10 * mm,
         topMargin=10 * mm,
@@ -60,7 +113,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
     title_style = ParagraphStyle(
         "BOMTitle",
         parent=styles["Title"],
-        fontName="Helvetica-Bold",
+        fontName="DejaVuSans-Bold",
         fontSize=18,
         leading=22,
         alignment=TA_CENTER,
@@ -79,7 +132,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
     section_style = ParagraphStyle(
         "Section",
         parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
+        fontName="DejaVuSans-Bold",
         fontSize=10,
         leading=12,
         spaceBefore=3 * mm,
@@ -89,6 +142,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
     normal_style = ParagraphStyle(
         "NormalSmall",
         parent=styles["Normal"],
+        fontName="DejaVuSans",
         fontSize=8,
         leading=10,
     )
@@ -108,7 +162,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
     header_style = ParagraphStyle(
         "Header",
         parent=normal_style,
-        fontName="Helvetica-Bold",
+        fontName="DejaVuSans-Bold",
         fontSize=7.5,
         leading=9,
         alignment=TA_CENTER,
@@ -173,7 +227,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
 
     info_table = Table(
         info_data,
-        colWidths=[42 * mm, 72 * mm, 32 * mm, 52 * mm,],
+        colWidths=[40 * mm, 65 * mm, 30 * mm, 55 * mm,],
         repeatRows=0,
     )
 
@@ -254,7 +308,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
                     ParagraphStyle(
                         "MinCost",
                         parent=styles["Normal"],
-                        fontName="Helvetica-Bold",
+                        fontName="DejaVuSans-Bold",
                         fontSize=14,
                         alignment=TA_CENTER,
                     ),
@@ -278,7 +332,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
                     ParagraphStyle(
                         "MaxCost",
                         parent=styles["Normal"],
-                        fontName="Helvetica-Bold",
+                        fontName="DejaVuSans-Bold",
                         fontSize=14,
                         alignment=TA_CENTER,
                     ),
@@ -378,16 +432,11 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
             Paragraph("UOM", header_style),
             Paragraph("Scrap %", header_style),
             Paragraph("Effective Qty.", header_style),
-            Paragraph("Min Rate", header_style),
-            Paragraph("Max Rate", header_style),
-            Paragraph("Min Cost", header_style),
-            Paragraph("Max Cost", header_style),
-            Paragraph("Notes", header_style),
         ]
     ]
 
     for index, component in enumerate(bom.get("components", []), start=1,):
-        item_code = str(component.get("item_code") or "")
+        item_code = str(component.get("item_code") or "-")
 
         calculated = cost_components.get(item_code, {},)
 
@@ -402,22 +451,108 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
                 Paragraph(str(component.get("uom") or "" ), center_style,),
                 Paragraph(f"{float(component.get('scrap_percent') or 0):.2f}%", right_style,),
                 Paragraph(_number(calculated.get("effective_quantity", component.get("quantity"),)), right_style,),
-                Paragraph(_money(calculated.get("minimum_rate", 0,)), right_style,),
-                Paragraph(_money(calculated.get("maximum_rate", 0,)), right_style,),
-                Paragraph(_money(calculated.get("minimum_cost", 0,)), right_style,),
-                Paragraph(_money(calculated.get("maximum_cost", 0,)), right_style,),
-                Paragraph(str(component.get("notes") or "" ), cell_style,),
             ]
         )
 
     raw_table = Table(
         table_data,
-        colWidths=[10 * mm, 28 * mm, 58 * mm, 18 * mm, 14 * mm, 18 * mm, 23 * mm, 24 * mm, 24 * mm, 26 * mm, 26 * mm, 35 * mm,],
+        colWidths=[10 * mm, 30 * mm, 72 * mm, 18 * mm, 15 * mm, 18 * mm, 27 * mm],
         repeatRows=1,
         repeatCols=0,
     )
 
     raw_table.setStyle(
+        TableStyle(
+            [
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.8,
+                    colors.grey,
+                ),
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, 0),
+                    colors.HexColor("#404040"),
+                ),
+                (
+                    "BACKGROUND",
+                    (0, 1),
+                    (-1, 1),
+                    colors.HexColor("#f7f7f7"),
+                ),
+                (
+                    "ALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "CENTER",
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE",
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    6,
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    6,
+                ),
+            ]
+        )
+    )
+
+    story.append(raw_table)
+
+    # =========================================================
+    # TOTAL
+    # =========================================================
+
+    story.append(Spacer(1, 3 * mm))
+
+    story.append(Paragraph("Raw Material Cost Analysis", section_style,))
+
+    cost_table_data = [
+        [
+            Paragraph("Raw Material", header_style),
+            Paragraph("Min. Rate", header_style),
+            Paragraph("Max. Rate", header_style),
+            Paragraph("Min. Cost", header_style),
+            Paragraph("Max. Cost", header_style),
+            Paragraph("Notes", header_style),
+        ]
+    ]
+
+    for component in bom.get("components", []):
+        item_code = str(component.get("item_code") or "-")
+        calculated = cost_components.get(item_code, {},)
+        cost_table_data.append(
+            [
+                Paragraph(item_code, cell_style),
+                Paragraph(_money(calculated.get("minimum_rate", 0)), right_style),
+                Paragraph(_money(calculated.get("maximum_rate", 0)), right_style),
+                Paragraph(_money(calculated.get("minimum_cost", 0)), right_style),
+                Paragraph(_money(calculated.get("maximum_cost", 0)), right_style),
+                Paragraph(str(component.get("notes") or ""), cell_style,),
+            ]
+        )
+
+    cost_table = Table(
+        cost_table_data,
+        colWidths=[35 * mm, 28 * mm, 28 * mm, 30 * mm, 30 * mm, 39 * mm,],
+        repeatRows=1,
+    )
+
+    cost_table.setStyle(
         TableStyle(
             [
                 (
@@ -482,29 +617,18 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
         )
     )
 
-    story.append(raw_table)
-
-    # =========================================================
-    # TOTAL
-    # =========================================================
-
+    story.append(cost_table)
     story.append(Spacer(1, 3 * mm))
 
     total_table = Table(
         [
             [
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
                 Paragraph(
                     "<b>Total Approx. Cost</b>",
                     right_style,
                 ),
+                "",
+                "",
                 Paragraph(
                     f"<b>{_money(minimum_cost)}</b>",
                     right_style,
@@ -517,59 +641,100 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
             ]
         ],
         colWidths=[
-            10 * mm,
-            28 * mm,
-            58 * mm,
-            18 * mm,
-            14 * mm,
-            18 * mm,
-            23 * mm,
-            24 * mm,
-            24 * mm,
-            26 * mm,
-            26 * mm,
-            35 * mm,
+            35 * mm,  # Raw Material
+            28 * mm,  # Min Rate
+            28 * mm,  # Max Rate
+            30 * mm,  # Min Cost
+            30 * mm,  # Max Cost
+            39 * mm,  # Notes
         ],
     )
 
     total_table.setStyle(
         TableStyle(
             [
+                # Border around the entire total row
                 (
-                    "GRID",
-                    (8, 0),
-                    (10, 0),
-                    0.5,
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.6,
                     colors.grey,
                 ),
+
+                # Internal column borders
+                (
+                    "INNERGRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.35,
+                    colors.grey,
+                ),
+
+                # Background
                 (
                     "BACKGROUND",
-                    (8, 0),
-                    (10, 0),
+                    (0, 0),
+                    (-1, -1),
                     colors.HexColor("#eeeeee"),
                 ),
+
+                # Merge first three columns for the label
                 (
                     "SPAN",
-                    (8, 0),
-                    (8, 0),
+                    (0, 0),
+                    (2, 0),
                 ),
+
                 (
                     "VALIGN",
                     (0, 0),
                     (-1, -1),
                     "MIDDLE",
                 ),
+
+                # Label aligned right
+                (
+                    "ALIGN",
+                    (0, 0),
+                    (2, 0),
+                    "RIGHT",
+                ),
+
+                # Costs aligned right
+                (
+                    "ALIGN",
+                    (3, 0),
+                    (4, 0),
+                    "RIGHT",
+                ),
+
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4,
+                ),
+
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4,
+                ),
+
                 (
                     "TOPPADDING",
                     (0, 0),
                     (-1, -1),
-                    5,
+                    6,
                 ),
+
                 (
                     "BOTTOMPADDING",
                     (0, 0),
                     (-1, -1),
-                    5,
+                    6,
                 ),
             ]
         )
@@ -632,8 +797,8 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
             ],
         ],
         colWidths=[
-            110 * mm,
-            110 * mm,
+            95 * mm,
+            95 * mm,
         ],
     )
 

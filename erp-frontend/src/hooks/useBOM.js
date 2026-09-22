@@ -8,12 +8,32 @@ export default function useBOM({sessionToken, setAlertMessage, setIsAlertOpen}){
 
     const [rawItemMaster, setRawItemMaster] = useState([]);
     const [isLoadingItems, setIsLoadingItems] = useState(false);
-    const [costRange, setCostRange] = useState({
-        components: [], minimum_material_cost: 0, maximum_material_cost: 1000000000
-    });
-
+    const [isLoadingBOMs, setIsLoadingBOMs] = useState(false);
+    const [costRange, setCostRange] = useState({components: [], minimum_material_cost: 0, maximum_material_cost: 1000000000});
+    const [bomList, setBomList] = useState([]);
     const [isCalculating, setIsCalculating] = useState(false);
 
+    const resetBOM = () => {
+        setBom({item_code: "", bom_name:"", revision_no: 1, status: "DRAFT", output_quantity: 1, uom: 'NOS', components: []});
+        setCostRange({components: [], minimum_material_cost: 0, maximum_material_cost: 1000000000});
+    };
+
+    const refreshBOMList = async () => {
+        try{
+            setIsLoadingBOMs(true);
+            const result = await API.fetchBOMs(sessionToken);
+            setBomList(Array.isArray(result) ? result : result?.items || []);
+        }catch(err){
+            console.error("Failed to load BOM List: ", err);
+            if(setAlertMessage){
+                setAlertMessage(err.message || "Failed to load BOM list");
+                setIsAlertOpen(true);
+            }
+            setBomList([]);
+        }finally{
+            setIsLoadingBOMs(false);
+        }
+    }
     const refreshRawMaterials = async () => {
         try{
             setIsLoadingItems(true);
@@ -54,6 +74,7 @@ export default function useBOM({sessionToken, setAlertMessage, setIsAlertOpen}){
             components[index] = {...components[index], [field]: value};
             return {...prev, components,};
         });
+        console.log(`Updated ${index} row of field ${field} & value ${value}`);
     };
 
     const removeComponent = (index) => {
@@ -63,6 +84,13 @@ export default function useBOM({sessionToken, setAlertMessage, setIsAlertOpen}){
     const calculateCostRange = async () => {
         try{
             setIsCalculating(true);
+            if(!bom.components.some(c => c.item_code)){
+                setAlertMessage("Please select atleast one item code for components before calculating cost.");
+                setIsAlertOpen(true);
+                setIsCalculating(false);
+                return;
+            }
+            
             const result = await API.getBOMCostRange(bom.components, sessionToken);
             setCostRange(result);
         }catch(err){
@@ -77,6 +105,7 @@ export default function useBOM({sessionToken, setAlertMessage, setIsAlertOpen}){
 
     const saveBOM = async () => {
         try{
+            console.log(`The BOM data sent: ${JSON.stringify(bom)}`)
             const result = await API.saveBOM(bom, sessionToken);
             if (setAlertMessage){
                 setAlertMessage("BOM Saved succcessfully");
@@ -94,50 +123,96 @@ export default function useBOM({sessionToken, setAlertMessage, setIsAlertOpen}){
         }
     };
 
+    const loadBOM = async(bomID) => {
+        try{
+            const result = await API.getBOM(bomID, sessionToken);
+            setBom({
+                id: result.id,
+                item_code: result.item_code,
+                bom_name: result.bom_name || "",
+                revision_no: result.revision_no || 1,
+                status: result.status || "Draft",
+                output_quantity: result.output_quantity || 1,
+                uom: result.uom || "NOS",
+                components: Array.isArray(result.components) ? 
+                    result.components.map((component) => ({
+                        id: component.id,
+                        item_code: component.item_code,
+                        quantity: component.quantity,
+                        uom: component.uom,
+                        scrap_percent: Number(component.scrap_percent || 0),
+                        notes: component.notes || ""
+                    }))
+                    : 
+                    [],
+            });
+
+            return result;
+        }catch(err){
+            console.error("FAiled to load BOM: ", err);
+            if(setAlertMessage){
+                setAlertMessage("Failed to load BOM : " + err.message);
+                setIsAlertOpen(true);
+            }
+
+            throw err;
+        }
+    };
+
     const generateBOMPdf = async (bomId) => {
         try {
             if (!bomId) {
-                throw new Error(
-                    "Please save the BOM before generating the PDF."
-                );
+                throw new Error("Please save the BOM before generating the PDF.");
             }
 
-            const blob = await API.getBOMPdf(
-                bomId,
-                sessionToken
-            );
+            const blob = await API.getBOMPdf(bomId, sessionToken);
 
             const url = window.URL.createObjectURL(blob);
 
-            window.open(
-                url,
-                "_blank",
-                "noopener,noreferrer"
-            );
+            window.open(url, "_blank", "noopener,noreferrer");
 
             setTimeout(() => {
                 window.URL.revokeObjectURL(url);
             }, 60000);
 
         } catch (err) {
-            console.error(
-                "Failed to generate BOM PDF:",
-                err
-            );
+            console.error("Failed to generate BOM PDF:", err);
 
             if (setAlertMessage) {
-                setAlertMessage(
-                    "Failed to generate BOM PDF: " +
-                    err.message
-                );
-
+                setAlertMessage("Failed to generate BOM PDF: " + err.message);
                 setIsAlertOpen(true);
             }
         }
     };
 
+    const deleteBOM = async(bomID) => {
+        try{
+            await API.deleteBOM(bomID, sessionToken);
+            setBomList((prev) => prev.filter(((item) => item.id != bomID)));
+            if(setAlertMessage){
+                setAlertMessage("BOM Deleted Successfully!");
+                setIsAlertOpen(true);
+            }
+        }catch(err){
+            console.error("Failed to delete BOM: ", err);
+            if(setAlertMessage){
+                setAlertMessage("Failed to delete BOM: " + err.message);
+                setIsAlertOpen(true);
+            }
+            throw err;
+        }
+    };
+
     return{
-        bom, setBom, updateBOM, addComponent, updateComponent, removeComponent, costRange, calculateCostRange,
-        isCalculating, saveBOM, refreshRawMaterials, rawItemMaster, generateBOMPdf,
+        //list
+        bomList, isLoadingBOMs, refreshBOMList,
+        //workspace
+        bom, setBom, resetBOM, loadBOM, updateBOM, addComponent, updateComponent, removeComponent, 
+        //materials
+        rawItemMaster, isLoadingItems, refreshRawMaterials,
+        //costing
+        costRange, calculateCostRange, isCalculating,
+        //actions
+        saveBOM, deleteBOM, generateBOMPdf,
     };
 }
