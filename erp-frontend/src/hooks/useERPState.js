@@ -23,7 +23,7 @@ import useQuotation from "./useQuotation";
 import useExerciseGenerator from "./useExerciseGenerator";
 import useProductionCalendar from "./useProductionCalendar";
 import { usePromptGenerator } from "./usePromptGenerator";
-import useBOM from "./useBOM";
+import useBOM from "./bom/useBOM";
 
 const API_HOST = window.location.hostname;
 

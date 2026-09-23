@@ -431,7 +431,7 @@ def generate_bom_pdf(bom: dict, cost_range: dict, generated_by: str,) -> BytesIO
             Paragraph("Qty.", header_style),
             Paragraph("UOM", header_style),
             Paragraph("Scrap %", header_style),
-            Paragraph("Effective Qty.", header_style),
+            Paragraph("Actual Qty.", header_style),
         ]
     ]
 

@@ -34,7 +34,7 @@ INDIAN_STATES = ["ANDHRA PRADESH", "ARUNACHAL PRADESH", "ASSAM", "BIHAR", "CHHAT
 
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URrL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
 
 TASK_UPLOAD_DIR = Path("uploaded_task_attachments")
 TASK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

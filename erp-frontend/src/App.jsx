@@ -81,7 +81,7 @@ import ProductionCalendar from "./components/production/ProductionCalendar";
 import ProductionScheduleModal from "./components/production/ProductionScheduleModal";
 import PromptGeneratorView from "./views/PromptGenerator";
 import BOMListView from "./views/BOMListView";
-
+import BOM_WorkspaceView from "./views/BOM_WorkSpaceView";
 function App() {
     const state = useERPState();
 
@@ -1506,7 +1506,7 @@ function App() {
                                 )}
 
                             {isSales && state.activeTab === "quote-generation" && (<QuoteGenerationView state={state}/>)}
-                            {isFactory && state.activeTab === "bom-list" && (<BOMListView state={state}/>)}
+                            {isFactory && state.activeTab === "bom-list" && (state.bomView==="list" ? <BOMListView state={state}/> : <BOM_WorkspaceView state={state}/>)}
                         </div>
                     </main>
                 </SidebarInset>

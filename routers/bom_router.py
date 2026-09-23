@@ -64,7 +64,7 @@ def get_bom_pdf(bom_id: int, user: dict = Depends(verify_bearer_token),):
 
 @router.get("/{bom_id}")
 def get_bom(bom_id: int, user: dict=Depends(verify_bearer_token)):
-    bom = EDBR.get_bom(bom_id)
+    bom = EDBR.get_bom_id(bom_id)
     if not bom:
         raise HTTPException(status_code=500, detail=f"Failed to find {bom_id}")
 

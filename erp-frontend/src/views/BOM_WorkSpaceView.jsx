@@ -1,4 +1,4 @@
-import {Plus, Trash, RefreshCw, Save, Package, AlertCircle,} from "lucide-react";
+import {Plus, Trash, RefreshCw, Save, Package, AlertCircle, ArrowLeft} from "lucide-react";
 
 import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
 
@@ -10,7 +10,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/
 
 export default function BOM_WorkspaceView({state,}) {
     const {bom, updateBOM, addComponent, updateComponent, removeComponent, costRange, calculateCostRange, 
-        isCalculating, saveBOM, refreshRawMaterials, rawItemMaster, itemsMaster,} = state;
+        isCalculating, saveBOM, refreshRawMaterials, rawItemMaster, itemsMaster, handleBackToBOMList} = state;
 
     const itemOptions = (rawItemMaster ?? []).map((item) => item.item_code).filter(Boolean);
     const productCodes = (itemsMaster ?? []).map((item) => item.item_code).filter(Boolean);
@@ -18,18 +18,23 @@ export default function BOM_WorkspaceView({state,}) {
     return (
         <div className="mx-auto w-full max-w-[1400px]">
             <Card>
-                <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Package className="h-5 w-5" />
+                <CardHeader className="flex flex-col gap-4 border-b bg-gradient-to-r from-blue-50 via-indigo-50 to-violet-50 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                        <Button type="button" variant="outline" size="icon" onClick={handleBackToBOMList} title="Back to BOM Register" className="shrink-0">
+                            <ArrowLeft className="h-4 w-4"/>
+                        </Button>
 
-                            Bill of Materials
-                        </CardTitle>
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Package className="h-5 w-5 text-blue-600" />
+                                {state.bom?.id ? "Edit Bill of Materials" : "Create Bill of Materials"}
+                            </CardTitle>
 
-                        <CardDescription>
-                            Define material requirements and
-                            calculate historical purchase-cost ranges.
-                        </CardDescription>
+                            <CardDescription>
+                                {state.bom?.id ? `Editing BOM ${state.bom.bom_name || state.bom.item_code}` :
+                                "Define material requirements and calculate historical purchase-cost ranges."}
+                            </CardDescription>
+                        </div>
                     </div>
 
                     <div className="flex gap-2">
@@ -56,13 +61,8 @@ export default function BOM_WorkspaceView({state,}) {
                                 : "Calculate Cost"}
                         </Button>
 
-                        <Button
-                            type="button"
-                            onClick={saveBOM}
-                            className="gap-2"
-                        >
+                        <Button type="button" onClick={saveBOM} className="gap-2 bg-blue-600 hover:bg-blue-700">
                             <Save className="h-4 w-4" />
-
                             Save BOM
                         </Button>
                     </div>

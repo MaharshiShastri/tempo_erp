@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 config = context.config
 USER = os.getenv("role", "")
 PASSWORD = os.getenv("db_password", "")
-DB_DSN = os.getenv("DATABASE_URL_LCOAsL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
+DB_DSN = os.getenv("DATABASE_URL", f"postgresql://{USER}:{PASSWORD}@localhost:5432/testing_DB")
 # ALTER TABLE test_items_master RENAME TO raw_materials;
 config.set_main_option("sqlalchemy.url", DB_DSN)
 # Interpret the config file for Python logging.

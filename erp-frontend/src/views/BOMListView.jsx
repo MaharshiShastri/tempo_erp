@@ -5,7 +5,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/c
 import {Badge} from "@/components/ui/badge";
 
 export default function BOMListView({state}){
-    const {bomList, isLoadingBOMs, refreshBOMList, deleteBOM, generateBOMPdf, onEdit, onCreate} = state;
+    const {bomList, isLoadingBOMs, refreshBOMList, deleteBOM, generateBOMPdf, handleEditBOM, handleCreateBOM} = state;
 
     const handleDelete = async(bom) => {
         const confirmed = window.confirm(`Delete BOM "${bom.bom_name || bom.item_code}"?`);
@@ -54,7 +54,7 @@ export default function BOMListView({state}){
                             </div>
                         </div>
 
-                        <Button onClick={onCreate} className="bg-white text-blue-700 hover:bg-blue-50">
+                        <Button onClick={handleCreateBOM} className="bg-white text-blue-700 hover:bg-blue-50">
                             <Plus className="h-6 w-6"/>
                             Create New BOM
                         </Button>
@@ -64,7 +64,7 @@ export default function BOMListView({state}){
 
             <Card className="border-0 shadow-sm">
                 <CardHeader className="border-b bg-slate-50-70">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:jusify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <CardTitle>
                                 BOM Register
@@ -102,7 +102,7 @@ export default function BOMListView({state}){
                                     materials required for production.
                                 </p>
 
-                                <Button className="mt-5" onClick={onCreate}>
+                                <Button className="mt-5" onClick={handleCreateBOM}>
                                     <Plus className="mr-2 h-4 w-4"/>
                                     Create New BOM
                                 </Button>
@@ -128,7 +128,7 @@ export default function BOMListView({state}){
                                             <TableRow className="group transition-colors hover:bg-blue-50/50" key={item.id}>
                                                 
                                                 <TableCell>
-                                                    <div className="font-semibold text-[var(--text-primary)]-800">{item.item_code}</div>
+                                                    <div className="font-semibold text-[var(--text-primary)]">{item.item_code}</div>
                                                 </TableCell>
                                                 
                                                 <TableCell>
@@ -160,7 +160,7 @@ export default function BOMListView({state}){
                                                 <TableCell>
                                                     <div className="flex justify-end gap-1">
                                                         <Button variant="default" size="icon" title="Edit BOM"
-                                                        className="text-blue-600 hover:bg-blue-100 hover:text-blue-700" onClick={() => onEdit?.(item.id)}>
+                                                        className="text-blue-600 hover:bg-blue-100 hover:text-blue-700" onClick={() => handleEditBOM(item.id)}>
                                                             <Pencil className="h-4 w-4"/>
                                                         </Button>
 
