@@ -49,35 +49,60 @@ export default function TransportAnalyticsView({ state }) {
   const formatNumber = (value) =>
     Number(value ?? 0).toLocaleString("en-IN");
 
+  const themedInputClass =
+    "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+  const cardClass =
+    "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]";
+
+  const cardHeaderClass =
+    "border-b border-[var(--border-light)] bg-[var(--bg-muted)]";
+
+  const tableHeaderClass =
+    "bg-[var(--bg-muted)] text-[var(--text-muted)]";
+
+  const tableRowClass =
+    "border-[var(--border-light)] hover:bg-[var(--combobox-hover)]";
+
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-6 bg-[var(--bg-main)] text-[var(--text-primary)]">
       {/* Header */}
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             Transport Analytics
           </h2>
 
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             Logistics performance dashboard
           </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="space-y-2">
-            <Label htmlFor="transport-from-date">From</Label>
+            <Label
+              htmlFor="transport-from-date"
+              className="text-[var(--text-primary)]"
+            >
+              From
+            </Label>
 
             <Input
               id="transport-from-date"
               type="date"
               value={state.fromDate}
               onChange={(e) => state.setFromDate(e.target.value)}
-              className="w-full sm:w-[160px]"
+              className={`w-full sm:w-[160px] ${themedInputClass}`}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="transport-to-date">To</Label>
+            <Label
+              htmlFor="transport-to-date"
+              className="text-[var(--text-primary)]"
+            >
+              To
+            </Label>
 
             <Input
               id="transport-to-date"
@@ -85,15 +110,20 @@ export default function TransportAnalyticsView({ state }) {
               max={today}
               value={state.toDate}
               onChange={(e) => state.setToDate(e.target.value)}
-              className="w-full sm:w-[160px]"
+              className={`w-full sm:w-[160px] ${themedInputClass}`}
             />
           </div>
 
           <Button
             type="button"
             onClick={() =>
-              state.fetchAnalytics(state.user.role,state.fromDate, state.toDate)
+              state.fetchAnalytics(
+                state.user.role,
+                state.fromDate,
+                state.toDate
+              )
             }
+            className="bg-[var(--brand-accent)] text-white hover:opacity-90"
           >
             Refresh
           </Button>
@@ -106,16 +136,25 @@ export default function TransportAnalyticsView({ state }) {
         onValueChange={setActiveView}
         className="flex w-full flex-col"
       >
-        <TabsList className="flex h-auto w-full flex-row items-stretch justify-start gap-1 overflow-x-auto">
-          <TabsTrigger value="statistics">
+        <TabsList className="flex h-auto w-full flex-row items-stretch justify-start gap-1 overflow-x-auto border border-[var(--border-light)] bg-[var(--bg-muted)] p-1">
+          <TabsTrigger
+            value="statistics"
+            className="text-[var(--text-muted)] data-[state=active]:bg-[var(--bg-surface)] data-[state=active]:text-[var(--text-primary)] data-[state=active]:shadow-[var(--shadow-sm)]"
+          >
             Statistics
           </TabsTrigger>
 
-          <TabsTrigger value="charts">
+          <TabsTrigger
+            value="charts"
+            className="text-[var(--text-muted)] data-[state=active]:bg-[var(--bg-surface)] data-[state=active]:text-[var(--text-primary)] data-[state=active]:shadow-[var(--shadow-sm)]"
+          >
             Charts
           </TabsTrigger>
 
-          <TabsTrigger value="geo">
+          <TabsTrigger
+            value="geo"
+            className="text-[var(--text-muted)] data-[state=active]:bg-[var(--bg-surface)] data-[state=active]:text-[var(--text-primary)] data-[state=active]:shadow-[var(--shadow-sm)]"
+          >
             Geo Analytics
           </TabsTrigger>
         </TabsList>
@@ -126,57 +165,57 @@ export default function TransportAnalyticsView({ state }) {
         <TabsContent value="statistics" className="mt-6 space-y-6">
           {/* KPI Cards */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card className={cardClass}>
+              <CardHeader className={`pb-2 ${cardHeaderClass}`}>
+                <CardTitle className="text-sm font-medium text-[var(--text-muted)]">
                   Total Logistics Partners
                 </CardTitle>
               </CardHeader>
 
               <CardContent>
-                <div className="text-2xl font-bold text-primary">
+                <div className="text-2xl font-bold text-[var(--brand-accent)]">
                   {formatNumber(totalPartners)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card className={cardClass}>
+              <CardHeader className={`pb-2 ${cardHeaderClass}`}>
+                <CardTitle className="text-sm font-medium text-[var(--text-muted)]">
                   Total Dispatches
                 </CardTitle>
               </CardHeader>
 
               <CardContent>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <div className="text-2xl font-bold text-[var(--brand-success)]">
                   {formatNumber(totalDispatches)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card className={cardClass}>
+              <CardHeader className={`pb-2 ${cardHeaderClass}`}>
+                <CardTitle className="text-sm font-medium text-[var(--text-muted)]">
                   Total Freight Spend
                 </CardTitle>
               </CardHeader>
 
               <CardContent>
-                <div className="text-2xl font-bold text-destructive">
+                <div className="text-2xl font-bold text-[var(--brand-danger)]">
                   {formatCurrency(totalCost)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card className={cardClass}>
+              <CardHeader className={`pb-2 ${cardHeaderClass}`}>
+                <CardTitle className="text-sm font-medium text-[var(--text-muted)]">
                   Average Freight
                 </CardTitle>
               </CardHeader>
 
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-2xl font-bold text-[var(--text-primary)]">
                   {formatCurrency(averageDispatchCost)}
                 </div>
               </CardContent>
@@ -184,20 +223,32 @@ export default function TransportAnalyticsView({ state }) {
           </div>
 
           {/* Monthly Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Summary</CardTitle>
+          <Card className={cardClass}>
+            <CardHeader className={cardHeaderClass}>
+              <CardTitle className="text-[var(--text-primary)]">
+                Monthly Summary
+              </CardTitle>
             </CardHeader>
 
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Dispatches</TableHead>
-                      <TableHead>Total Cost</TableHead>
-                      <TableHead>Average</TableHead>
+                    <TableRow
+                      className={`border-[var(--border-light)] ${tableHeaderClass}`}
+                    >
+                      <TableHead className="text-[var(--text-muted)]">
+                        Month
+                      </TableHead>
+                      <TableHead className="text-[var(--text-muted)]">
+                        Dispatches
+                      </TableHead>
+                      <TableHead className="text-[var(--text-muted)]">
+                        Total Cost
+                      </TableHead>
+                      <TableHead className="text-[var(--text-muted)]">
+                        Average
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -213,30 +264,33 @@ export default function TransportAnalyticsView({ state }) {
                         const average = cost / (dispatches || 1);
 
                         return (
-                          <TableRow key={month.month_period}>
-                            <TableCell className="font-medium">
+                          <TableRow
+                            key={month.month_period}
+                            className={tableRowClass}
+                          >
+                            <TableCell className="font-medium text-[var(--text-primary)]">
                               {month.month_period}
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="text-[var(--text-primary)]">
                               {formatNumber(dispatches)}
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="text-[var(--text-primary)]">
                               {formatCurrency(cost)}
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="text-[var(--text-primary)]">
                               {formatCurrency(average.toFixed(0))}
                             </TableCell>
                           </TableRow>
                         );
                       })
                     ) : (
-                      <TableRow>
+                      <TableRow className="border-[var(--border-light)]">
                         <TableCell
                           colSpan={4}
-                          className="h-24 text-center text-muted-foreground"
+                          className="h-24 text-center text-[var(--text-muted)]"
                         >
                           No monthly data available.
                         </TableCell>
@@ -251,11 +305,11 @@ export default function TransportAnalyticsView({ state }) {
           {/* Dispatch Records */}
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                 Dispatch Records
               </h3>
 
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-[var(--text-muted)]">
                 Dispatch activity grouped by month
               </p>
             </div>
@@ -270,15 +324,15 @@ export default function TransportAnalyticsView({ state }) {
                     <AccordionItem
                       key={month}
                       value={month}
-                      className="rounded-lg border bg-card px-4"
+                      className={`rounded-lg border border-[var(--border-light)] bg-[var(--bg-surface)] px-4 shadow-[var(--shadow-sm)]`}
                     >
-                      <AccordionTrigger className="hover:no-underline">
+                      <AccordionTrigger className="text-[var(--text-primary)] hover:no-underline">
                         <div className="flex items-center gap-2 text-left">
-                          <span className="font-medium">
+                          <span className="font-medium text-[var(--text-primary)]">
                             {month}
                           </span>
 
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-[var(--text-muted)]">
                             ({records.length} Dispatches)
                           </span>
                         </div>
@@ -288,45 +342,64 @@ export default function TransportAnalyticsView({ state }) {
                         <div className="overflow-x-auto pb-2">
                           <Table>
                             <TableHeader>
-                              <TableRow>
-                                <TableHead>Partner</TableHead>
-                                <TableHead>Zone</TableHead>
-                                <TableHead>Weight</TableHead>
-                                <TableHead>Subtotal</TableHead>
-                                <TableHead>GST</TableHead>
-                                <TableHead>Operator</TableHead>
-                                <TableHead>Date</TableHead>
+                              <TableRow
+                                className={`border-[var(--border-light)] ${tableHeaderClass}`}
+                              >
+                                <TableHead className="text-[var(--text-muted)]">
+                                  Partner
+                                </TableHead>
+                                <TableHead className="text-[var(--text-muted)]">
+                                  Zone
+                                </TableHead>
+                                <TableHead className="text-[var(--text-muted)]">
+                                  Weight
+                                </TableHead>
+                                <TableHead className="text-[var(--text-muted)]">
+                                  Subtotal
+                                </TableHead>
+                                <TableHead className="text-[var(--text-muted)]">
+                                  GST
+                                </TableHead>
+                                <TableHead className="text-[var(--text-muted)]">
+                                  Operator
+                                </TableHead>
+                                <TableHead className="text-[var(--text-muted)]">
+                                  Date
+                                </TableHead>
                               </TableRow>
                             </TableHeader>
 
                             <TableBody>
                               {records.map((record) => (
-                                <TableRow key={record.id}>
-                                  <TableCell className="font-medium">
+                                <TableRow
+                                  key={record.id}
+                                  className={tableRowClass}
+                                >
+                                  <TableCell className="font-medium text-[var(--text-primary)]">
                                     {record.partner_name}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="text-[var(--text-primary)]">
                                     {record.destination_zone}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="text-[var(--text-primary)]">
                                     {record.chargeable_weight}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="text-[var(--text-primary)]">
                                     {formatCurrency(record.subtotal)}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="text-[var(--text-primary)]">
                                     {formatCurrency(record.gst)}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="text-[var(--text-primary)]">
                                     {record.operator}
                                   </TableCell>
 
-                                  <TableCell className="whitespace-nowrap">
+                                  <TableCell className="whitespace-nowrap text-[var(--text-primary)]">
                                     {record.created_at}
                                   </TableCell>
                                 </TableRow>
@@ -340,8 +413,8 @@ export default function TransportAnalyticsView({ state }) {
                 )}
               </Accordion>
             ) : (
-              <Card>
-                <CardContent className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+              <Card className={cardClass}>
+                <CardContent className="flex h-24 items-center justify-center text-sm text-[var(--text-muted)]">
                   No dispatch records available.
                 </CardContent>
               </Card>
@@ -354,9 +427,11 @@ export default function TransportAnalyticsView({ state }) {
         ============================================================ */}
         <TabsContent value="charts" className="mt-6">
           <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Logistics Spend</CardTitle>
+            <Card className={cardClass}>
+              <CardHeader className={cardHeaderClass}>
+                <CardTitle className="text-[var(--text-primary)]">
+                  Monthly Logistics Spend
+                </CardTitle>
               </CardHeader>
 
               <CardContent>
@@ -377,9 +452,9 @@ export default function TransportAnalyticsView({ state }) {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>
+            <Card className={cardClass}>
+              <CardHeader className={cardHeaderClass}>
+                <CardTitle className="text-[var(--text-primary)]">
                   Dispatches by Logistics Partner
                 </CardTitle>
               </CardHeader>

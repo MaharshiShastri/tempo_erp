@@ -48,16 +48,38 @@ export default function LogisticsPartnerEntryView({ state }) {
     });
   };
 
+  const themedInputClass =
+    "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+  const themedSelectTriggerClass =
+    "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+  const themedSelectContentClass =
+    "border-[var(--border-light)] bg-[var(--bg-surface)] text-[var(--text-primary)]";
+
+  const themedSelectItemClass =
+    "focus:bg-[var(--combobox-hover)] focus:text-[var(--text-primary)]";
+
+  const themedTableClass =
+    "border-[var(--border-light)] bg-[var(--bg-main)]";
+
+  const themedTableHeaderClass =
+    "border-[var(--border-light)] bg-[var(--bg-muted)] text-[var(--text-primary)]";
+
+  const themedTableCellClass =
+    "border-[var(--border-light)] text-[var(--text-primary)]";
+
   return (
-    <div className="mx-auto w-full max-w-[1200px] p-6">
-      <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div className="mx-auto w-full max-w-[1200px] bg-[var(--bg-main)] p-6 text-[var(--text-primary)]">
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
         {/* Header */}
-        <div className="flex flex-col gap-4 border-b p-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 border-b border-[var(--border-light)] bg-[var(--bg-muted)] p-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-xl font-semibold tracking-tight">
+            <h3 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
               🚚 Master Logistics Onboarding
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
               Configure transporter contract parameters, zones, fuel escalation,
               and ODA delivery rates.
             </p>
@@ -76,9 +98,9 @@ export default function LogisticsPartnerEntryView({ state }) {
 
               <Button
                 type="button"
-                variant="default"
                 onClick={() => state.fileInputRef.current?.click()}
                 disabled={state.isExtracting}
+                className="bg-[var(--brand-accent)] text-white hover:opacity-90"
               >
                 {state.isExtracting
                   ? "⏳ Extracting..."
@@ -97,17 +119,26 @@ export default function LogisticsPartnerEntryView({ state }) {
                 })
               }
             >
-              <SelectTrigger className="w-full sm:w-[240px]">
+              <SelectTrigger
+                className={`w-full sm:w-[240px] ${themedSelectTriggerClass}`}
+              >
                 <SelectValue placeholder="Select transporter" />
               </SelectTrigger>
 
-              <SelectContent>
-                <SelectItem value="__manual__">
+              <SelectContent className={themedSelectContentClass}>
+                <SelectItem
+                  value="__manual__"
+                  className={themedSelectItemClass}
+                >
                   ➕ Create Manually
                 </SelectItem>
 
                 {state.availablePartners.map((partner) => (
-                  <SelectItem key={partner.id} value={String(partner.id)}>
+                  <SelectItem
+                    key={partner.id}
+                    value={String(partner.id)}
+                    className={themedSelectItemClass}
+                  >
                     ✏️ {partner.name}
                   </SelectItem>
                 ))}
@@ -121,10 +152,11 @@ export default function LogisticsPartnerEntryView({ state }) {
             {/* Core Contract Parameters */}
             <section>
               <div className="mb-5">
-                <h4 className="text-lg font-semibold text-primary">
+                <h4 className="text-lg font-semibold text-[var(--brand-accent)]">
                   Core Contract Parameters
                 </h4>
-                <p className="text-sm text-muted-foreground">
+
+                <p className="text-sm text-[var(--text-muted)]">
                   Basic transporter and commercial contract configuration.
                 </p>
               </div>
@@ -140,6 +172,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         name: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -153,6 +186,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         partner_link: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -166,6 +200,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         mobile_number: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -181,6 +216,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         cft_factor: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -195,6 +231,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         minimum_weight: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -209,6 +246,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         minimum_freight_value: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -223,6 +261,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         documentation_charge: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -238,12 +277,13 @@ export default function LogisticsPartnerEntryView({ state }) {
                         fov_percentage: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
                 <FormField
                   label="Local Loading Cost (₹)"
-                  labelClassName="text-emerald-600"
+                  labelClassName="text-[var(--brand-success)]"
                 >
                   <Input
                     required
@@ -256,12 +296,13 @@ export default function LogisticsPartnerEntryView({ state }) {
                         local_loading_cost: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
                 <FormField
                   label="Max Hub Loading Cap (₹)"
-                  labelClassName="text-destructive"
+                  labelClassName="text-[var(--brand-danger)]"
                 >
                   <Input
                     required
@@ -274,6 +315,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         hub_loading_max_cost: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
 
@@ -288,6 +330,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                         gst_percentage: e.target.value,
                       })
                     }
+                    className={themedInputClass}
                   />
                 </FormField>
               </div>
@@ -302,6 +345,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 <Button
                   type="button"
                   variant="outline"
+                  className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                   onClick={() =>
                     state.addZoneRow(state.setZones, {
                       zone_code: "",
@@ -315,24 +359,37 @@ export default function LogisticsPartnerEntryView({ state }) {
                 </Button>
               </SectionHeader>
 
-              <div className="overflow-x-auto rounded-lg border">
-                <Table>
+              <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                <Table className={themedTableClass}>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Zone Code</TableHead>
-                      <TableHead>Regions Served</TableHead>
-                      <TableHead>States (Comma Separated)</TableHead>
-                      <TableHead>Rate (₹/kg)</TableHead>
-                      <TableHead className="w-[60px]" />
+                    <TableRow className={themedTableHeaderClass}>
+                      <TableHead className={themedTableHeaderClass}>
+                        Zone Code
+                      </TableHead>
+                      <TableHead className={themedTableHeaderClass}>
+                        Regions Served
+                      </TableHead>
+                      <TableHead className={themedTableHeaderClass}>
+                        States (Comma Separated)
+                      </TableHead>
+                      <TableHead className={themedTableHeaderClass}>
+                        Rate (₹/kg)
+                      </TableHead>
+                      <TableHead
+                        className={`${themedTableHeaderClass} w-[60px]`}
+                      />
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
                     {state.zones.map((zone, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
+                      <TableRow
+                        key={index}
+                        className="border-[var(--border-light)] hover:bg-[var(--combobox-hover)]"
+                      >
+                        <TableCell className={themedTableCellClass}>
                           <Input
-                            className="uppercase"
+                            className={`${themedInputClass} uppercase`}
                             value={zone.zone_code}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -346,8 +403,9 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Input
+                            className={themedInputClass}
                             value={zone.zone_name}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -361,8 +419,9 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Input
+                            className={themedInputClass}
                             value={zone.states_raw}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -376,11 +435,12 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Input
                             type="number"
                             step="0.01"
                             placeholder="0.00"
+                            className={themedInputClass}
                             value={zone.rate_per_kg}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -394,12 +454,12 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="text-destructive hover:text-destructive"
+                            className="text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                             onClick={() =>
                               state.removeZoneRow(
                                 state.zones,
@@ -427,6 +487,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 <Button
                   type="button"
                   variant="outline"
+                  className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                   onClick={() =>
                     state.addZoneRow(state.setFuelMatrix, {
                       fuel_price_from: "",
@@ -439,24 +500,36 @@ export default function LogisticsPartnerEntryView({ state }) {
                 </Button>
               </SectionHeader>
 
-              <div className="overflow-x-auto rounded-lg border">
-                <Table>
+              <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                <Table className={themedTableClass}>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Diesel Price From (₹)</TableHead>
-                      <TableHead>Diesel Price To (₹)</TableHead>
-                      <TableHead>FSC Applicable (%)</TableHead>
-                      <TableHead className="w-[60px]" />
+                    <TableRow className={themedTableHeaderClass}>
+                      <TableHead className={themedTableHeaderClass}>
+                        Diesel Price From (₹)
+                      </TableHead>
+                      <TableHead className={themedTableHeaderClass}>
+                        Diesel Price To (₹)
+                      </TableHead>
+                      <TableHead className={themedTableHeaderClass}>
+                        FSC Applicable (%)
+                      </TableHead>
+                      <TableHead
+                        className={`${themedTableHeaderClass} w-[60px]`}
+                      />
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
                     {state.fuelMatrix.map((fuel, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
+                      <TableRow
+                        key={index}
+                        className="border-[var(--border-light)] hover:bg-[var(--combobox-hover)]"
+                      >
+                        <TableCell className={themedTableCellClass}>
                           <Input
                             type="number"
                             step="0.01"
+                            className={themedInputClass}
                             value={fuel.fuel_price_from}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -470,10 +543,11 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Input
                             type="number"
                             step="0.01"
+                            className={themedInputClass}
                             value={fuel.fuel_price_to}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -487,10 +561,11 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Input
                             type="number"
                             step="0.01"
+                            className={themedInputClass}
                             value={fuel.surcharge_percentage}
                             onChange={(e) =>
                               state.handleTableChange(
@@ -504,12 +579,12 @@ export default function LogisticsPartnerEntryView({ state }) {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className={themedTableCellClass}>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="text-destructive hover:text-destructive"
+                            className="text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                             onClick={() =>
                               state.removeZoneRow(
                                 state.fuelMatrix,
@@ -538,6 +613,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                   <Button
                     type="button"
                     variant="outline"
+                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                     onClick={state.addOdaCol}
                   >
                     + Add Weight Column
@@ -546,6 +622,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                   <Button
                     type="button"
                     variant="outline"
+                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                     onClick={state.addOdaRow}
                   >
                     + Add Distance Row
@@ -553,16 +630,20 @@ export default function LogisticsPartnerEntryView({ state }) {
                 </div>
               </SectionHeader>
 
-              <div className="overflow-x-auto rounded-lg border">
-                <Table className="min-w-[800px]">
+              <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                <Table
+                  className={`min-w-[800px] ${themedTableClass}`}
+                >
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[180px] border-r-2 bg-muted/50">
+                    <TableRow className={themedTableHeaderClass}>
+                      <TableHead
+                        className={`min-w-[180px] border-r-2 border-[var(--border-light)] bg-[var(--bg-muted)] ${themedTableHeaderClass}`}
+                      >
                         <div className="flex flex-col gap-1">
-                          <span className="text-right text-xs text-muted-foreground">
+                          <span className="text-right text-xs text-[var(--text-muted)]">
                             Weights (KG) →
                           </span>
-                          <span className="text-left text-xs text-muted-foreground">
+                          <span className="text-left text-xs text-[var(--text-muted)]">
                             Distances (KM) ↓
                           </span>
                         </div>
@@ -571,11 +652,11 @@ export default function LogisticsPartnerEntryView({ state }) {
                       {state.odaWeights.map((weight) => (
                         <TableHead
                           key={weight.id}
-                          className="border-r bg-muted/50"
+                          className={`border-r border-[var(--border-light)] bg-[var(--bg-muted)] ${themedTableHeaderClass}`}
                         >
                           <div className="flex items-center justify-center gap-2">
                             <Input
-                              className="h-8 w-[65px] px-2 text-center"
+                              className={`${themedInputClass} h-8 w-[65px] px-2 text-center`}
                               placeholder="Min"
                               value={weight.from}
                               onChange={(e) =>
@@ -589,10 +670,12 @@ export default function LogisticsPartnerEntryView({ state }) {
                               }
                             />
 
-                            <span className="text-muted-foreground">-</span>
+                            <span className="text-[var(--text-muted)]">
+                              -
+                            </span>
 
                             <Input
-                              className="h-8 w-[65px] px-2 text-center"
+                              className={`${themedInputClass} h-8 w-[65px] px-2 text-center`}
                               placeholder="Max"
                               value={weight.to}
                               onChange={(e) =>
@@ -610,7 +693,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                              className="h-8 w-8 shrink-0 text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                               onClick={() => state.removeOdaCol(weight.id)}
                             >
                               ×
@@ -623,11 +706,16 @@ export default function LogisticsPartnerEntryView({ state }) {
 
                   <TableBody>
                     {state.odaDistances.map((distance) => (
-                      <TableRow key={distance.id}>
-                        <TableCell className="border-r-2 bg-muted/50">
+                      <TableRow
+                        key={distance.id}
+                        className="border-[var(--border-light)] hover:bg-[var(--combobox-hover)]"
+                      >
+                        <TableCell
+                          className={`border-r-2 border-[var(--border-light)] bg-[var(--bg-muted)] ${themedTableCellClass}`}
+                        >
                           <div className="flex items-center gap-2">
                             <Input
-                              className="h-8 w-[65px] px-2 text-center"
+                              className={`${themedInputClass} h-8 w-[65px] px-2 text-center`}
                               placeholder="Min"
                               value={distance.from}
                               onChange={(e) =>
@@ -641,10 +729,12 @@ export default function LogisticsPartnerEntryView({ state }) {
                               }
                             />
 
-                            <span className="text-muted-foreground">-</span>
+                            <span className="text-[var(--text-muted)]">
+                              -
+                            </span>
 
                             <Input
-                              className="h-8 w-[65px] px-2 text-center"
+                              className={`${themedInputClass} h-8 w-[65px] px-2 text-center`}
                               placeholder="Max"
                               value={distance.to}
                               onChange={(e) =>
@@ -662,7 +752,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="ml-auto h-8 w-8 text-destructive hover:text-destructive"
+                              className="ml-auto h-8 w-8 text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                               onClick={() =>
                                 state.removeOdaRow(distance.id)
                               }
@@ -678,13 +768,15 @@ export default function LogisticsPartnerEntryView({ state }) {
                           return (
                             <TableCell
                               key={cellKey}
-                              className="border-r"
+                              className={`border-r border-[var(--border-light)] ${themedTableCellClass}`}
                             >
                               <Input
                                 type="number"
                                 placeholder="₹"
-                                className="text-center"
-                                value={state.odaCharges[cellKey] ?? ""}
+                                className={`${themedInputClass} text-center`}
+                                value={
+                                  state.odaCharges[cellKey] ?? ""
+                                }
                                 onChange={(e) =>
                                   state.updateOdaCharge(
                                     distance.id,
@@ -705,7 +797,7 @@ export default function LogisticsPartnerEntryView({ state }) {
           </div>
 
           {/* Footer Actions */}
-          <div className="flex flex-col-reverse gap-3 border-t bg-muted/20 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col-reverse gap-3 border-t border-[var(--border-light)] bg-[var(--bg-muted)] p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               {state.selectedPartnerId && (
                 <Button
@@ -714,6 +806,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                   size="lg"
                   onClick={state.handlePartnerDelete}
                   disabled={state.isDeleting}
+                  className="bg-[var(--brand-danger)] text-white hover:opacity-90"
                 >
                   {state.isDeleting
                     ? "⏳ Deleting..."
@@ -727,7 +820,7 @@ export default function LogisticsPartnerEntryView({ state }) {
                 <Button
                   type="submit"
                   size="lg"
-                  className="font-semibold"
+                  className="bg-[var(--brand-accent)] font-semibold text-white hover:opacity-90"
                 >
                   {state.selectedPartnerId
                     ? "Update Changed Matrices"
@@ -748,25 +841,29 @@ export default function LogisticsPartnerEntryView({ state }) {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
           <DialogHeader>
             <DialogTitle
               className={
                 modalAlert.isError
-                  ? "text-destructive"
-                  : "text-emerald-600"
+                  ? "text-[var(--brand-danger)]"
+                  : "text-[var(--brand-success)]"
               }
             >
               {modalAlert.title}
             </DialogTitle>
 
-            <DialogDescription className="whitespace-pre-wrap pt-2">
+            <DialogDescription className="whitespace-pre-wrap pt-2 text-[var(--text-muted)]">
               {modalAlert.message}
             </DialogDescription>
           </DialogHeader>
 
           <DialogFooter>
-            <Button type="button" onClick={closeModal}>
+            <Button
+              type="button"
+              onClick={closeModal}
+              className="bg-[var(--brand-accent)] text-white hover:opacity-90"
+            >
               {state.isExtracting ? "Dismiss" : "Acknowledge"}
             </Button>
           </DialogFooter>
@@ -787,7 +884,11 @@ function FormField({
 }) {
   return (
     <div className="space-y-2">
-      <Label className={labelClassName}>{label}</Label>
+      <Label
+        className={`text-[var(--text-primary)] ${labelClassName}`}
+      >
+        {label}
+      </Label>
       {children}
     </div>
   );
@@ -801,10 +902,12 @@ function SectionHeader({
   return (
     <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h4 className="text-lg font-semibold text-primary">{title}</h4>
+        <h4 className="text-lg font-semibold text-[var(--brand-accent)]">
+          {title}
+        </h4>
 
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             {description}
           </p>
         )}

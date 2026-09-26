@@ -1,22 +1,27 @@
 import { useRef } from "react";
+
 import API from "../api/api";
+
 import {
-  FiTrendingUp,
-  FiActivity,
-  FiTruck,
-  FiMapPin,
-  FiPrinter,
-  FiPieChart,
-  FiAlertOctagon,
-  FiTarget,
-  FiDownload,
-  FiUsers,
-  FiPackage,
-  FiMessageSquare,
-} from "react-icons/fi";
+  TrendingUp,
+  Activity,
+  Truck,
+  MapPin,
+  Printer,
+  PieChart,
+  AlertOctagon,
+  Target,
+  Download,
+  Users,
+  Package,
+  MessageSquare,
+} from "lucide-react";
+
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+
 import { Bar, Pie, Line } from "react-chartjs-2";
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -29,17 +34,27 @@ import {
   PointElement,
   LineElement,
 } from "chart.js";
+
 import TransportAnalyticsView from "./TransportAnalyticsView";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
 import {
   Tabs,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+
 import { Badge } from "@/components/ui/badge";
+
 import {
   Table,
   TableBody,
@@ -48,21 +63,75 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
 
 export default function SalesAnalyticsView({ state }) {
-  const {salesKpis, rndKpis, transportKpis, gtmKpis, errorLogs, email, prodKpis, isLoading, selectedAnalytics,
-        setSelectedAnalytics, isExporting, setIsExporting, targetValues, setTargetValues, targetFromDates, 
-        setTargetFromDates, targetToDates, setTargetToDates, salesPerformanceChart, transportChart, faqAskedChart,
-        faqAnswerChart, completionChart, productionPieChart, totalQueued, conversionRatio, total_completed,
-        totalCRM, totalErrors, totalFaqAnswered, pendingFaqs, setAlertMessage, setIsAlertOpen, showErrorModal,
-        user, fromDate, setFromDate, toDate, fetchAnalytics,} = state;
+  const {
+    salesKpis,
+    rndKpis,
+    transportKpis,
+    gtmKpis,
+    errorLogs,
+    email,
+    prodKpis,
+    isLoading,
+    selectedAnalytics,
+    setSelectedAnalytics,
+    isExporting,
+    setIsExporting,
+    targetValues,
+    setTargetValues,
+    targetFromDates,
+    setTargetFromDates,
+    targetToDates,
+    setTargetToDates,
+    salesPerformanceChart,
+    transportChart,
+    faqAskedChart,
+    faqAnswerChart,
+    completionChart,
+    productionPieChart,
+    totalQueued,
+    conversionRatio,
+    total_completed,
+    totalCRM,
+    totalErrors,
+    totalFaqAnswered,
+    pendingFaqs,
+    setAlertMessage,
+    setIsAlertOpen,
+    showErrorModal,
+    user,
+    fromDate,
+    setFromDate,
+    toDate,
+    fetchAnalytics,
+  } = state;
 
-  const reportTabs = ["overview", "faq", "performance", "transport", "gtm", "production", "health",];
+  const reportTabs = [
+    "overview",
+    "faq",
+    "performance",
+    "transport",
+    "gtm",
+    "production",
+    "health",
+  ];
 
   const dashboardRef = useRef(null);
   const reportRef = useRef(null);
@@ -74,9 +143,11 @@ export default function SalesAnalyticsView({ state }) {
     if (!dashboardRef.current) return;
 
     setIsExporting(true);
+
     setAlertMessage(
       "📸 Capturing high-resolution snapshot for PDF..."
     );
+
     setIsAlertOpen(true);
 
     try {
@@ -93,6 +164,7 @@ export default function SalesAnalyticsView({ state }) {
       const pdf = new jsPDF("p", "mm", "a4");
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
+
       const pdfHeight =
         (canvas.height * pdfWidth) / canvas.width;
 
@@ -269,14 +341,22 @@ export default function SalesAnalyticsView({ state }) {
 
   const handleUpdateTarget = async (email) => {
     const targetValue = Number(targetValues[email]);
-    const targetFromDate = targetFromDates[email] ?? fromDate;
-    const targetToDate = targetToDates[email] ?? toDate;
 
-    if (!Number.isFinite(targetValue) || targetValue <= 0) {
+    const targetFromDate =
+      targetFromDates[email] ?? fromDate;
+
+    const targetToDate =
+      targetToDates[email] ?? toDate;
+
+    if (
+      !Number.isFinite(targetValue) ||
+      targetValue <= 0
+    ) {
       showErrorModal(
         "Validation Error",
         "Please enter a target amount greater than zero."
       );
+
       return;
     }
 
@@ -285,6 +365,7 @@ export default function SalesAnalyticsView({ state }) {
         "Validation Error",
         "Please select both target start and end dates."
       );
+
       return;
     }
 
@@ -293,17 +374,26 @@ export default function SalesAnalyticsView({ state }) {
         "Validation Error",
         "The target start date cannot be later than the end date."
       );
+
       return;
     }
 
     try {
-      await API.createSalesTarget(state.sessionToken, email, {
-        target_value: targetValue,
-        from_date: targetFromDate,
-        to_date: targetToDate,
-      });
+      await API.createSalesTarget(
+        state.sessionToken,
+        email,
+        {
+          target_value: targetValue,
+          from_date: targetFromDate,
+          to_date: targetToDate,
+        }
+      );
 
-      await fetchAnalytics(user.role, fromDate, toDate);
+      await fetchAnalytics(
+        user.role,
+        fromDate,
+        toDate
+      );
 
       setTargetValues((previous) => ({
         ...previous,
@@ -311,8 +401,11 @@ export default function SalesAnalyticsView({ state }) {
       }));
 
       setAlertMessage(
-        `✅ Target of ₹${targetValue.toLocaleString("en-IN")} created for ${email}.`
+        `✅ Target of ₹${targetValue.toLocaleString(
+          "en-IN"
+        )} created for ${email}.`
       );
+
       setIsAlertOpen(true);
     } catch (error) {
       showErrorModal(
@@ -328,37 +421,37 @@ export default function SalesAnalyticsView({ state }) {
     {
       value: "overview",
       label: "Overview",
-      icon: FiPieChart,
+      icon: PieChart,
     },
     {
       value: "faq",
       label: "F&Q Actions",
-      icon: FiMessageSquare,
+      icon: MessageSquare,
     },
     {
       value: "performance",
       label: "Team Matrix",
-      icon: FiUsers,
+      icon: Users,
     },
     {
       value: "transport",
       label: "Transport",
-      icon: FiTruck,
+      icon: Truck,
     },
     {
       value: "gtm",
       label: "GTM ROI",
-      icon: FiTarget,
+      icon: Target,
     },
     {
       value: "production",
       label: "Production Analytics",
-      icon: FiPackage,
+      icon: Package,
     },
     {
       value: "health",
       label: "System Health",
-      icon: FiAlertOctagon,
+      icon: AlertOctagon,
     },
   ];
 
@@ -370,7 +463,7 @@ export default function SalesAnalyticsView({ state }) {
           disabled={isExporting}
           onClick={exportAllReports}
         >
-          <FiDownload className="mr-2 h-4 w-4" />
+          <Download className="mr-2 h-4 w-4" />
           Export Master Data
         </Button>
 
@@ -383,7 +476,8 @@ export default function SalesAnalyticsView({ state }) {
           onClick={handleExportPDF}
           variant="outline"
         >
-          <FiDownload className="mr-2 h-4 w-4" />
+          <Download className="mr-2 h-4 w-4" />
+
           {isExporting
             ? "Generating PDF..."
             : "Export to PDF"}
@@ -399,7 +493,7 @@ export default function SalesAnalyticsView({ state }) {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-2xl">
-                <FiPieChart className="h-6 w-6" />
+                <PieChart className="h-6 w-6" />
                 Executive Command Center
               </CardTitle>
 
@@ -447,10 +541,14 @@ export default function SalesAnalyticsView({ state }) {
 
             <Button
               onClick={() =>
-                fetchAnalytics(user.role, fromDate, toDate)
+                fetchAnalytics(
+                  user.role,
+                  fromDate,
+                  toDate
+                )
               }
             >
-              <FiActivity className="mr-2 h-4 w-4" />
+              <Activity className="mr-2 h-4 w-4" />
               Refresh Analytics
             </Button>
           </div>
@@ -487,7 +585,10 @@ export default function SalesAnalyticsView({ state }) {
           </ScrollArea>
         </CardHeader>
 
-        <CardContent ref={reportRef} className="space-y-8">
+        <CardContent
+          ref={reportRef}
+          className="space-y-8"
+        >
           {/* ===================================================== */}
           {/* OVERVIEW */}
           {/* ===================================================== */}
@@ -577,21 +678,27 @@ export default function SalesAnalyticsView({ state }) {
                           <TableHead className="whitespace-nowrap">
                             Month
                           </TableHead>
+
                           <TableHead className="whitespace-nowrap">
                             GTM
                           </TableHead>
+
                           <TableHead className="whitespace-nowrap">
                             Queued
                           </TableHead>
+
                           <TableHead className="whitespace-nowrap">
                             Awaiting Review
                           </TableHead>
+
                           <TableHead className="whitespace-nowrap">
                             Completed
                           </TableHead>
+
                           <TableHead className="whitespace-nowrap">
                             Rejected
                           </TableHead>
+
                           <TableHead className="whitespace-nowrap">
                             Completion %
                           </TableHead>
@@ -672,7 +779,14 @@ export default function SalesAnalyticsView({ state }) {
                   <div className="h-[300px]">
                     <Bar
                       data={salesPerformanceChart}
-                      options={{responsive: true, maintainAspectRatio: false, plugins: {title: {display: false,},},
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          title: {
+                            display: false,
+                          },
+                        },
                       }}
                     />
                   </div>
@@ -684,28 +798,38 @@ export default function SalesAnalyticsView({ state }) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Serial number</TableHead>
+                        <TableHead>
+                          Serial number
+                        </TableHead>
+
                         <TableHead>
                           Executive Name
                         </TableHead>
+
                         <TableHead className="text-center">
                           Achieved Order Value
                         </TableHead>
+
                         <TableHead className="text-center">
                           Performance Score
                         </TableHead>
+
                         <TableHead className="text-center">
                           Sales Target
                         </TableHead>
+
                         <TableHead className="text-center">
                           Target Period
                         </TableHead>
+
                         <TableHead className="text-center">
                           Achievement
                         </TableHead>
+
                         <TableHead className="text-center">
                           Create Target
                         </TableHead>
+
                         <TableHead className="text-center">
                           Action
                         </TableHead>
@@ -725,7 +849,9 @@ export default function SalesAnalyticsView({ state }) {
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {formatCurrency(kpi.achieved_order_value)}
+                              {formatCurrency(
+                                kpi.achieved_order_value
+                              )}
                             </TableCell>
 
                             <TableCell className="text-center font-semibold text-emerald-600">
@@ -733,17 +859,43 @@ export default function SalesAnalyticsView({ state }) {
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {kpi.target_id ? formatCurrency(kpi.target_value) : "No target"}
+                              {kpi.target_id
+                                ? formatCurrency(
+                                    kpi.target_value
+                                  )
+                                : "No target"}
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {kpi.target_id ? `${formatDate(kpi.target_from_date)} – ${formatDate(kpi.target_to_date)}` : "—"}
+                              {kpi.target_id
+                                ? `${formatDate(
+                                    kpi.target_from_date
+                                  )} – ${formatDate(
+                                    kpi.target_to_date
+                                  )}`
+                                : "—"}
                             </TableCell>
 
                             <TableCell className="text-center">
-                              {kpi.achievement_percentage == null ? (<Badge variant="secondary">No target</Badge>) : (
-                                <Badge variant={ Number(kpi.achievement_percentage) >= 100 ? "default" : "secondary"}>
-                                  {Number(kpi.achievement_percentage).toFixed(1)}%
+                              {kpi.achievement_percentage ==
+                              null ? (
+                                <Badge variant="secondary">
+                                  No target
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant={
+                                    Number(
+                                      kpi.achievement_percentage
+                                    ) >= 100
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
+                                  {Number(
+                                    kpi.achievement_percentage
+                                  ).toFixed(1)}
+                                  %
                                 </Badge>
                               )}
                             </TableCell>
@@ -755,41 +907,64 @@ export default function SalesAnalyticsView({ state }) {
                                   min="0"
                                   step="0.01"
                                   placeholder="Target amount (₹)"
-                                  value={targetValues[kpi.email] ?? ""}
+                                  value={
+                                    targetValues[
+                                      kpi.email
+                                    ] ?? ""
+                                  }
                                   onChange={(event) =>
-                                    setTargetValues((previous) => ({
-                                      ...previous,
-                                      [kpi.email]: event.target.value,
-                                    }))
+                                    setTargetValues(
+                                      (previous) => ({
+                                        ...previous,
+                                        [kpi.email]:
+                                          event.target.value,
+                                      })
+                                    )
                                   }
                                 />
 
                                 <div className="grid grid-cols-2 gap-2">
                                   <Input
                                     type="date"
-                                    value={targetFromDates[kpi.email] ?? fromDate}
+                                    value={
+                                      targetFromDates[
+                                        kpi.email
+                                      ] ?? fromDate
+                                    }
                                     onChange={(event) =>
-                                      setTargetFromDates((previous) => ({
-                                        ...previous,
-                                        [kpi.email]: event.target.value,
-                                      }))
+                                      setTargetFromDates(
+                                        (previous) => ({
+                                          ...previous,
+                                          [kpi.email]:
+                                            event.target
+                                              .value,
+                                        })
+                                      )
                                     }
                                   />
 
                                   <Input
                                     type="date"
-                                    value={targetToDates[kpi.email] ?? toDate}
+                                    value={
+                                      targetToDates[
+                                        kpi.email
+                                      ] ?? toDate
+                                    }
                                     onChange={(event) =>
-                                      setTargetToDates((previous) => ({
-                                        ...previous,
-                                        [kpi.email]: event.target.value,
-                                      }))
+                                      setTargetToDates(
+                                        (previous) => ({
+                                          ...previous,
+                                          [kpi.email]:
+                                            event.target
+                                              .value,
+                                        })
+                                      )
                                     }
                                   />
                                 </div>
                               </div>
                             </TableCell>
-                            
+
                             <TableCell className="text-center">
                               <Button
                                 size="sm"
@@ -933,10 +1108,15 @@ export default function SalesAnalyticsView({ state }) {
                         <TableHeader>
                           <TableRow>
                             <TableHead>#</TableHead>
-                            <TableHead>Name</TableHead>
+
+                            <TableHead>
+                              Name
+                            </TableHead>
+
                             <TableHead>
                               Questions
                             </TableHead>
+
                             <TableHead>
                               Score
                             </TableHead>
@@ -944,9 +1124,7 @@ export default function SalesAnalyticsView({ state }) {
                         </TableHeader>
 
                         <TableBody>
-                          {[
-                            ...(salesKpis ?? []),
-                          ]
+                          {[...(salesKpis ?? [])]
                             .sort(
                               (a, b) =>
                                 b.activity_score -
@@ -995,10 +1173,15 @@ export default function SalesAnalyticsView({ state }) {
                         <TableHeader>
                           <TableRow>
                             <TableHead>#</TableHead>
-                            <TableHead>Name</TableHead>
+
+                            <TableHead>
+                              Name
+                            </TableHead>
+
                             <TableHead>
                               Answered
                             </TableHead>
+
                             <TableHead>
                               Knowledge Score
                             </TableHead>
@@ -1006,9 +1189,7 @@ export default function SalesAnalyticsView({ state }) {
                         </TableHeader>
 
                         <TableBody>
-                          {[
-                            ...(rndKpis ?? []),
-                          ]
+                          {[...(rndKpis ?? [])]
                             .sort(
                               (a, b) =>
                                 b.knowledge_score -
@@ -1082,34 +1263,34 @@ export default function SalesAnalyticsView({ state }) {
                         </TableHeader>
 
                         <TableBody>
-                          {[
-                            ...(salesKpis ?? []),
-                          ].map((kpi, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-semibold">
-                                {kpi.name}
-                              </TableCell>
+                          {[...(salesKpis ?? [])].map(
+                            (kpi, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-semibold">
+                                  {kpi.name}
+                                </TableCell>
 
-                              <TableCell className="text-center">
-                                {kpi.targets_queued}
-                              </TableCell>
+                                <TableCell className="text-center">
+                                  {kpi.targets_queued}
+                                </TableCell>
 
-                              <TableCell
-                                className={`text-right font-medium ${
-                                  Number(
+                                <TableCell
+                                  className={`text-right font-medium ${
+                                    Number(
+                                      kpi.total_spend
+                                    ) > 500
+                                      ? "text-destructive"
+                                      : ""
+                                  }`}
+                                >
+                                  ₹
+                                  {Number(
                                     kpi.total_spend
-                                  ) > 500
-                                    ? "text-destructive"
-                                    : ""
-                                }`}
-                              >
-                                ₹
-                                {Number(
-                                  kpi.total_spend
-                                ).toFixed(2)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                  ).toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          )}
                         </TableBody>
                       </Table>
 
@@ -1199,7 +1380,7 @@ export default function SalesAnalyticsView({ state }) {
                         <TableRow key={idx}>
                           <TableCell className="font-semibold capitalize">
                             {k.stage.replace(
-                              /\_/g,
+                              /_/g,
                               " "
                             )}
                           </TableCell>
@@ -1234,7 +1415,7 @@ export default function SalesAnalyticsView({ state }) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FiAlertOctagon className="h-5 w-5" />
+                  <AlertOctagon className="h-5 w-5" />
                   System Health
                 </CardTitle>
               </CardHeader>

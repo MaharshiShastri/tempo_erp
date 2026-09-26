@@ -1,4 +1,5 @@
 import React from "react";
+
 import TaskCreationForm from "../components/shared/TaskCreationForm";
 import TaskList from "../components/shared/TaskList";
 
@@ -58,21 +59,40 @@ export default function TasksWorkspaceView({ state }) {
   } = state;
 
   return (
-    <Card className="w-full overflow-hidden">
+    <Card
+      className="
+        w-full
+        overflow-hidden
+        border
+        border-[var(--border-subtle)]
+        bg-[var(--bg-surface)]
+        text-[var(--text-primary)]
+        shadow-[var(--shadow-sm)]
+      "
+    >
       {/* ============================================================
           HEADER
       ============================================================ */}
 
-      <CardHeader className="border-b px-5 py-5 md:px-6">
+      <CardHeader
+        className="
+          border-b
+          border-[var(--border-light)]
+          bg-[var(--bg-muted)]
+          px-5
+          py-5
+          md:px-6
+        "
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* TITLE */}
 
           <div className="space-y-1">
-            <CardTitle className="text-xl">
+            <CardTitle className="text-xl text-[var(--text-primary)]">
               Corporate Workflow Task Manager
             </CardTitle>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[var(--text-muted)]">
               Delegate, track, and dispatch operational queues.
             </p>
           </div>
@@ -86,24 +106,58 @@ export default function TasksWorkspaceView({ state }) {
               value={statusFilter}
               onValueChange={setStatusFilter}
             >
-              <SelectTrigger className="w-full sm:w-[170px]">
+              <SelectTrigger
+                className="
+                  w-full
+                  border-[var(--border-light)]
+                  bg-[var(--bg-main)]
+                  text-[var(--text-primary)]
+                  focus:border-[var(--brand-accent)]
+                  focus:ring-[var(--brand-accent)]
+                  sm:w-[170px]
+                "
+              >
                 <div className="flex items-center gap-2">
-                  <ListFilter className="h-4 w-4 text-muted-foreground" />
+                  <ListFilter className="h-4 w-4 text-[var(--text-muted)]" />
 
                   <SelectValue placeholder="Filter status" />
                 </div>
               </SelectTrigger>
 
-              <SelectContent>
-                <SelectItem value="all">
+              <SelectContent
+                className="
+                  border-[var(--border-light)]
+                  bg-[var(--bg-surface)]
+                  text-[var(--text-primary)]
+                "
+              >
+                <SelectItem
+                  value="all"
+                  className="
+                    focus:bg-[var(--combobox-hover)]
+                    focus:text-[var(--text-primary)]
+                  "
+                >
                   🚦 All Statuses
                 </SelectItem>
 
-                <SelectItem value="pending">
+                <SelectItem
+                  value="pending"
+                  className="
+                    focus:bg-[var(--combobox-hover)]
+                    focus:text-[var(--text-primary)]
+                  "
+                >
                   ⏳ Pending Only
                 </SelectItem>
 
-                <SelectItem value="done">
+                <SelectItem
+                  value="done"
+                  className="
+                    focus:bg-[var(--combobox-hover)]
+                    focus:text-[var(--text-primary)]
+                  "
+                >
                   ✅ Completed Only
                 </SelectItem>
               </SelectContent>
@@ -111,7 +165,16 @@ export default function TasksWorkspaceView({ state }) {
 
             {/* VIEW TABS */}
 
-            <div className="flex rounded-md border bg-muted/40 p-1">
+            <div
+              className="
+                flex
+                rounded-md
+                border
+                border-[var(--border-light)]
+                bg-[var(--bg-main)]
+                p-1
+              "
+            >
               <Button
                 type="button"
                 variant={
@@ -120,7 +183,11 @@ export default function TasksWorkspaceView({ state }) {
                     : "ghost"
                 }
                 size="sm"
-                className="gap-2"
+                className={
+                  viewTab === "received"
+                    ? "gap-2 bg-[var(--brand-accent)] text-white shadow-[var(--shadow-sm)] hover:opacity-90"
+                    : "gap-2 text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
+                }
                 onClick={() => setViewTab("received")}
               >
                 <Inbox className="h-4 w-4" />
@@ -135,7 +202,11 @@ export default function TasksWorkspaceView({ state }) {
                     : "ghost"
                 }
                 size="sm"
-                className="gap-2"
+                className={
+                  viewTab === "dispatched"
+                    ? "gap-2 bg-[var(--brand-accent)] text-white shadow-[var(--shadow-sm)] hover:opacity-90"
+                    : "gap-2 text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
+                }
                 onClick={() => setViewTab("dispatched")}
               >
                 <Send className="h-4 w-4" />
@@ -150,7 +221,15 @@ export default function TasksWorkspaceView({ state }) {
           CONTENT
       ============================================================ */}
 
-      <CardContent className="space-y-6 p-5 md:p-6">
+      <CardContent
+        className="
+          space-y-6
+          bg-[var(--bg-surface)]
+          p-5
+          text-[var(--text-primary)]
+          md:p-6
+        "
+      >
         {/* TASK CREATION */}
 
         <TaskCreationForm

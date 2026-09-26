@@ -267,7 +267,7 @@ const API = {
           }
       });
 
-      if (!res.ok) throw new Error("Failed to fetch partners");
+      if (!res.ok){ throw new Error("Failed to fetch partners")};
       return res.json();
   },
   

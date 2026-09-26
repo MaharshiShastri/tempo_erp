@@ -31,6 +31,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+const themedInputClass =
+  "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+const themedCardClass =
+  "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]";
+
 export default function GRN_WorkspaceView({ state }) {
   const {
     scannedData,
@@ -53,16 +59,16 @@ export default function GRN_WorkspaceView({ state }) {
   } = state;
 
   return (
-    <div className="mx-auto w-full max-w-[1400px]">
-      <Card>
-        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="mx-auto w-full max-w-[1400px] bg-[var(--bg-main)] text-[var(--text-primary)]">
+      <Card className={themedCardClass}>
+        <CardHeader className="flex flex-col gap-4 border-b border-[var(--border-light)] md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <FiPackage className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-[var(--text-primary)]">
+              <FiPackage className="h-5 w-5 text-[var(--brand-accent)]" />
               Goods Receipt Note (GRN) Desk
             </CardTitle>
 
-            <CardDescription>
+            <CardDescription className="text-[var(--text-muted)]">
               Vendor Invoice to BOM Auto-Mapper
             </CardDescription>
           </div>
@@ -80,7 +86,7 @@ export default function GRN_WorkspaceView({ state }) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning}
-              className="gap-2"
+              className="gap-2 bg-[var(--brand-accent)] text-white hover:opacity-90"
             >
               <FiUploadCloud className="h-4 w-4" />
 
@@ -92,14 +98,20 @@ export default function GRN_WorkspaceView({ state }) {
         {scannedData && (
           <CardContent className="space-y-6">
             {/* Header Information */}
-            <Card>
+            <Card className={themedCardClass}>
               <CardContent className="grid gap-4 p-5 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="vendor-name">Vendor Name</Label>
+                  <Label
+                    htmlFor="vendor-name"
+                    className="text-[var(--text-primary)]"
+                  >
+                    Vendor Name
+                  </Label>
 
                   <Input
                     id="vendor-name"
                     value={scannedData.vendor_name}
+                    className={themedInputClass}
                     onChange={(e) =>
                       updateHeader("vendor_name", e.target.value)
                     }
@@ -107,13 +119,17 @@ export default function GRN_WorkspaceView({ state }) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="invoice-number">
+                  <Label
+                    htmlFor="invoice-number"
+                    className="text-[var(--text-primary)]"
+                  >
                     Vendor Invoice No.
                   </Label>
 
                   <Input
                     id="invoice-number"
                     value={scannedData.invoice_number}
+                    className={themedInputClass}
                     onChange={(e) =>
                       updateHeader("invoice_number", e.target.value)
                     }
@@ -121,7 +137,10 @@ export default function GRN_WorkspaceView({ state }) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="grn-number">
+                  <Label
+                    htmlFor="grn-number"
+                    className="text-[var(--text-primary)]"
+                  >
                     Internal GRN Assignment
                   </Label>
 
@@ -129,6 +148,7 @@ export default function GRN_WorkspaceView({ state }) {
                     id="grn-number"
                     disabled
                     value={scannedData.grn_number}
+                    className={themedInputClass}
                   />
                 </div>
               </CardContent>
@@ -137,11 +157,11 @@ export default function GRN_WorkspaceView({ state }) {
             {/* Material Line Items */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-base font-semibold">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
                   Material Line Items
                 </h3>
 
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-[var(--text-muted)]">
                   Review OCR results and verify material mappings.
                 </p>
               </div>
@@ -150,7 +170,7 @@ export default function GRN_WorkspaceView({ state }) {
                 type="button"
                 variant="outline"
                 onClick={addNewRow}
-                className="gap-2"
+                className="gap-2 border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
               >
                 <FiPlus className="h-4 w-4" />
                 Add Row
@@ -158,39 +178,39 @@ export default function GRN_WorkspaceView({ state }) {
             </div>
 
             {/* Items Table */}
-            <div className="overflow-x-auto rounded-md border">
+            <div className="overflow-x-auto rounded-md border border-[var(--border-light)]">
               <table className="w-full min-w-[1100px] text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="border-b">
-                    <th className="px-3 py-3 text-left font-medium">
+                <thead className="bg-[var(--bg-muted)]">
+                  <tr className="border-b border-[var(--border-light)]">
+                    <th className="px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Item Code *
                     </th>
 
-                    <th className="px-3 py-3 text-left font-medium">
+                    <th className="px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Description
                     </th>
 
-                    <th className="px-3 py-3 text-left font-medium">
+                    <th className="px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Qty
                     </th>
 
-                    <th className="px-3 py-3 text-left font-medium">
+                    <th className="px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Rate
                     </th>
 
-                    <th className="bg-muted px-3 py-3 text-left font-medium">
+                    <th className="bg-[var(--bg-muted)] px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Gross
                     </th>
 
-                    <th className="px-3 py-3 text-left font-medium">
+                    <th className="px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Disc %
                     </th>
 
-                    <th className="bg-muted px-3 py-3 text-left font-medium">
+                    <th className="bg-[var(--bg-muted)] px-3 py-3 text-left font-medium text-[var(--text-primary)]">
                       Disc Amt
                     </th>
 
-                    <th className="px-3 py-3 text-left font-medium text-primary">
+                    <th className="px-3 py-3 text-left font-medium text-[var(--brand-accent)]">
                       Net Amt
                     </th>
 
@@ -202,10 +222,10 @@ export default function GRN_WorkspaceView({ state }) {
                   {scannedData.items.map((item, idx) => (
                     <tr
                       key={idx}
-                      className={`border-b last:border-0 ${
+                      className={`border-b border-[var(--border-light)] last:border-0 ${
                         item.isMatched
-                          ? "bg-background"
-                          : "bg-destructive/5"
+                          ? "bg-[var(--bg-main)]"
+                          : "bg-[var(--warning-row)]"
                       }`}
                     >
                       {/* Item Code */}
@@ -216,8 +236,8 @@ export default function GRN_WorkspaceView({ state }) {
                           placeholder="Code..."
                           className={
                             item.isMatched
-                              ? ""
-                              : "border-destructive focus-visible:ring-destructive"
+                              ? themedInputClass
+                              : `${themedInputClass} border-[var(--brand-danger)] focus:border-[var(--brand-danger)] focus:ring-[var(--brand-danger)]`
                           }
                           onChange={(e) =>
                             updateItem(
@@ -232,7 +252,7 @@ export default function GRN_WorkspaceView({ state }) {
                         />
 
                         {!item.isMatched && (
-                          <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-destructive">
+                          <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-[var(--brand-danger)]">
                             <FiAlertCircle className="h-3.5 w-3.5" />
                             Unmapped
                           </div>
@@ -244,6 +264,7 @@ export default function GRN_WorkspaceView({ state }) {
                         <Input
                           value={item.item_name}
                           required
+                          className={themedInputClass}
                           onChange={(e) =>
                             updateItem(
                               idx,
@@ -254,8 +275,8 @@ export default function GRN_WorkspaceView({ state }) {
                         />
 
                         {item.item_description && (
-                          <div className="mt-2 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
-                            <span className="font-semibold text-foreground">
+                          <div className="mt-2 rounded-md border border-[var(--border-light)] bg-[var(--bg-muted)] p-2 text-xs text-[var(--text-muted)]">
+                            <span className="font-semibold text-[var(--text-primary)]">
                               Matched Spec:
                             </span>
 
@@ -272,6 +293,7 @@ export default function GRN_WorkspaceView({ state }) {
                           type="number"
                           value={item.quantity}
                           required
+                          className={themedInputClass}
                           onChange={(e) =>
                             updateItem(
                               idx,
@@ -289,6 +311,7 @@ export default function GRN_WorkspaceView({ state }) {
                           step="0.01"
                           value={item.rate}
                           required
+                          className={themedInputClass}
                           onChange={(e) =>
                             updateItem(
                               idx,
@@ -300,7 +323,7 @@ export default function GRN_WorkspaceView({ state }) {
                       </td>
 
                       {/* Gross */}
-                      <td className="bg-muted/50 px-3 py-3 align-top font-medium text-muted-foreground">
+                      <td className="bg-[var(--bg-muted)] px-3 py-3 align-top font-medium text-[var(--text-muted)]">
                         ₹{(item.gross_amount || 0).toFixed(2)}
                       </td>
 
@@ -310,6 +333,7 @@ export default function GRN_WorkspaceView({ state }) {
                           type="number"
                           step="0.01"
                           value={item.discount_percent || 0}
+                          className={themedInputClass}
                           onChange={(e) =>
                             updateItem(
                               idx,
@@ -321,12 +345,12 @@ export default function GRN_WorkspaceView({ state }) {
                       </td>
 
                       {/* Discount Amount */}
-                      <td className="bg-muted/50 px-3 py-3 align-top font-medium text-destructive">
+                      <td className="bg-[var(--bg-muted)] px-3 py-3 align-top font-medium text-[var(--brand-danger)]">
                         ₹{(item.discount_amount || 0).toFixed(2)}
                       </td>
 
                       {/* Net Amount */}
-                      <td className="px-3 py-3 align-top font-semibold text-primary">
+                      <td className="px-3 py-3 align-top font-semibold text-[var(--brand-accent)]">
                         ₹{(item.net_amount || 0).toFixed(2)}
                       </td>
 
@@ -336,7 +360,7 @@ export default function GRN_WorkspaceView({ state }) {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          className="text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                           onClick={() => removeRow(idx)}
                           title="Delete Row"
                         >
@@ -351,62 +375,64 @@ export default function GRN_WorkspaceView({ state }) {
 
             {/* Totals */}
             <div className="flex justify-end">
-              <Card className="w-full sm:w-[360px]">
+              <Card
+                className={`w-full sm:w-[360px] ${themedCardClass}`}
+              >
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
+                    <span className="text-[var(--text-muted)]">
                       Gross Total:
                     </span>
 
-                    <span className="font-semibold">
+                    <span className="font-semibold text-[var(--text-primary)]">
                       ₹{(scannedData.gross_total || 0).toFixed(2)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-destructive">
+                    <span className="text-[var(--brand-danger)]">
                       Total Item Discounts (-):
                     </span>
 
-                    <span className="font-semibold text-destructive">
+                    <span className="font-semibold text-[var(--brand-danger)]">
                       ₹{(scannedData.discount_total || 0).toFixed(2)}
                     </span>
                   </div>
 
-                  <div className="border-t border-dashed pt-3">
+                  <div className="border-t border-dashed border-[var(--border-light)] pt-3">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">
+                      <span className="font-medium text-[var(--text-primary)]">
                         Subtotal (Taxable):
                       </span>
 
-                      <span className="font-semibold">
+                      <span className="font-semibold text-[var(--text-primary)]">
                         ₹{(scannedData.subtotal || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
+                    <span className="text-[var(--text-muted)]">
                       SGST (9%):
                     </span>
 
-                    <span className="font-semibold">
+                    <span className="font-semibold text-[var(--text-primary)]">
                       ₹{scannedData.taxes.sgst.toFixed(2)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
+                    <span className="text-[var(--text-muted)]">
                       CGST (9%):
                     </span>
 
-                    <span className="font-semibold">
+                    <span className="font-semibold text-[var(--text-primary)]">
                       ₹{scannedData.taxes.cgst.toFixed(2)}
                     </span>
                   </div>
 
-                  <div className="border-t pt-3">
-                    <div className="flex items-center justify-between text-lg font-bold text-primary">
+                  <div className="border-t border-[var(--border-light)] pt-3">
+                    <div className="flex items-center justify-between text-lg font-bold text-[var(--brand-accent)]">
                       <span>Grand Total:</span>
 
                       <span>
@@ -424,7 +450,7 @@ export default function GRN_WorkspaceView({ state }) {
                 type="button"
                 variant="outline"
                 onClick={exportExcel}
-                className="gap-2"
+                className="gap-2 border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
               >
                 <FiDownload className="h-4 w-4" />
                 Export Excel
@@ -433,7 +459,7 @@ export default function GRN_WorkspaceView({ state }) {
               <Button
                 type="button"
                 onClick={handleSaveInit}
-                className="gap-2"
+                className="gap-2 bg-[var(--brand-success)] text-white hover:opacity-90"
               >
                 <FiSave className="h-4 w-4" />
                 Confirm & Log GRN
@@ -448,14 +474,14 @@ export default function GRN_WorkspaceView({ state }) {
         open={showUnmappedModal}
         onOpenChange={setShowUnmappedModal}
       >
-        <DialogContent className="max-h-[90vh] max-w-[850px]">
+        <DialogContent className="max-h-[90vh] max-w-[850px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
+            <DialogTitle className="flex items-center gap-2 text-[var(--brand-danger)]">
               <FiAlertCircle className="h-5 w-5" />
               Unmapped Components Detected
             </DialogTitle>
 
-            <DialogDescription>
+            <DialogDescription className="text-[var(--text-muted)]">
               We noticed items from the OCR scan that do not exist
               in your Product Master. Would you like to register them
               into the system now, or proceed with saving the GRN
@@ -465,17 +491,24 @@ export default function GRN_WorkspaceView({ state }) {
 
           <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-2">
             {unmappedDrafts.map((draft, idx) => (
-              <Card key={idx}>
+              <Card
+                key={idx}
+                className={themedCardClass}
+              >
                 <CardContent className="p-4">
                   <div className="grid gap-4 md:grid-cols-[1fr_2fr_1fr]">
                     <div className="space-y-2">
-                      <Label htmlFor={`draft-code-${idx}`}>
+                      <Label
+                        htmlFor={`draft-code-${idx}`}
+                        className="text-[var(--text-primary)]"
+                      >
                         Internal Item Code
                       </Label>
 
                       <Input
                         id={`draft-code-${idx}`}
                         value={draft.item_code}
+                        className={themedInputClass}
                         onChange={(e) =>
                           handleDraftChange(
                             idx,
@@ -487,13 +520,17 @@ export default function GRN_WorkspaceView({ state }) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`draft-name-${idx}`}>
+                      <Label
+                        htmlFor={`draft-name-${idx}`}
+                        className="text-[var(--text-primary)]"
+                      >
                         Item Name / Description
                       </Label>
 
                       <Input
                         id={`draft-name-${idx}`}
                         value={draft.item_name}
+                        className={themedInputClass}
                         onChange={(e) =>
                           handleDraftChange(
                             idx,
@@ -505,7 +542,10 @@ export default function GRN_WorkspaceView({ state }) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`draft-group-${idx}`}>
+                      <Label
+                        htmlFor={`draft-group-${idx}`}
+                        className="text-[var(--text-primary)]"
+                      >
                         Inventory Group
                       </Label>
 
@@ -514,6 +554,7 @@ export default function GRN_WorkspaceView({ state }) {
                         list="inventory-groups-list"
                         value={draft.item_group}
                         placeholder="Select or type new..."
+                        className={themedInputClass}
                         onChange={(e) =>
                           handleDraftChange(
                             idx,
@@ -535,11 +576,12 @@ export default function GRN_WorkspaceView({ state }) {
             <option value="Sub-Assembly" />
           </datalist>
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+          <DialogFooter className="flex-col gap-2 border-t border-[var(--border-light)] pt-4 sm:flex-row sm:justify-between">
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowUnmappedModal(false)}
+              className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
             >
               Cancel & Review Table
             </Button>
@@ -549,6 +591,7 @@ export default function GRN_WorkspaceView({ state }) {
                 type="button"
                 variant="outline"
                 onClick={handleProceedWithoutAdding}
+                className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
               >
                 Save GRN Without Registering
               </Button>
@@ -556,7 +599,7 @@ export default function GRN_WorkspaceView({ state }) {
               <Button
                 type="button"
                 onClick={handleRegisterAndSave}
-                className="gap-2"
+                className="gap-2 bg-[var(--brand-success)] text-white hover:opacity-90"
               >
                 <FiSave className="h-4 w-4" />
                 Register Items & Save GRN

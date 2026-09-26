@@ -45,29 +45,29 @@ export default function ItemMasterCreateView({ state }) {
         "Others",
     ];
 
+    const themedInputClass =
+        "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
 
     return (
+        <Card className="mx-auto max-w-6xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
 
-        <Card className="mx-auto max-w-6xl">
-
-            <CardHeader className="border-b bg-muted/20">
+            <CardHeader className="border-b border-[var(--border-light)] bg-[var(--bg-muted)]">
 
                 <div className="flex items-center gap-3">
 
-                    <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-[var(--bg-main)] text-[var(--brand-accent)]">
 
                         <PackagePlus className="size-5" />
 
                     </div>
 
-
                     <div>
 
-                        <CardTitle>
+                        <CardTitle className="text-[var(--text-primary)]">
                             Create Product SKU
                         </CardTitle>
 
-                        <CardDescription>
+                        <CardDescription className="text-[var(--text-muted)]">
                             Add a new product to the enterprise inventory master.
                         </CardDescription>
 
@@ -87,16 +87,15 @@ export default function ItemMasterCreateView({ state }) {
                     className="space-y-8"
                 >
 
-
                     {/* BASIC PRODUCT INFORMATION */}
 
                     <div className="space-y-5">
 
                         <div className="flex items-center gap-2">
 
-                            <Tag className="size-4 text-blue-500" />
+                            <Tag className="size-4 text-[var(--brand-accent)]" />
 
-                            <h3 className="font-semibold">
+                            <h3 className="font-semibold text-[var(--text-primary)]">
 
                                 Product Information
 
@@ -107,10 +106,9 @@ export default function ItemMasterCreateView({ state }) {
 
                         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
 
-
                             <div className="space-y-2">
 
-                                <label className="text-sm font-medium">
+                                <label className="text-sm font-medium text-[var(--text-primary)]">
 
                                     Product Code (SKU)
 
@@ -118,6 +116,7 @@ export default function ItemMasterCreateView({ state }) {
 
                                 <Input
                                     required
+                                    className={themedInputClass}
                                     value={
                                         state.itemForm.item_code
                                     }
@@ -136,7 +135,7 @@ export default function ItemMasterCreateView({ state }) {
 
                             <div className="space-y-2 lg:col-span-2">
 
-                                <label className="text-sm font-medium">
+                                <label className="text-sm font-medium text-[var(--text-primary)]">
 
                                     Product Name
 
@@ -144,6 +143,7 @@ export default function ItemMasterCreateView({ state }) {
 
                                 <Input
                                     required
+                                    className={themedInputClass}
                                     value={
                                         state.itemForm.item_name
                                     }
@@ -162,7 +162,7 @@ export default function ItemMasterCreateView({ state }) {
 
                             <div className="space-y-2">
 
-                                <label className="text-sm font-medium">
+                                <label className="text-sm font-medium text-[var(--text-primary)]">
 
                                     Product Group
 
@@ -180,14 +180,16 @@ export default function ItemMasterCreateView({ state }) {
                                     }
                                 >
 
-                                    <SelectTrigger>
+                                    <SelectTrigger
+                                        className={themedInputClass}
+                                    >
 
                                         <SelectValue placeholder="Select category" />
 
                                     </SelectTrigger>
 
 
-                                    <SelectContent>
+                                    <SelectContent className="border-[var(--border-light)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
 
                                         {productGroups.map(
                                             (group) => (
@@ -195,6 +197,7 @@ export default function ItemMasterCreateView({ state }) {
                                                 <SelectItem
                                                     key={group}
                                                     value={group}
+                                                    className="focus:bg-[var(--combobox-hover)] focus:text-[var(--text-primary)]"
                                                 >
 
                                                     {group}
@@ -213,9 +216,9 @@ export default function ItemMasterCreateView({ state }) {
 
                             <div className="space-y-2">
 
-                                <label className="flex items-center gap-1 text-sm font-medium">
+                                <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
 
-                                    <IndianRupee className="size-3.5 text-emerald-600" />
+                                    <IndianRupee className="size-3.5 text-[var(--brand-success)]" />
 
                                     Base Price
 
@@ -226,6 +229,7 @@ export default function ItemMasterCreateView({ state }) {
                                     step="0.01"
                                     min="0"
                                     required
+                                    className={themedInputClass}
                                     value={
                                         state.itemForm.rate
                                     }
@@ -247,12 +251,11 @@ export default function ItemMasterCreateView({ state }) {
 
                         <div className="grid gap-5 md:grid-cols-3">
 
-
                             <div className="space-y-2">
 
-                                <label className="flex items-center gap-1 text-sm font-medium">
+                                <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
 
-                                    <Ruler className="size-3.5 text-orange-500" />
+                                    <Ruler className="size-3.5 text-[var(--brand-accent)]" />
 
                                     Unit of Measure
 
@@ -260,6 +263,7 @@ export default function ItemMasterCreateView({ state }) {
 
                                 <Input
                                     required
+                                    className={themedInputClass}
                                     value={
                                         state.itemForm
                                             .unit_measure
@@ -279,15 +283,16 @@ export default function ItemMasterCreateView({ state }) {
 
                             <div className="space-y-2">
 
-                                <label className="flex items-center gap-1 text-sm font-medium">
+                                <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
 
-                                    <FileCode2 className="size-3.5 text-violet-500" />
+                                    <FileCode2 className="size-3.5 text-[var(--brand-accent)]" />
 
                                     HSN Code
 
                                 </label>
 
                                 <Input
+                                    className={themedInputClass}
                                     value={
                                         state.itemForm.hsn_code
                                     }
@@ -305,15 +310,16 @@ export default function ItemMasterCreateView({ state }) {
 
                             <div className="space-y-2">
 
-                                <label className="flex items-center gap-1 text-sm font-medium">
+                                <label className="flex items-center gap-1 text-sm font-medium text-[var(--text-primary)]">
 
-                                    <Hash className="size-3.5 text-cyan-500" />
+                                    <Hash className="size-3.5 text-[var(--brand-accent)]" />
 
                                     Revision No.
 
                                 </label>
 
                                 <Input
+                                    className={themedInputClass}
                                     value={
                                         state.itemForm.revision_no
                                     }
@@ -335,13 +341,13 @@ export default function ItemMasterCreateView({ state }) {
 
                     {/* TECHNICAL SPECIFICATIONS */}
 
-                    <div className="space-y-3 border-t pt-6">
+                    <div className="space-y-3 border-t border-[var(--border-light)] pt-6">
 
                         <div className="flex items-center gap-2">
 
-                            <ClipboardList className="size-4 text-purple-500" />
+                            <ClipboardList className="size-4 text-[var(--brand-accent)]" />
 
-                            <h3 className="font-semibold">
+                            <h3 className="font-semibold text-[var(--text-primary)]">
 
                                 Technical Specification
 
@@ -352,6 +358,7 @@ export default function ItemMasterCreateView({ state }) {
 
                         <Textarea
                             rows={7}
+                            className={themedInputClass}
                             value={
                                 state.itemForm
                                     .additional_spec_text
@@ -371,11 +378,12 @@ export default function ItemMasterCreateView({ state }) {
 
                     {/* ACTIONS */}
 
-                    <div className="flex flex-col-reverse gap-3 border-t pt-6 sm:flex-row sm:justify-between">
+                    <div className="flex flex-col-reverse gap-3 border-t border-[var(--border-light)] pt-6 sm:flex-row sm:justify-between">
 
                         <Button
                             type="button"
                             variant="outline"
+                            className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
                             onClick={() =>
                                 state.setActiveTab(
                                     "items-master"
@@ -390,7 +398,10 @@ export default function ItemMasterCreateView({ state }) {
                         </Button>
 
 
-                        <Button type="submit">
+                        <Button
+                            type="submit"
+                            className="bg-[var(--brand-accent)] text-white hover:opacity-90"
+                        >
 
                             <Save className="mr-2 size-4" />
 

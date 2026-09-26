@@ -24,14 +24,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const themedInputClass =
+  "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+const themedSelectTriggerClass =
+  "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+const themedSelectContentClass =
+  "border-[var(--border-light)] bg-[var(--bg-surface)] text-[var(--text-primary)]";
+
+const themedSelectItemClass =
+  "focus:bg-[var(--combobox-hover)] focus:text-[var(--text-primary)]";
+
 export default function LogisticsPartnerReadOnlyView({ state }) {
   const hasSelectedPartner = Boolean(state.selectedPartnerId);
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] p-4 md:p-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-4 border-b sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2 text-xl">
+    <div className="mx-auto w-full max-w-[1200px] bg-[var(--bg-main)] p-4 text-[var(--text-primary)] md:p-6">
+      <Card className="border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+        <CardHeader className="flex flex-col gap-4 border-b border-[var(--border-light)] bg-[var(--bg-muted)] sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2 text-xl text-[var(--text-primary)]">
             <span>🚚</span>
             <span>Logistics Configuration</span>
           </CardTitle>
@@ -49,12 +61,15 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                 });
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={themedSelectTriggerClass}>
                 <SelectValue placeholder="No partner selected" />
               </SelectTrigger>
 
-              <SelectContent>
-                <SelectItem value="__none__">
+              <SelectContent className={themedSelectContentClass}>
+                <SelectItem
+                  value="__none__"
+                  className={themedSelectItemClass}
+                >
                   No partner selected
                 </SelectItem>
 
@@ -62,6 +77,7 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                   <SelectItem
                     key={partner.id}
                     value={String(partner.id)}
+                    className={themedSelectItemClass}
                   >
                     ✏️ {partner.name}
                   </SelectItem>
@@ -73,8 +89,8 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
 
         <CardContent className="space-y-8 pt-6">
           {!hasSelectedPartner && (
-            <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
-              <p className="text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-[var(--border-light)] bg-[var(--bg-muted)] px-6 py-12 text-center">
+              <p className="text-sm text-[var(--text-muted)]">
                 Select a transporter to view its logistics configuration.
               </p>
             </div>
@@ -138,14 +154,14 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                     label="Local Loading Cost (₹)"
                     value={state.partner?.local_loading_cost}
                     type="number"
-                    labelClassName="text-emerald-600"
+                    labelClassName="text-[var(--brand-success)]"
                   />
 
                   <ReadOnlyField
                     label="Max Hub Loading Cap (₹)"
                     value={state.partner?.hub_loading_max_cost}
                     type="number"
-                    labelClassName="text-red-600"
+                    labelClassName="text-[var(--brand-danger)]"
                   />
 
                   <ReadOnlyField
@@ -162,41 +178,52 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                   Zone Definitions & Freight Rates
                 </SectionHeading>
 
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                  <Table className="bg-[var(--bg-main)] text-[var(--text-primary)]">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Zone Code</TableHead>
-                        <TableHead>Regions Served</TableHead>
-                        <TableHead>States (Comma Separated)</TableHead>
-                        <TableHead>Rate (₹/kg)</TableHead>
+                      <TableRow className="border-[var(--border-light)] bg-[var(--bg-muted)]">
+                        <TableHead className="text-[var(--text-primary)]">
+                          Zone Code
+                        </TableHead>
+                        <TableHead className="text-[var(--text-primary)]">
+                          Regions Served
+                        </TableHead>
+                        <TableHead className="text-[var(--text-primary)]">
+                          States (Comma Separated)
+                        </TableHead>
+                        <TableHead className="text-[var(--text-primary)]">
+                          Rate (₹/kg)
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
 
                     <TableBody>
                       {state.zones?.length > 0 ? (
                         state.zones.map((zone, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
+                          <TableRow
+                            key={index}
+                            className="border-[var(--border-light)] hover:bg-[var(--combobox-hover)]"
+                          >
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={zone.zone_code}
                                 className="uppercase"
                               />
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={zone.zone_name}
                               />
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={zone.states_raw}
                               />
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={zone.rate_per_kg}
                                 type="number"
@@ -221,19 +248,19 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                   Fuel Escalation (FSC)
                 </SectionHeading>
 
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                  <Table className="bg-[var(--bg-main)] text-[var(--text-primary)]">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>
+                      <TableRow className="border-[var(--border-light)] bg-[var(--bg-muted)]">
+                        <TableHead className="text-[var(--text-primary)]">
                           Diesel Price From (₹)
                         </TableHead>
 
-                        <TableHead>
+                        <TableHead className="text-[var(--text-primary)]">
                           Diesel Price To (₹)
                         </TableHead>
 
-                        <TableHead>
+                        <TableHead className="text-[var(--text-primary)]">
                           FSC Applicable (%)
                         </TableHead>
                       </TableRow>
@@ -242,22 +269,25 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                     <TableBody>
                       {state.fuelMatrix?.length > 0 ? (
                         state.fuelMatrix.map((fuel, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
+                          <TableRow
+                            key={index}
+                            className="border-[var(--border-light)] hover:bg-[var(--combobox-hover)]"
+                          >
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={fuel.fuel_price_from}
                                 type="number"
                               />
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={fuel.fuel_price_to}
                                 type="number"
                               />
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="border-[var(--border-light)]">
                               <ReadOnlyTableInput
                                 value={fuel.surcharge_percentage}
                                 type="number"
@@ -282,17 +312,17 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                   ODA Delivery Matrix
                 </SectionHeading>
 
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table className="min-w-[800px]">
+                <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                  <Table className="min-w-[800px] bg-[var(--bg-main)] text-[var(--text-primary)]">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-[150px] bg-muted/50">
+                      <TableRow className="border-[var(--border-light)] bg-[var(--bg-muted)]">
+                        <TableHead className="min-w-[150px] border-r border-[var(--border-light)] bg-[var(--bg-muted)]">
                           <div className="flex flex-col gap-1">
-                            <span className="text-right text-[11px] font-medium text-muted-foreground">
+                            <span className="text-right text-[11px] font-medium text-[var(--text-muted)]">
                               Weights (KG) →
                             </span>
 
-                            <span className="text-left text-[11px] font-medium text-muted-foreground">
+                            <span className="text-left text-[11px] font-medium text-[var(--text-muted)]">
                               Distances (KM) ↓
                             </span>
                           </div>
@@ -301,17 +331,17 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                         {state.odaWeights?.map((weight) => (
                           <TableHead
                             key={weight.id}
-                            className="bg-muted/50 text-center"
+                            className="border-r border-[var(--border-light)] bg-[var(--bg-muted)] text-center text-[var(--text-primary)]"
                           >
                             <div className="flex items-center justify-center gap-2">
                               <Input
                                 readOnly
                                 placeholder="Min"
                                 value={weight.from ?? ""}
-                                className="h-8 w-[60px] px-2 text-center text-xs"
+                                className={`${themedInputClass} h-8 w-[60px] px-2 text-center text-xs disabled:opacity-70`}
                               />
 
-                              <span className="text-muted-foreground">
+                              <span className="text-[var(--text-muted)]">
                                 -
                               </span>
 
@@ -319,7 +349,7 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                                 readOnly
                                 placeholder="Max"
                                 value={weight.to ?? ""}
-                                className="h-8 w-[60px] px-2 text-center text-xs"
+                                className={`${themedInputClass} h-8 w-[60px] px-2 text-center text-xs disabled:opacity-70`}
                               />
                             </div>
                           </TableHead>
@@ -330,17 +360,20 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                     <TableBody>
                       {state.odaDistances?.length > 0 ? (
                         state.odaDistances.map((distance) => (
-                          <TableRow key={distance.id}>
-                            <TableCell className="bg-muted/30">
+                          <TableRow
+                            key={distance.id}
+                            className="border-[var(--border-light)] hover:bg-[var(--combobox-hover)]"
+                          >
+                            <TableCell className="border-r border-[var(--border-light)] bg-[var(--bg-muted)]">
                               <div className="flex items-center gap-2">
                                 <Input
                                   readOnly
                                   placeholder="Min"
                                   value={distance.from ?? ""}
-                                  className="h-8 w-[60px] px-2 text-center text-xs"
+                                  className={`${themedInputClass} h-8 w-[60px] px-2 text-center text-xs`}
                                 />
 
-                                <span className="text-muted-foreground">
+                                <span className="text-[var(--text-muted)]">
                                   -
                                 </span>
 
@@ -348,7 +381,7 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                                   readOnly
                                   placeholder="Max"
                                   value={distance.to ?? ""}
-                                  className="h-8 w-[60px] px-2 text-center text-xs"
+                                  className={`${themedInputClass} h-8 w-[60px] px-2 text-center text-xs`}
                                 />
                               </div>
                             </TableCell>
@@ -359,7 +392,7 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                               return (
                                 <TableCell
                                   key={cellKey}
-                                  className="min-w-[110px]"
+                                  className="min-w-[110px] border-[var(--border-light)]"
                                 >
                                   <Input
                                     readOnly
@@ -368,7 +401,7 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                                     value={
                                       state.odaCharges?.[cellKey] ?? ""
                                     }
-                                    className="h-9 text-center"
+                                    className={`${themedInputClass} h-9 text-center`}
                                   />
                                 </TableCell>
                               );
@@ -376,12 +409,12 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
                           </TableRow>
                         ))
                       ) : (
-                        <TableRow>
+                        <TableRow className="border-[var(--border-light)]">
                           <TableCell
                             colSpan={
                               (state.odaWeights?.length || 0) + 1
                             }
-                            className="h-24 text-center text-sm text-muted-foreground"
+                            className="h-24 border-[var(--border-light)] text-center text-sm text-[var(--text-muted)]"
                           >
                             No ODA delivery matrix configured.
                           </TableCell>
@@ -406,11 +439,11 @@ export default function LogisticsPartnerReadOnlyView({ state }) {
 function SectionHeading({ children }) {
   return (
     <div className="flex items-center gap-3">
-      <h4 className="text-base font-semibold text-primary">
+      <h4 className="text-base font-semibold text-[var(--brand-accent)]">
         {children}
       </h4>
 
-      <div className="h-px flex-1 bg-border" />
+      <div className="h-px flex-1 bg-[var(--border-light)]" />
     </div>
   );
 }
@@ -424,7 +457,7 @@ function ReadOnlyField({
   return (
     <div className="space-y-2">
       <label
-        className={`text-sm font-medium ${labelClassName}`}
+        className={`text-sm font-medium text-[var(--text-primary)] ${labelClassName}`}
       >
         {label}
       </label>
@@ -433,7 +466,7 @@ function ReadOnlyField({
         readOnly
         type={type}
         value={value ?? ""}
-        className="bg-muted/30"
+        className={`${themedInputClass} bg-[var(--bg-muted)]`}
       />
     </div>
   );
@@ -449,17 +482,17 @@ function ReadOnlyTableInput({
       readOnly
       type={type}
       value={value ?? ""}
-      className={`h-9 bg-muted/30 ${className}`}
+      className={`${themedInputClass} h-9 bg-[var(--bg-muted)] ${className}`}
     />
   );
 }
 
 function EmptyTableRow({ colSpan, message }) {
   return (
-    <TableRow>
+    <TableRow className="border-[var(--border-light)]">
       <TableCell
         colSpan={colSpan}
-        className="h-24 text-center text-sm text-muted-foreground"
+        className="h-24 border-[var(--border-light)] text-center text-sm text-[var(--text-muted)]"
       >
         {message}
       </TableCell>

@@ -1,29 +1,49 @@
-import {FiActivity, FiArrowRight, FiBox, FiCalendar, FiClock, FiLayers,} from "react-icons/fi";
+import {
+    FiActivity,
+    FiArrowRight,
+    FiBox,
+    FiCalendar,
+    FiLayers,
+} from "react-icons/fi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function GlobalProductionPulseView({ state }) {
-    const {STAGES, orders, isLoading, isFactory, loadPulse, handleMoveStage, isDispatcher,} = state;
+    const {
+        STAGES,
+        orders,
+        isLoading,
+        isFactory,
+        loadPulse,
+        handleMoveStage,
+        isDispatcher,
+    } = state;
 
     if (isLoading) {
         return (
-            <div className="flex min-h-[60vh] items-center justify-center">
+            <div className="flex min-h-[60vh] items-center justify-center bg-[var(--bg-main)] text-[var(--text-primary)]">
                 <div className="flex flex-col items-center gap-4 text-center">
-                    <div className="relative flex size-12 items-center justify-center rounded-full bg-primary/10">
-                        <FiActivity className="size-6 animate-pulse text-primary" />
+                    <div className="relative flex size-12 items-center justify-center rounded-full bg-[var(--bg-muted)]">
+                        <FiActivity className="size-6 animate-pulse text-[var(--brand-accent)]" />
 
-                        <span className="absolute inset-0 animate-ping rounded-full border border-primary/20" />
+                        <span className="absolute inset-0 animate-ping rounded-full border border-[var(--border-light)]" />
                     </div>
 
                     <div>
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
                             Loading Factory Floor...
                         </p>
 
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
                             Fetching the latest production movement.
                         </p>
                     </div>
@@ -44,38 +64,38 @@ export default function GlobalProductionPulseView({ state }) {
     const activeOrders = orders.length;
 
     return (
-        <div className="mx-auto flex h-[85vh] w-full max-w-[1500px] flex-col gap-5">
+        <div className="mx-auto flex h-[85vh] w-full max-w-[1500px] flex-col gap-5 bg-[var(--bg-main)] text-[var(--text-primary)]">
             {/* ===================================================== */}
             {/* PRODUCTION PULSE HEADER */}
             {/* ===================================================== */}
 
-            <Card className="relative shrink-0 overflow-hidden border-border/70 bg-gradient-to-r from-background via-background to-primary/[0.04] shadow-sm">
+            <Card className="relative shrink-0 overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
                 {/* Decorative accent */}
-                <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary via-blue-500 to-cyan-400" />
+                <div className="absolute inset-y-0 left-0 w-1 bg-[var(--brand-accent)]" />
 
                 <CardHeader className="pl-6">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                         {/* TITLE */}
                         <div>
                             <div className="mb-2 flex items-center gap-2">
-                                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-[var(--brand-accent)]">
                                     <FiActivity className="size-5" />
                                 </div>
 
                                 <Badge
                                     variant="outline"
-                                    className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    className="border-[var(--brand-success)] bg-[var(--bg-muted)] text-[var(--brand-success)]"
                                 >
-                                    <span className="mr-1.5 size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                                    <span className="mr-1.5 size-1.5 animate-pulse rounded-full bg-[var(--brand-success)]" />
                                     LIVE FLOOR
                                 </Badge>
                             </div>
 
-                            <CardTitle className="text-xl font-bold tracking-tight">
+                            <CardTitle className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
                                 Global Production Pulse
                             </CardTitle>
 
-                            <CardDescription className="mt-1 max-w-2xl">
+                            <CardDescription className="mt-1 max-w-2xl text-[var(--text-muted)]">
                                 Company-wide transparency across active
                                 production. Track products as they move
                                 through the factory floor.
@@ -88,21 +108,21 @@ export default function GlobalProductionPulseView({ state }) {
                                 icon={<FiLayers />}
                                 label="Orders"
                                 value={activeOrders}
-                                className="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                className="bg-[var(--bg-muted)] text-[var(--brand-accent)]"
                             />
 
                             <PulseMetric
                                 icon={<FiBox />}
                                 label="Products"
                                 value={totalProducts}
-                                className="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                                className="bg-[var(--bg-muted)] text-[var(--brand-accent)]"
                             />
 
                             <PulseMetric
                                 icon={<FiActivity />}
                                 label="Stages"
                                 value={STAGES.length}
-                                className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+                                className="bg-[var(--bg-muted)] text-[var(--brand-accent)]"
                             />
                         </div>
                     </div>
@@ -181,13 +201,14 @@ function ProductionStageColumn({
                 flex-col
                 gap-0
                 overflow-hidden
-                border-border/60
-                bg-muted/[0.18]
+                border border-[var(--border-subtle)]
+                bg-[var(--bg-muted)]
                 py-0
-                shadow-sm
+                text-[var(--text-primary)]
+                shadow-[var(--shadow-sm)]
                 transition-all
                 duration-200
-                hover:shadow-md
+                hover:shadow-[var(--shadow-sm)]
                 lg:flex-1
             "
         >
@@ -196,15 +217,10 @@ function ProductionStageColumn({
             {/* ================================================= */}
 
             <div
-                className="relative shrink-0 overflow-hidden px-4 py-3.5"
+                className="relative shrink-0 overflow-hidden border-b-[3px] px-4 py-3.5"
                 style={{
-                    background: `linear-gradient(
-                        135deg,
-                        ${stage.bg} 0%,
-                        color-mix(in srgb, ${stage.bg} 55%, transparent) 55%,
-                        transparent 100%
-                    )`,
-                    borderBottom: `3px solid ${stage.color}`,
+                    backgroundColor: stage.bg,
+                    borderBottomColor: stage.color,
                 }}
             >
                 {/* Background glow */}
@@ -219,10 +235,9 @@ function ProductionStageColumn({
                     {/* Stage identity */}
                     <div className="flex min-w-0 items-center gap-3">
                         <div
-                            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+                            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-[var(--shadow-sm)]"
                             style={{
                                 backgroundColor: stage.color,
-                                boxShadow: `0 5px 15px ${stage.color}35`,
                             }}
                         >
                             <FiActivity className="size-4" />
@@ -238,7 +253,7 @@ function ProductionStageColumn({
                                 {stage.label}
                             </div>
 
-                            <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
                                 Stage {stageIndex + 1}
                             </div>
                         </div>
@@ -246,11 +261,11 @@ function ProductionStageColumn({
 
                     {/* Count */}
                     <div
-                        className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                        className="flex size-9 shrink-0 items-center justify-center rounded-full border text-xs font-bold"
                         style={{
                             color: stage.color,
-                            backgroundColor: `${stage.color}18`,
-                            border: `1px solid ${stage.color}35`,
+                            backgroundColor: stage.bg,
+                            borderColor: stage.color,
                         }}
                     >
                         {stageItems.length}
@@ -266,11 +281,7 @@ function ProductionStageColumn({
                 <div
                     className="flex min-h-full flex-col gap-2.5 p-2.5"
                     style={{
-                        background: `linear-gradient(
-                            180deg,
-                            ${stage.color}08 0%,
-                            transparent 180px
-                        )`,
+                        backgroundColor: "var(--bg-muted)",
                     }}
                 >
                     {stageItems.map((item) => (
@@ -316,14 +327,15 @@ function ProductionItemCard({
                 group/card
                 relative
                 overflow-hidden
-                border-border/60
-                bg-background
+                border border-[var(--border-light)]
+                bg-[var(--bg-main)]
                 py-0
-                shadow-sm
+                text-[var(--text-primary)]
+                shadow-[var(--shadow-sm)]
                 transition-all
                 duration-200
                 hover:-translate-y-[1px]
-                hover:shadow-md
+                hover:shadow-[var(--shadow-sm)]
             "
         >
             {/* Stage colour rail */}
@@ -345,14 +357,14 @@ function ProductionItemCard({
                             <div
                                 className="flex size-7 shrink-0 items-center justify-center rounded-md"
                                 style={{
-                                    backgroundColor: `${stage.color}12`,
+                                    backgroundColor: stage.bg,
                                     color: stage.color,
                                 }}
                             >
                                 <FiBox className="size-3.5" />
                             </div>
 
-                            <span className="truncate text-sm font-bold text-foreground">
+                            <span className="truncate text-sm font-bold text-[var(--text-primary)]">
                                 {item.item_code}
                             </span>
                         </div>
@@ -362,7 +374,7 @@ function ProductionItemCard({
                     {item.quantity ? (
                         <Badge
                             variant="secondary"
-                            className="shrink-0 border-0 bg-muted text-[10px] font-bold"
+                            className="shrink-0 border border-[var(--border-light)] bg-[var(--bg-muted)] text-[10px] font-bold text-[var(--text-primary)]"
                         >
                             ×{item.quantity}
                         </Badge>
@@ -379,8 +391,8 @@ function ProductionItemCard({
                         icon={<FiLayers />}
                         label="Order"
                         value={order.order_id}
-                        className="bg-blue-500/[0.07]"
-                        iconClassName="text-blue-500"
+                        className="bg-[var(--bg-muted)]"
+                        iconClassName="text-[var(--brand-accent)]"
                     />
 
                     {/* DUE DATE */}
@@ -388,9 +400,9 @@ function ProductionItemCard({
                         icon={<FiCalendar />}
                         label="Due"
                         value={order.due_date || "—"}
-                        className="bg-rose-500/[0.07]"
-                        iconClassName="text-rose-500"
-                        valueClassName="text-rose-600 dark:text-rose-400"
+                        className="bg-[var(--bg-muted)]"
+                        iconClassName="text-[var(--brand-danger)]"
+                        valueClassName="text-[var(--brand-danger)]"
                     />
                 </div>
 
@@ -414,7 +426,7 @@ function ProductionItemCard({
                             transition-all
                         "
                         style={{
-                            backgroundColor: `${stage.color}12`,
+                            backgroundColor: stage.bg,
                             color: stage.color,
                         }}
                         onMouseEnter={(e) => {
@@ -424,7 +436,7 @@ function ProductionItemCard({
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor =
-                                `${stage.color}12`;
+                                stage.bg;
                             e.currentTarget.style.color = stage.color;
                         }}
                         onClick={() =>
@@ -446,7 +458,7 @@ function ProductionItemCard({
                         className="mt-3 flex h-7 items-center justify-center rounded-md text-[10px] font-semibold"
                         style={{
                             color: stage.color,
-                            backgroundColor: `${stage.color}0d`,
+                            backgroundColor: stage.bg,
                         }}
                     >
                         <FiActivity className="mr-1.5 size-3" />
@@ -474,20 +486,20 @@ function InfoTile({
 }) {
     return (
         <div
-            className={`min-w-0 rounded-md border border-border/40 px-2 py-1.5 ${className}`}
+            className={`min-w-0 rounded-md border border-[var(--border-light)] px-2 py-1.5 ${className}`}
         >
             <div className="flex items-center gap-1.5">
                 <span className={`shrink-0 ${iconClassName}`}>
                     {icon}
                 </span>
 
-                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     {label}
                 </span>
             </div>
 
             <div
-                className={`mt-0.5 truncate font-mono text-[10px] font-semibold text-foreground ${valueClassName}`}
+                className={`mt-0.5 truncate font-mono text-[10px] font-semibold text-[var(--text-primary)] ${valueClassName}`}
                 title={String(value)}
             >
                 {value}
@@ -508,18 +520,18 @@ function PulseMetric({
 }) {
     return (
         <div
-            className={`flex min-w-[90px] items-center gap-2 rounded-lg border border-border/50 px-3 py-2 ${className}`}
+            className={`flex min-w-[90px] items-center gap-2 rounded-lg border border-[var(--border-light)] px-3 py-2 ${className}`}
         >
             <div className="text-sm">
                 {icon}
             </div>
 
             <div>
-                <div className="text-base font-bold leading-none text-foreground">
+                <div className="text-base font-bold leading-none text-[var(--text-primary)]">
                     {value}
                 </div>
 
-                <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     {label}
                 </div>
             </div>
@@ -537,7 +549,7 @@ function EmptyStage({ stage }) {
             <div
                 className="mb-3 flex size-11 items-center justify-center rounded-full"
                 style={{
-                    backgroundColor: `${stage.color}10`,
+                    backgroundColor: stage.bg,
                     color: stage.color,
                 }}
             >
@@ -553,7 +565,7 @@ function EmptyStage({ stage }) {
                 No products here
             </p>
 
-            <p className="mt-1 max-w-[180px] text-[10px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 max-w-[180px] text-[10px] leading-relaxed text-[var(--text-muted)]">
                 Products entering this stage will appear here
                 automatically.
             </p>

@@ -32,7 +32,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
   const isTargetAchieved = progressPercentage >= 100;
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] space-y-8 p-6 md:p-8">
+    <div className="mx-auto w-full max-w-[1100px] space-y-8 bg-[var(--bg-main)] p-6 text-[var(--text-primary)] md:p-8">
       {/* ============================================================
           PERSONAL QUOTA
       ============================================================ */}
@@ -41,19 +41,19 @@ export default function PersonalSalesAnalyticsView({ state }) {
         <section className="space-y-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
+              <Target className="h-5 w-5 text-[var(--brand-accent)]" />
 
-              <h2 className="text-xl font-semibold tracking-tight">
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
                 My Quarterly Quota
               </h2>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[var(--text-muted)]">
               Track your personal progress against your quarterly goal.
             </p>
           </div>
 
-          <Card>
+          <Card className="border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
             <CardContent className="p-6 md:p-8">
               {/* KPI VALUES */}
 
@@ -68,7 +68,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
                   value={`₹${Number(harvested || 0).toLocaleString(
                     "en-IN"
                   )}`}
-                  valueClassName="text-emerald-600 dark:text-emerald-400"
+                  valueClassName="text-[var(--brand-success)]"
                 />
 
                 <QuotaMetric
@@ -78,8 +78,8 @@ export default function PersonalSalesAnalyticsView({ state }) {
                   )}`}
                   valueClassName={
                     shortfall > 0
-                      ? "text-destructive"
-                      : "text-emerald-600 dark:text-emerald-400"
+                      ? "text-[var(--brand-danger)]"
+                      : "text-[var(--brand-success)]"
                   }
                 />
               </div>
@@ -89,15 +89,15 @@ export default function PersonalSalesAnalyticsView({ state }) {
               <div className="mt-8 space-y-3">
                 <Progress
                   value={Math.min(100, Math.max(0, progressPercentage || 0))}
-                  className="h-4"
+                  className="h-4 bg-[var(--bg-muted)] [&>div]:bg-[var(--brand-accent)]"
                 />
 
                 <div
                   className={[
                     "flex items-center justify-center gap-2 text-sm font-semibold",
                     isTargetAchieved
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-foreground",
+                      ? "text-[var(--brand-success)]"
+                      : "text-[var(--text-primary)]",
                   ].join(" ")}
                 >
                   {isTargetAchieved ? (
@@ -126,14 +126,14 @@ export default function PersonalSalesAnalyticsView({ state }) {
       <section className="space-y-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Award className="h-5 w-5 text-primary" />
+            <Award className="h-5 w-5 text-[var(--brand-accent)]" />
 
-            <h2 className="text-xl font-semibold tracking-tight">
+            <h2 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
               Team Leaderboards
             </h2>
           </div>
 
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--text-muted)]">
             See how you rank against the rest of the sales force.
           </p>
         </div>
@@ -143,12 +143,12 @@ export default function PersonalSalesAnalyticsView({ state }) {
               TOP CLOSERS
           ========================================================== */}
 
-          <Card className="overflow-hidden">
-            <CardHeader className="border-b bg-muted/40 px-5 py-4">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                <Activity className="h-4 w-4 text-primary" />
+          <Card className="overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+            <CardHeader className="border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-5 py-4">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <Activity className="h-4 w-4 text-[var(--brand-accent)]" />
                 Top Closers
-                <span className="font-normal text-muted-foreground">
+                <span className="font-normal text-[var(--text-muted)]">
                   (By Total Value)
                 </span>
               </CardTitle>
@@ -163,19 +163,20 @@ export default function PersonalSalesAnalyticsView({ state }) {
                     return (
                       <TableRow
                         key={kpi.email || idx}
-                        className={
+                        className={[
+                          "border-b border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]",
                           isCurrentUser
-                            ? "bg-primary/10 hover:bg-primary/15"
-                            : undefined
-                        }
+                            ? "bg-[var(--brand-accent)]/10 hover:bg-[var(--brand-accent)]/15"
+                            : "",
+                        ].join(" ")}
                       >
                         <TableCell className="font-semibold">
                           <div className="flex items-center gap-2">
                             <span
                               className={
                                 idx < 3
-                                  ? "text-primary"
-                                  : "text-foreground"
+                                  ? "text-[var(--brand-accent)]"
+                                  : "text-[var(--text-primary)]"
                               }
                             >
                               {idx + 1}. {kpi.name?.split(" ")[0]}
@@ -183,8 +184,8 @@ export default function PersonalSalesAnalyticsView({ state }) {
 
                             {isCurrentUser && (
                               <Badge
-                                variant="secondary"
-                                className="px-1.5 py-0 text-[10px]"
+                                variant="outline"
+                                className="border-[var(--border-light)] bg-[var(--bg-muted)] px-1.5 py-0 text-[10px] text-[var(--text-primary)]"
                               >
                                 You
                               </Badge>
@@ -192,7 +193,7 @@ export default function PersonalSalesAnalyticsView({ state }) {
                           </div>
                         </TableCell>
 
-                        <TableCell className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                        <TableCell className="text-right font-semibold text-[var(--brand-success)]">
                           ₹
                           {Number(
                             parseFloat(kpi.targets_harvested || 0)
@@ -210,12 +211,12 @@ export default function PersonalSalesAnalyticsView({ state }) {
               TARGET CRUSHERS
           ========================================================== */}
 
-          <Card className="overflow-hidden">
-            <CardHeader className="border-b bg-muted/40 px-5 py-4">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <Card className="overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+            <CardHeader className="border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-5 py-4">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <TrendingUp className="h-4 w-4 text-[var(--brand-success)]" />
                 Target Crushers
-                <span className="font-normal text-muted-foreground">
+                <span className="font-normal text-[var(--text-muted)]">
                   (By Quota %)
                 </span>
               </CardTitle>
@@ -231,19 +232,20 @@ export default function PersonalSalesAnalyticsView({ state }) {
                     return (
                       <TableRow
                         key={kpi.email || idx}
-                        className={
+                        className={[
+                          "border-b border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]",
                           isCurrentUser
-                            ? "bg-primary/10 hover:bg-primary/15"
-                            : undefined
-                        }
+                            ? "bg-[var(--brand-accent)]/10 hover:bg-[var(--brand-accent)]/15"
+                            : "",
+                        ].join(" ")}
                       >
                         <TableCell className="w-[35%] font-semibold">
                           <div className="flex items-center gap-2">
                             <span
                               className={
                                 idx < 3
-                                  ? "text-primary"
-                                  : "text-foreground"
+                                  ? "text-[var(--brand-accent)]"
+                                  : "text-[var(--text-primary)]"
                               }
                             >
                               {idx + 1}. {kpi.name?.split(" ")[0]}
@@ -251,8 +253,8 @@ export default function PersonalSalesAnalyticsView({ state }) {
 
                             {isCurrentUser && (
                               <Badge
-                                variant="secondary"
-                                className="px-1.5 py-0 text-[10px]"
+                                variant="outline"
+                                className="border-[var(--border-light)] bg-[var(--bg-muted)] px-1.5 py-0 text-[10px] text-[var(--text-primary)]"
                               >
                                 You
                               </Badge>
@@ -263,11 +265,11 @@ export default function PersonalSalesAnalyticsView({ state }) {
                         <TableCell className="w-[45%]">
                           <Progress
                             value={Math.min(100, Math.max(0, pct))}
-                            className="h-2"
+                            className="h-2 bg-[var(--bg-muted)] [&>div]:bg-[var(--brand-accent)]"
                           />
                         </TableCell>
 
-                        <TableCell className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                        <TableCell className="text-right font-semibold text-[var(--brand-success)]">
                           {pct.toFixed(1)}%
                         </TableCell>
                       </TableRow>
@@ -290,11 +292,11 @@ export default function PersonalSalesAnalyticsView({ state }) {
 function QuotaMetric({
   label,
   value,
-  valueClassName = "text-foreground",
+  valueClassName = "text-[var(--text-primary)]",
 }) {
   return (
     <div className="space-y-2">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
         {label}
       </div>
 

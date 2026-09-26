@@ -2,7 +2,12 @@ import React from "react";
 import SearchBox from "../components/SearchBox";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +33,18 @@ import {
     ArrowLeft,
     Save,
 } from "lucide-react";
+
+const themedInputClass =
+    "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+const themedSelectTriggerClass =
+    "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+const themedSelectContentClass =
+    "border-[var(--border-light)] bg-[var(--bg-surface)] text-[var(--text-primary)]";
+
+const themedSelectItemClass =
+    "focus:bg-[var(--combobox-hover)] focus:text-[var(--text-primary)]";
 
 export default function OrderEntryFormView({ state }) {
     const {
@@ -83,24 +100,24 @@ export default function OrderEntryFormView({ state }) {
     };
 
     return (
-        <div className="mx-auto w-full max-w-[1400px] px-4 py-6">
-            <Card className="overflow-hidden">
+        <div className="mx-auto w-full max-w-[1400px] bg-[var(--bg-main)] px-4 py-6 text-[var(--text-primary)]">
+            <Card className="overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
                 {/* Header */}
-                <CardHeader className="border-b bg-muted/20 px-6 py-5">
+                <CardHeader className="border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-6 py-5">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-start gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-accent)]/10 text-[var(--brand-accent)]">
                                 <FileText className="size-5" />
                             </div>
 
                             <div>
-                                <h2 className="text-lg font-semibold tracking-tight">
+                                <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
                                     Establish Order Acceptance
                                 </h2>
 
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Create and register a new customer order acceptance
-                                    against the corporate master.
+                                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                    Create and register a new customer order
+                                    acceptance against the corporate master.
                                 </p>
                             </div>
                         </div>
@@ -118,7 +135,7 @@ export default function OrderEntryFormView({ state }) {
                                 type="button"
                                 variant="outline"
                                 disabled={isOcrLoading}
-                                className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/70"
+                                className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--brand-accent)] hover:bg-[var(--combobox-hover)]"
                             >
                                 {isOcrLoading ? (
                                     <>
@@ -144,16 +161,17 @@ export default function OrderEntryFormView({ state }) {
 
                         <section className="space-y-5">
                             <div>
-                                <h3 className="text-sm font-semibold">
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                                     Order Information
                                 </h3>
 
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    Core order acceptance and delivery information.
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                    Core order acceptance and delivery
+                                    information.
                                 </p>
                             </div>
 
-                            <Separator />
+                            <Separator className="bg-[var(--border-light)]" />
 
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                 {/* OA ID */}
@@ -161,9 +179,12 @@ export default function OrderEntryFormView({ state }) {
                                     ref={oaInputRef}
                                     className="relative space-y-2"
                                 >
-                                    <Label htmlFor="order-acceptance-id">
+                                    <Label
+                                        htmlFor="order-acceptance-id"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Order Acceptance ID
-                                        <span className="ml-1 text-destructive">
+                                        <span className="ml-1 text-[var(--brand-danger)]">
                                             *
                                         </span>
                                     </Label>
@@ -188,6 +209,7 @@ export default function OrderEntryFormView({ state }) {
                                             placeholder="XXX/000"
                                             maxLength={7}
                                             autoComplete="off"
+                                            className={themedInputClass}
                                         />
 
                                         <Button
@@ -198,9 +220,9 @@ export default function OrderEntryFormView({ state }) {
                                                     orderHeader.order_acceptance_id
                                                 )
                                             }
-                                            className="shrink-0"
+                                            className="shrink-0 border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                                         >
-                                            <Search className="mr-2 size-4" />
+                                            <Search className="mr-2 size-4 text-[var(--brand-accent)]" />
                                             Lookup
                                         </Button>
                                     </div>
@@ -208,8 +230,8 @@ export default function OrderEntryFormView({ state }) {
                                     {/* OA Suggestions */}
                                     {showOaSuggestions &&
                                         oaSuggestions.length > 0 && (
-                                            <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg">
-                                                <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+                                            <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border border-[var(--border-light)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+                                                <div className="border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-3 py-2 text-xs font-medium text-[var(--text-muted)]">
                                                     Order Acceptance
                                                     recommendations
                                                 </div>
@@ -233,13 +255,13 @@ export default function OrderEntryFormView({ state }) {
                                                                             oa
                                                                         )
                                                                     }
-                                                                    className="block w-full border-b px-3 py-2.5 text-left text-sm transition-colors last:border-b-0 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                                                                    className="block w-full border-b border-[var(--border-light)] px-3 py-2.5 text-left text-sm transition-colors last:border-b-0 hover:bg-[var(--combobox-hover)] focus:bg-[var(--combobox-hover)] focus:outline-none"
                                                                 >
                                                                     <span
                                                                         className={
                                                                             isMatch
-                                                                                ? "font-semibold"
-                                                                                : "font-normal"
+                                                                                ? "font-semibold text-[var(--brand-accent)]"
+                                                                                : "font-normal text-[var(--text-primary)]"
                                                                         }
                                                                     >
                                                                         {oa}
@@ -255,9 +277,12 @@ export default function OrderEntryFormView({ state }) {
 
                                 {/* PO Reference */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="customer-po-ref">
+                                    <Label
+                                        htmlFor="customer-po-ref"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Customer PO Reference
-                                        <span className="ml-1 text-destructive">
+                                        <span className="ml-1 text-[var(--brand-danger)]">
                                             *
                                         </span>
                                     </Label>
@@ -275,14 +300,18 @@ export default function OrderEntryFormView({ state }) {
                                             )
                                         }
                                         placeholder="PO-XXXX"
+                                        className={themedInputClass}
                                     />
                                 </div>
 
                                 {/* Acceptance Date */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="acceptance-date">
+                                    <Label
+                                        htmlFor="acceptance-date"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Acceptance Date
-                                        <span className="ml-1 text-destructive">
+                                        <span className="ml-1 text-[var(--brand-danger)]">
                                             *
                                         </span>
                                     </Label>
@@ -301,14 +330,18 @@ export default function OrderEntryFormView({ state }) {
                                                 e.target.value
                                             )
                                         }
+                                        className={themedInputClass}
                                     />
                                 </div>
 
                                 {/* PO Date */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="po-date">
+                                    <Label
+                                        htmlFor="po-date"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Customer PO Date
-                                        <span className="ml-1 text-destructive">
+                                        <span className="ml-1 text-[var(--brand-danger)]">
                                             *
                                         </span>
                                     </Label>
@@ -327,14 +360,18 @@ export default function OrderEntryFormView({ state }) {
                                                 e.target.value
                                             )
                                         }
+                                        className={themedInputClass}
                                     />
                                 </div>
 
                                 {/* Due Date */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="delivery-due-date">
+                                    <Label
+                                        htmlFor="delivery-due-date"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Delivery Expiry Due Date
-                                        <span className="ml-1 text-destructive">
+                                        <span className="ml-1 text-[var(--brand-danger)]">
                                             *
                                         </span>
                                     </Label>
@@ -363,12 +400,16 @@ export default function OrderEntryFormView({ state }) {
                                                 value
                                             );
                                         }}
+                                        className={themedInputClass}
                                     />
                                 </div>
 
                                 {/* Payment Terms */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="payment-terms">
+                                    <Label
+                                        htmlFor="payment-terms"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Payment Terms
                                     </Label>
 
@@ -382,6 +423,7 @@ export default function OrderEntryFormView({ state }) {
                                             )
                                         }
                                         placeholder="e.g. Net 30 Days"
+                                        className={themedInputClass}
                                     />
                                 </div>
                             </div>
@@ -394,11 +436,11 @@ export default function OrderEntryFormView({ state }) {
                         <section className="space-y-5">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <h3 className="text-sm font-semibold">
+                                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                                         Customer Master Registry
                                     </h3>
 
-                                    <p className="mt-1 text-xs text-muted-foreground">
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">
                                         Link this order to an existing customer
                                         or register a temporary client.
                                     </p>
@@ -407,10 +449,11 @@ export default function OrderEntryFormView({ state }) {
                                 <Button
                                     type="button"
                                     size="sm"
-                                    variant={
+                                    variant="outline"
+                                    className={
                                         isNewClient
-                                            ? "destructive"
-                                            : "secondary"
+                                            ? "border-[var(--brand-danger)] bg-[var(--warning-row)] text-[var(--brand-danger)] hover:opacity-90"
+                                            : "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                                     }
                                     onClick={() => {
                                         setIsNewClient(!isNewClient);
@@ -437,7 +480,7 @@ export default function OrderEntryFormView({ state }) {
                                 </Button>
                             </div>
 
-                            <Separator />
+                            <Separator className="bg-[var(--border-light)]" />
 
                             {!isNewClient ? (
                                 <div className="space-y-3">
@@ -452,8 +495,8 @@ export default function OrderEntryFormView({ state }) {
                                     />
 
                                     {orderHeader.customer_name && (
-                                        <div className="flex flex-col gap-2 rounded-lg border bg-blue-50/60 px-4 py-3 text-sm dark:bg-blue-950/20 sm:flex-row sm:items-center">
-                                            <span>
+                                        <div className="flex flex-col gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-muted)] px-4 py-3 text-sm sm:flex-row sm:items-center">
+                                            <span className="text-[var(--text-primary)]">
                                                 Selected Customer:{" "}
                                                 <strong>
                                                     {
@@ -465,7 +508,7 @@ export default function OrderEntryFormView({ state }) {
                                             {!orderHeader.customer_code && (
                                                 <Badge
                                                     variant="outline"
-                                                    className="w-fit border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
+                                                    className="w-fit border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--brand-accent)]"
                                                 >
                                                     Not registered yet
                                                 </Badge>
@@ -475,9 +518,12 @@ export default function OrderEntryFormView({ state }) {
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    <Label htmlFor="temporary-client">
+                                    <Label
+                                        htmlFor="temporary-client"
+                                        className="text-[var(--text-primary)]"
+                                    >
                                         Temporary Client Corporate Name
-                                        <span className="ml-1 text-destructive">
+                                        <span className="ml-1 text-[var(--brand-danger)]">
                                             *
                                         </span>
                                     </Label>
@@ -486,7 +532,7 @@ export default function OrderEntryFormView({ state }) {
                                         id="temporary-client"
                                         type="text"
                                         required
-                                        className="border-dashed border-emerald-500"
+                                        className={`${themedInputClass} border-dashed border-[var(--brand-success)]`}
                                         value={temporaryClientName}
                                         onChange={(e) => {
                                             const value = e.target.value;
@@ -514,19 +560,19 @@ export default function OrderEntryFormView({ state }) {
 
                         <section className="space-y-5">
                             <div>
-                                <h3 className="text-sm font-semibold">
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                                     Billing Configuration
                                 </h3>
 
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">
                                     Configure whether billing information should
                                     match the customer entity.
                                 </p>
                             </div>
 
-                            <Separator />
+                            <Separator className="bg-[var(--border-light)]" />
 
-                            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-muted)] p-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-start gap-3">
                                     <Checkbox
                                         id="billing-same"
@@ -536,18 +582,19 @@ export default function OrderEntryFormView({ state }) {
                                                 checked === true
                                             )
                                         }
+                                        className="border-[var(--border-light)] data-[state=checked]:border-[var(--brand-accent)] data-[state=checked]:bg-[var(--brand-accent)]"
                                     />
 
                                     <div className="space-y-1">
                                         <Label
                                             htmlFor="billing-same"
-                                            className="cursor-pointer font-medium"
+                                            className="cursor-pointer font-medium text-[var(--text-primary)]"
                                         >
                                             Billing parameters and Customer
                                             Entity details are identical
                                         </Label>
 
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-xs text-[var(--text-muted)]">
                                             Disable this if the commercial
                                             billing entity is different.
                                         </p>
@@ -555,12 +602,12 @@ export default function OrderEntryFormView({ state }) {
                                 </div>
 
                                 <Badge
-                                    variant={
+                                    variant="outline"
+                                    className={
                                         isBillingSameAsCustomer
-                                            ? "default"
-                                            : "destructive"
+                                            ? "w-fit border-[var(--brand-success)]/30 bg-[var(--brand-success)]/10 text-[var(--brand-success)]"
+                                            : "w-fit border-[var(--brand-danger)]/30 bg-[var(--warning-row)] text-[var(--brand-danger)]"
                                     }
-                                    className="w-fit"
                                 >
                                     {isBillingSameAsCustomer
                                         ? "AUTO-MATCH ON"
@@ -569,11 +616,11 @@ export default function OrderEntryFormView({ state }) {
                             </div>
 
                             {!isBillingSameAsCustomer && (
-                                <div className="space-y-5 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                                <div className="space-y-5 rounded-lg border border-[var(--brand-danger)]/30 bg-[var(--warning-row)] p-4">
                                     <div className="space-y-2">
                                         <Label
                                             htmlFor="billing-name"
-                                            className="text-destructive"
+                                            className="text-[var(--brand-danger)]"
                                         >
                                             Override Billing Corporate Legal
                                             Name
@@ -591,13 +638,14 @@ export default function OrderEntryFormView({ state }) {
                                                 )
                                             }
                                             placeholder="Enter distinct commercial recipient name..."
+                                            className={themedInputClass}
                                         />
                                     </div>
 
                                     <div className="space-y-2">
                                         <Label
                                             htmlFor="billing-address"
-                                            className="text-destructive"
+                                            className="text-[var(--brand-danger)]"
                                         >
                                             Override Billing Core Street
                                             Address
@@ -616,6 +664,7 @@ export default function OrderEntryFormView({ state }) {
                                                 )
                                             }
                                             placeholder="Enter distinct billing/logistics address..."
+                                            className={themedInputClass}
                                         />
                                     </div>
                                 </div>
@@ -629,17 +678,20 @@ export default function OrderEntryFormView({ state }) {
                         <section className="space-y-5">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <h3 className="text-sm font-semibold">
+                                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                                         Order Line Items
                                     </h3>
 
-                                    <p className="mt-1 text-xs text-muted-foreground">
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">
                                         Add products, specifications,
                                         quantities, rates and discounts.
                                     </p>
                                 </div>
 
-                                <Badge variant="secondary">
+                                <Badge
+                                    variant="outline"
+                                    className="w-fit border-[var(--border-light)] bg-[var(--bg-muted)] text-[var(--text-primary)]"
+                                >
                                     {orderItems.length}{" "}
                                     {orderItems.length === 1
                                         ? "Line"
@@ -647,12 +699,12 @@ export default function OrderEntryFormView({ state }) {
                                 </Badge>
                             </div>
 
-                            <Separator />
+                            <Separator className="bg-[var(--border-light)]" />
 
-                            <div className="overflow-x-auto rounded-lg border">
-                                <table className="w-full min-w-[1100px] text-sm">
-                                    <thead className="bg-muted/50">
-                                        <tr className="border-b">
+                            <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
+                                <table className="w-full min-w-[1100px] text-sm text-[var(--text-primary)]">
+                                    <thead className="bg-[var(--bg-muted)]">
+                                        <tr className="border-b border-[var(--border-light)]">
                                             <th className="px-3 py-3 text-left font-medium">
                                                 Target Stock Code
                                             </th>
@@ -704,7 +756,7 @@ export default function OrderEntryFormView({ state }) {
                                             return (
                                                 <tr
                                                     key={index}
-                                                    className="border-b last:border-b-0"
+                                                    className="border-b border-[var(--border-light)] last:border-b-0 hover:bg-[var(--combobox-hover)]"
                                                 >
                                                     {/* Item */}
                                                     <td className="p-2 align-top">
@@ -723,11 +775,19 @@ export default function OrderEntryFormView({ state }) {
                                                             }
                                                             required
                                                         >
-                                                            <SelectTrigger>
+                                                            <SelectTrigger
+                                                                className={
+                                                                    themedSelectTriggerClass
+                                                                }
+                                                            >
                                                                 <SelectValue placeholder="Choose item" />
                                                             </SelectTrigger>
 
-                                                            <SelectContent>
+                                                            <SelectContent
+                                                                className={
+                                                                    themedSelectContentClass
+                                                                }
+                                                            >
                                                                 {itemsMaster?.map(
                                                                     (im) => (
                                                                         <SelectItem
@@ -737,6 +797,9 @@ export default function OrderEntryFormView({ state }) {
                                                                             value={
                                                                                 im.item_code
                                                                             }
+                                                                            className={
+                                                                                themedSelectItemClass
+                                                                            }
                                                                         >
                                                                             {
                                                                                 im.item_code
@@ -745,7 +808,12 @@ export default function OrderEntryFormView({ state }) {
                                                                     )
                                                                 )}
 
-                                                                <SelectItem value="TRIGGER_ERR_UNREGISTERED_PART">
+                                                                <SelectItem
+                                                                    value="TRIGGER_ERR_UNREGISTERED_PART"
+                                                                    className={
+                                                                        themedSelectItemClass
+                                                                    }
+                                                                >
                                                                     Non-standard
                                                                     Code
                                                                 </SelectItem>
@@ -758,7 +826,7 @@ export default function OrderEntryFormView({ state }) {
                                                         <Textarea
                                                             required
                                                             rows={3}
-                                                            className="min-h-[80px] resize-y"
+                                                            className={`${themedInputClass} min-h-[80px] resize-y`}
                                                             value={
                                                                 item.additional_spec_text ||
                                                                 ""
@@ -790,6 +858,9 @@ export default function OrderEntryFormView({ state }) {
                                                                 )
                                                             }
                                                             placeholder="HSN"
+                                                            className={
+                                                                themedInputClass
+                                                            }
                                                         />
                                                     </td>
 
@@ -819,6 +890,9 @@ export default function OrderEntryFormView({ state }) {
                                                                           )
                                                                 );
                                                             }}
+                                                            className={
+                                                                themedInputClass
+                                                            }
                                                         />
                                                     </td>
 
@@ -839,6 +913,9 @@ export default function OrderEntryFormView({ state }) {
                                                                 )
                                                             }
                                                             placeholder="NOS"
+                                                            className={
+                                                                themedInputClass
+                                                            }
                                                         />
                                                     </td>
 
@@ -861,6 +938,9 @@ export default function OrderEntryFormView({ state }) {
                                                                             .value
                                                                     ) || 0
                                                                 )
+                                                            }
+                                                            className={
+                                                                themedInputClass
                                                             }
                                                         />
                                                     </td>
@@ -887,12 +967,15 @@ export default function OrderEntryFormView({ state }) {
                                                                     ) || 0
                                                                 )
                                                             }
+                                                            className={
+                                                                themedInputClass
+                                                            }
                                                         />
                                                     </td>
 
                                                     {/* Amount */}
                                                     <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
-                                                        <span className="font-mono font-semibold">
+                                                        <span className="font-mono font-semibold text-[var(--brand-accent)]">
                                                             ₹
                                                             {lineTotal.toFixed(
                                                                 2
@@ -908,7 +991,7 @@ export default function OrderEntryFormView({ state }) {
                                                                 type="button"
                                                                 variant="ghost"
                                                                 size="icon"
-                                                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                                className="text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                                                                 onClick={() =>
                                                                     popOrderItemRow(
                                                                         index
@@ -931,8 +1014,9 @@ export default function OrderEntryFormView({ state }) {
                                 type="button"
                                 variant="outline"
                                 onClick={appendOrderItemRow}
+                                className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                             >
-                                <Plus className="mr-2 size-4" />
+                                <Plus className="mr-2 size-4 text-[var(--brand-accent)]" />
                                 Append Line Item
                             </Button>
                         </section>
@@ -942,15 +1026,15 @@ export default function OrderEntryFormView({ state }) {
                         {/* ================================================== */}
 
                         <section className="flex justify-end">
-                            <Card className="w-full max-w-md bg-muted/20">
+                            <Card className="w-full max-w-md border border-[var(--border-subtle)] bg-[var(--bg-muted)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
                                 <CardContent className="space-y-4 p-5">
                                     {/* Subtotal */}
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
+                                        <span className="text-[var(--text-muted)]">
                                             Item Subtotal
                                         </span>
 
-                                        <span className="font-semibold">
+                                        <span className="font-semibold text-[var(--text-primary)]">
                                             ₹
                                             {totals.itemSubtotal.toFixed(2)}
                                         </span>
@@ -960,7 +1044,7 @@ export default function OrderEntryFormView({ state }) {
                                     <div className="flex items-center justify-between gap-4 text-sm">
                                         <Label
                                             htmlFor="packing-charges"
-                                            className="font-normal"
+                                            className="font-normal text-[var(--text-primary)]"
                                         >
                                             Packing Charges (₹)
                                         </Label>
@@ -969,7 +1053,7 @@ export default function OrderEntryFormView({ state }) {
                                             id="packing-charges"
                                             type="number"
                                             step="0.01"
-                                            className="w-32 text-right"
+                                            className={`${themedInputClass} w-32 text-right`}
                                             value={
                                                 orderHeader.packing_charges ||
                                                 ""
@@ -988,7 +1072,7 @@ export default function OrderEntryFormView({ state }) {
                                     <div className="flex items-center justify-between gap-4 text-sm">
                                         <Label
                                             htmlFor="freight-charges"
-                                            className="font-normal"
+                                            className="font-normal text-[var(--text-primary)]"
                                         >
                                             Freight Charges (₹)
                                         </Label>
@@ -997,7 +1081,7 @@ export default function OrderEntryFormView({ state }) {
                                             id="freight-charges"
                                             type="number"
                                             step="0.01"
-                                            className="w-32 text-right"
+                                            className={`${themedInputClass} w-32 text-right`}
                                             value={
                                                 orderHeader.freight_charges ||
                                                 ""
@@ -1016,7 +1100,7 @@ export default function OrderEntryFormView({ state }) {
                                     <div className="flex items-center justify-between gap-4 text-sm">
                                         <Label
                                             htmlFor="gst-rate"
-                                            className="font-normal"
+                                            className="font-normal text-[var(--text-primary)]"
                                         >
                                             GST Rate (%)
                                         </Label>
@@ -1034,51 +1118,80 @@ export default function OrderEntryFormView({ state }) {
                                         >
                                             <SelectTrigger
                                                 id="gst-rate"
-                                                className="w-32"
+                                                className={`w-32 ${themedSelectTriggerClass}`}
                                             >
                                                 <SelectValue />
                                             </SelectTrigger>
 
-                                            <SelectContent>
-                                                <SelectItem value="0">
+                                            <SelectContent
+                                                className={
+                                                    themedSelectContentClass
+                                                }
+                                            >
+                                                <SelectItem
+                                                    value="0"
+                                                    className={
+                                                        themedSelectItemClass
+                                                    }
+                                                >
                                                     0%
                                                 </SelectItem>
-                                                <SelectItem value="5">
+                                                <SelectItem
+                                                    value="5"
+                                                    className={
+                                                        themedSelectItemClass
+                                                    }
+                                                >
                                                     5%
                                                 </SelectItem>
-                                                <SelectItem value="12">
+                                                <SelectItem
+                                                    value="12"
+                                                    className={
+                                                        themedSelectItemClass
+                                                    }
+                                                >
                                                     12%
                                                 </SelectItem>
-                                                <SelectItem value="18">
+                                                <SelectItem
+                                                    value="18"
+                                                    className={
+                                                        themedSelectItemClass
+                                                    }
+                                                >
                                                     18%
                                                 </SelectItem>
-                                                <SelectItem value="28">
+                                                <SelectItem
+                                                    value="28"
+                                                    className={
+                                                        themedSelectItemClass
+                                                    }
+                                                >
                                                     28%
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="bg-[var(--border-light)]" />
 
                                     {/* Tax */}
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">
+                                        <span className="text-[var(--text-muted)]">
                                             Tax Amount (CGST/SGST/IGST)
                                         </span>
 
-                                        <span className="font-semibold">
+                                        <span className="font-semibold text-[var(--text-primary)]">
                                             ₹{totals.taxAmount.toFixed(2)}
                                         </span>
                                     </div>
 
                                     {/* Grand Total */}
                                     <div className="flex items-center justify-between pt-1">
-                                        <span className="text-base font-semibold">
+                                        <span className="text-base font-semibold text-[var(--text-primary)]">
                                             Grand Total
                                         </span>
 
-                                        <span className="text-xl font-bold text-primary">
+                                        <span className="text-xl font-bold text-[var(--brand-accent)]">
                                             ₹{totals.grandTotal.toFixed(2)}
                                         </span>
                                     </div>
@@ -1091,25 +1204,29 @@ export default function OrderEntryFormView({ state }) {
                     {/* FORM ACTIONS */}
                     {/* ================================================== */}
 
-                    <CardFooter className="flex flex-col-reverse gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row sm:justify-end">
+                    <CardFooter className="flex flex-col-reverse gap-2 border-t border-[var(--border-light)] bg-[var(--bg-muted)] px-6 py-4 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
                             variant="outline"
                             onClick={() =>
                                 setActiveTab("orders-list")
                             }
+                            className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                         >
                             Discard Form
                         </Button>
 
-                        <Button type="submit">
+                        <Button
+                            type="submit"
+                            className="bg-[var(--brand-accent)] text-white hover:opacity-90"
+                        >
                             <Save className="mr-2 size-4" />
 
                             {state.isPendingTallyOrder
                                 ? "Claim Order"
                                 : "Create Order"}
 
-                            <kbd className="ml-2 rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] font-normal">
+                            <kbd className="ml-2 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-white">
                                 Ctrl+S
                             </kbd>
                         </Button>

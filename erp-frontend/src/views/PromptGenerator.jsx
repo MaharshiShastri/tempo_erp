@@ -37,7 +37,6 @@ import {
     WandSparkles,
 } from "lucide-react";
 
-
 const LLM_OPTIONS = [
     {
         value: "chatgpt",
@@ -69,7 +68,6 @@ const LLM_OPTIONS = [
     },
 ];
 
-
 const PROMPT_TYPES = [
     {
         value: "normal",
@@ -80,7 +78,6 @@ const PROMPT_TYPES = [
         label: "System Prompt",
     },
 ];
-
 
 export default function PromptGeneratorView({ state }) {
     const [copied, setCopied] = useState(false);
@@ -104,7 +101,6 @@ export default function PromptGeneratorView({ state }) {
         copyPrompt,
     } = state;
 
-
     const handleCopy = async () => {
         const success = await copyPrompt();
 
@@ -117,47 +113,51 @@ export default function PromptGeneratorView({ state }) {
         }
     };
 
+    const themedInputClass =
+        "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+    const themedSelectTriggerClass =
+        "w-full border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
+
+    const themedSelectContentClass =
+        "border-[var(--border-light)] bg-[var(--bg-surface)] text-[var(--text-primary)]";
+
+    const themedSelectItemClass =
+        "focus:bg-[var(--combobox-hover)] focus:text-[var(--text-primary)]";
 
     return (
-        <div className="min-h-full space-y-6 p-4 md:p-6">
+        <div className="min-h-full space-y-6 bg-[var(--bg-main)] p-4 text-[var(--text-primary)] md:p-6">
 
             {/* =========================================================
                 PAGE HEADER
             ========================================================= */}
 
             <div className="flex flex-col gap-4">
-
                 <div className="flex items-start gap-4">
-
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] shadow-[var(--shadow-sm)]">
                         <WandSparkles className="size-5" />
                     </div>
 
                     <div className="min-w-0">
-
-                        <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <div className="mb-1 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
                             <span>AI Tools</span>
                             <span>/</span>
-                            <span className="text-foreground">
+                            <span className="text-[var(--text-primary)]">
                                 Prompt Generator
                             </span>
                         </div>
 
-                        <h1 className="text-2xl font-bold tracking-tight">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                             AI Prompt Generator
                         </h1>
 
-                        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
                             Create a model-specific prompt from your
                             requirements and your company context.
                         </p>
-
                     </div>
-
                 </div>
-
             </div>
-
 
             {/* =========================================================
                 MAIN GRID
@@ -165,53 +165,42 @@ export default function PromptGeneratorView({ state }) {
 
             <div className="grid gap-6 xl:grid-cols-2">
 
-
                 {/* =====================================================
                     CONFIGURATION CARD
                 ===================================================== */}
 
-                <Card className="gap-0 py-0 overflow-hidden border-border/70 shadow-sm">
-
-                    <CardHeader
-                        className="
-                            border-b
-                            bg-gradient-to-r from-violet-500/10 via-background to-blue-500/10
-                            px-5 py-4 md:px-6
-                            space-y-0
-                        "
-                        >
+                <Card className="gap-0 overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-0 text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+                    <CardHeader className="space-y-0 border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-5 py-4 md:px-6">
                         <div className="flex items-center gap-3">
-                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                            <Settings2 className="size-4" />
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-accent)]/10 text-[var(--brand-accent)]">
+                                <Settings2 className="size-4" />
                             </div>
 
                             <div className="min-w-0 flex-1">
-                            <CardTitle className="m-0 text-base font-semibold leading-tight">
-                                Prompt Configuration
-                            </CardTitle>
+                                <CardTitle className="m-0 text-base font-semibold leading-tight text-[var(--text-primary)]">
+                                    Prompt Configuration
+                                </CardTitle>
 
-                            <CardDescription className="m-0 mt-1 text-xs leading-5">
-                                Describe what the prompt should accomplish and select the target model.
-                            </CardDescription>
+                                <CardDescription className="m-0 mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                                    Describe what the prompt should accomplish
+                                    and select the target model.
+                                </CardDescription>
                             </div>
                         </div>
                     </CardHeader>
 
-
-                    <CardContent className="space-y-6 p-5 md:p-6">
-
+                    <CardContent className="space-y-6 p-5 text-[var(--text-primary)] md:p-6">
 
                         {/* =================================================
                             REQUIREMENTS
                         ================================================= */}
 
                         <div className="space-y-2">
-
                             <Label
                                 htmlFor="prompt-requirements"
-                                className="flex items-center gap-2 text-sm font-semibold"
+                                className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"
                             >
-                                <FileText className="size-4 text-violet-500" />
+                                <FileText className="size-4 text-[var(--brand-accent)]" />
                                 Requirements
                             </Label>
 
@@ -224,23 +213,14 @@ export default function PromptGeneratorView({ state }) {
                                     )
                                 }
                                 placeholder="Describe what you want the prompt to accomplish..."
-                                className="
-                                    min-h-[240px]
-                                    resize-y
-                                    bg-background
-                                    text-foreground
-                                    placeholder:text-muted-foreground
-                                    focus-visible:ring-violet-500/30
-                                "
+                                className={`${themedInputClass} min-h-[240px] resize-y`}
                             />
 
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-[var(--text-muted)]">
                                 Be specific about the task, expected output,
                                 constraints, tone, and relevant context.
                             </p>
-
                         </div>
-
 
                         {/* =================================================
                             MODEL SETTINGS
@@ -248,16 +228,14 @@ export default function PromptGeneratorView({ state }) {
 
                         <div className="grid gap-5 sm:grid-cols-2">
 
-
                             {/* TARGET LLM */}
 
                             <div className="space-y-2">
-
                                 <Label
                                     htmlFor="prompt-llm"
-                                    className="flex items-center gap-2 text-sm font-semibold"
+                                    className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"
                                 >
-                                    <Bot className="size-4 text-blue-500" />
+                                    <Bot className="size-4 text-[var(--brand-accent)]" />
                                     Target LLM
                                 </Label>
 
@@ -265,46 +243,37 @@ export default function PromptGeneratorView({ state }) {
                                     value={promptLLM}
                                     onValueChange={setPromptLLM}
                                 >
-
                                     <SelectTrigger
                                         id="prompt-llm"
-                                        className="
-                                            w-full
-                                            bg-background
-                                            text-foreground
-                                            border-border
-                                        "
+                                        className={themedSelectTriggerClass}
                                     >
                                         <SelectValue placeholder="Select model" />
                                     </SelectTrigger>
 
-                                    <SelectContent>
-
+                                    <SelectContent
+                                        className={themedSelectContentClass}
+                                    >
                                         {LLM_OPTIONS.map((option) => (
                                             <SelectItem
                                                 key={option.value}
                                                 value={option.value}
+                                                className={themedSelectItemClass}
                                             >
                                                 {option.label}
                                             </SelectItem>
                                         ))}
-
                                     </SelectContent>
-
                                 </Select>
-
                             </div>
-
 
                             {/* PROMPT TYPE */}
 
                             <div className="space-y-2">
-
                                 <Label
                                     htmlFor="prompt-type"
-                                    className="flex items-center gap-2 text-sm font-semibold"
+                                    className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"
                                 >
-                                    <Sparkles className="size-4 text-amber-500" />
+                                    <Sparkles className="size-4 text-[var(--brand-accent)]" />
                                     Prompt Type
                                 </Label>
 
@@ -312,45 +281,35 @@ export default function PromptGeneratorView({ state }) {
                                     value={promptType}
                                     onValueChange={setPromptType}
                                 >
-
                                     <SelectTrigger
                                         id="prompt-type"
-                                        className="
-                                            w-full
-                                            bg-background
-                                            text-foreground
-                                            border-border
-                                        "
+                                        className={themedSelectTriggerClass}
                                     >
                                         <SelectValue placeholder="Select prompt type" />
                                     </SelectTrigger>
 
-                                    <SelectContent>
-
+                                    <SelectContent
+                                        className={themedSelectContentClass}
+                                    >
                                         {PROMPT_TYPES.map((option) => (
                                             <SelectItem
                                                 key={option.value}
                                                 value={option.value}
+                                                className={themedSelectItemClass}
                                             >
                                                 {option.label}
                                             </SelectItem>
                                         ))}
-
                                     </SelectContent>
-
                                 </Select>
-
                             </div>
-
                         </div>
-
 
                         {/* =================================================
                             GENERATE BUTTON
                         ================================================= */}
 
-                        <div className="flex justify-end border-t pt-5">
-
+                        <div className="flex justify-end border-t border-[var(--border-light)] pt-5">
                             <Button
                                 type="button"
                                 onClick={generatePrompt}
@@ -358,17 +317,8 @@ export default function PromptGeneratorView({ state }) {
                                     promptLoading ||
                                     !promptRequirements.trim()
                                 }
-                                className="
-                                    min-w-[170px]
-                                    bg-violet-600
-                                    text-white
-                                    shadow-sm
-                                    hover:bg-violet-700
-                                    dark:bg-violet-500
-                                    dark:hover:bg-violet-600
-                                "
+                                className="min-w-[170px] bg-[var(--brand-accent)] text-white shadow-[var(--shadow-sm)] hover:opacity-90"
                             >
-
                                 {promptLoading ? (
                                     <>
                                         <Sparkles className="mr-2 size-4 animate-pulse" />
@@ -380,67 +330,47 @@ export default function PromptGeneratorView({ state }) {
                                         Generate Prompt
                                     </>
                                 )}
-
                             </Button>
-
                         </div>
-
 
                         {/* =================================================
                             ERROR
                         ================================================= */}
 
                         {promptError && (
-                            <Alert
-                                variant="destructive"
-                                className="border-red-500/30 bg-red-500/5"
-                            >
-
+                            <Alert className="border-[var(--brand-danger)]/30 bg-[var(--warning-row)] text-[var(--brand-danger)]">
                                 <AlertCircle className="size-4" />
 
-                                <AlertDescription>
+                                <AlertDescription className="text-[var(--brand-danger)]">
                                     {promptError}
                                 </AlertDescription>
-
                             </Alert>
                         )}
-
                     </CardContent>
-
                 </Card>
-
 
                 {/* =====================================================
                     OUTPUT CARD
                 ===================================================== */}
 
-                <Card className="gap-0 py-0 overflow-hidden border-border/70 shadow-sm">
-
-                    <CardHeader
-                        className="
-                            border-b
-                            bg-gradient-to-r from-emerald-500/10 via-background to-cyan-500/10
-                            px-5 py-4 md:px-6
-                            space-y-0
-                        "
-                        >
+                <Card className="gap-0 overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-0 text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+                    <CardHeader className="space-y-0 border-b border-[var(--border-light)] bg-[var(--bg-muted)] px-5 py-4 md:px-6">
                         <div className="flex items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-3">
-                                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-success)]/10 text-[var(--brand-success)]">
                                     <Sparkles className="size-4" />
                                 </div>
 
                                 <div className="min-w-0">
-                                    <CardTitle className="m-0 text-base font-semibold leading-tight">
-                                    Generated Prompt
+                                    <CardTitle className="m-0 text-base font-semibold leading-tight text-[var(--text-primary)]">
+                                        Generated Prompt
                                     </CardTitle>
 
-                                    <CardDescription className="m-0 mt-1 text-xs leading-5">
-                                    Your model-specific prompt will appear here.
+                                    <CardDescription className="m-0 mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                                        Your model-specific prompt will appear here.
                                     </CardDescription>
                                 </div>
                             </div>
-
 
                             {generatedPrompt && (
                                 <Button
@@ -449,11 +379,13 @@ export default function PromptGeneratorView({ state }) {
                                     size="icon"
                                     onClick={handleCopy}
                                     title={copied ? "Copied" : "Copy prompt"}
-                                    aria-label={copied ? "Copied" : "Copy prompt"}
+                                    aria-label={
+                                        copied ? "Copied" : "Copy prompt"
+                                    }
                                     className={
                                         copied
-                                            ? "shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15"
-                                            : "shrink-0 hover:bg-muted"
+                                            ? "shrink-0 border-[var(--brand-success)]/40 bg-[var(--brand-success)]/10 text-[var(--brand-success)] hover:bg-[var(--brand-success)]/20]"
+                                            : "shrink-0 border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)]"
                                     }
                                 >
                                     {copied ? (
@@ -466,101 +398,49 @@ export default function PromptGeneratorView({ state }) {
                         </div>
                     </CardHeader>
 
-
-                    <CardContent className="p-5 md:p-6">
-
+                    <CardContent className="p-5 text-[var(--text-primary)] md:p-6">
                         {generatedPrompt ? (
-
                             <div className="space-y-3">
-
                                 <div className="flex items-center justify-between">
-
                                     <div className="flex items-center gap-2">
+                                        <span className="size-2 rounded-full bg-[var(--brand-success)]" />
 
-                                        <span className="size-2 rounded-full bg-emerald-500" />
-
-                                        <span className="text-xs font-medium text-muted-foreground">
+                                        <span className="text-xs font-medium text-[var(--text-muted)]">
                                             Generated output
                                         </span>
-
                                     </div>
 
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-xs text-[var(--text-muted)]">
                                         Read only
                                     </span>
-
                                 </div>
 
                                 <Textarea
                                     value={generatedPrompt}
                                     readOnly
-                                    className="
-                                        min-h-[500px]
-                                        resize-y
-                                        bg-muted/30
-                                        font-mono
-                                        text-sm
-                                        leading-6
-                                        text-foreground
-                                        placeholder:text-muted-foreground
-                                    "
+                                    className={`${themedInputClass} min-h-[500px] resize-y bg-[var(--bg-muted)] font-mono text-sm leading-6`}
                                 />
-
                             </div>
-
                         ) : (
-
-                            <div
-                                className="
-                                    flex
-                                    min-h-[500px]
-                                    flex-col
-                                    items-center
-                                    justify-center
-                                    rounded-xl
-                                    border
-                                    border-dashed
-                                    border-border
-                                    bg-muted/20
-                                    px-6
-                                    text-center
-                                "
-                            >
-
-                                <div className="
-                                    mb-4
-                                    flex
-                                    size-14
-                                    items-center
-                                    justify-center
-                                    rounded-2xl
-                                    bg-violet-500/10
-                                    text-violet-600
-                                    dark:text-violet-400
-                                ">
+                            <div className="flex min-h-[500px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-muted)] px-6 text-center">
+                                <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-[var(--brand-accent)]/10 text-[var(--brand-accent)]">
                                     <Sparkles className="size-7" />
                                 </div>
 
-                                <h3 className="text-sm font-semibold">
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                                     No prompt generated yet
                                 </h3>
 
-                                <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                                <p className="mt-2 max-w-sm text-sm leading-6 text-[var(--text-muted)]">
                                     Enter your requirements, choose the
                                     target model and prompt type, then
                                     generate your model-specific prompt.
                                 </p>
-
                             </div>
-
                         )}
-
                     </CardContent>
-
                 </Card>
-
             </div>
-
         </div>
     );
 }

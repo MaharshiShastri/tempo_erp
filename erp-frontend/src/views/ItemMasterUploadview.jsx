@@ -125,13 +125,13 @@ export default function ItemMasterUploadView({ state }) {
 
     return (
 
-        <Card className="mx-auto max-w-3xl">
+        <Card className="mx-auto max-w-3xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
 
-            <CardHeader className="border-b bg-muted/20">
+            <CardHeader className="border-b border-[var(--border-light)] bg-[var(--bg-muted)]">
 
                 <div className="flex items-center gap-3">
 
-                    <div className="flex size-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+                    <div className="flex size-11 items-center justify-center rounded-xl bg-[var(--bg-main)] text-[var(--brand-accent)]">
 
                         <FileSpreadsheet className="size-6" />
 
@@ -140,11 +140,11 @@ export default function ItemMasterUploadView({ state }) {
 
                     <div>
 
-                        <CardTitle>
+                        <CardTitle className="text-[var(--text-primary)]">
                             Bulk Import Product Master
                         </CardTitle>
 
-                        <CardDescription>
+                        <CardDescription className="text-[var(--text-muted)]">
                             Import structured product information using a CSV file.
                         </CardDescription>
 
@@ -160,16 +160,16 @@ export default function ItemMasterUploadView({ state }) {
 
                 {/* REQUIREMENTS */}
 
-                <Alert className="border-blue-500/20 bg-blue-500/5">
+                <Alert className="border-[var(--border-light)] bg-[var(--bg-muted)] text-[var(--text-primary)]">
 
-                    <Info className="size-4 text-blue-600" />
+                    <Info className="size-4 text-[var(--brand-accent)]" />
 
-                    <AlertTitle>
+                    <AlertTitle className="text-[var(--text-primary)]">
                         Data Formatting Requirements
                     </AlertTitle>
 
 
-                    <AlertDescription className="mt-2 space-y-3">
+                    <AlertDescription className="mt-2 space-y-3 text-[var(--text-muted)]">
 
                         <p>
 
@@ -184,14 +184,14 @@ export default function ItemMasterUploadView({ state }) {
 
                             <Badge
                                 variant="secondary"
-                                className="font-mono"
+                                className="border border-[var(--border-light)] bg-[var(--bg-main)] font-mono text-[var(--text-primary)]"
                             >
                                 Item code
                             </Badge>
 
                             <Badge
                                 variant="secondary"
-                                className="font-mono"
+                                className="border border-[var(--border-light)] bg-[var(--bg-main)] font-mono text-[var(--text-primary)]"
                             >
                                 Item Specifications
                             </Badge>
@@ -203,7 +203,7 @@ export default function ItemMasterUploadView({ state }) {
                 </Alert>
 
 
-                <Separator />
+                <Separator className="bg-[var(--border-light)]" />
 
 
                 {/* UPLOAD AREA */}
@@ -212,8 +212,8 @@ export default function ItemMasterUploadView({ state }) {
                     className={[
                         "rounded-xl border-2 border-dashed p-10 text-center transition-all",
                         selectedFile
-                            ? "border-emerald-500/50 bg-emerald-500/5"
-                            : "border-muted-foreground/20 bg-muted/20 hover:border-primary/50 hover:bg-primary/5",
+                            ? "border-[var(--brand-success)] bg-[var(--bg-muted)]"
+                            : "border-[var(--border-light)] bg-[var(--bg-muted)] hover:border-[var(--brand-accent)] hover:bg-[var(--combobox-hover)]",
                     ].join(" ")}
                 >
 
@@ -231,21 +231,21 @@ export default function ItemMasterUploadView({ state }) {
                         <div className="flex flex-col items-center">
 
 
-                            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-[var(--bg-main)] text-[var(--brand-success)]">
 
                                 <FileCheck2 className="size-8" />
 
                             </div>
 
 
-                            <h3 className="font-semibold">
+                            <h3 className="font-semibold text-[var(--text-primary)]">
 
                                 {selectedFile.name}
 
                             </h3>
 
 
-                            <p className="mt-1 text-sm text-muted-foreground">
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">
 
                                 {(
                                     selectedFile.size / 1024
@@ -258,6 +258,7 @@ export default function ItemMasterUploadView({ state }) {
 
                                 <Button
                                     variant="outline"
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
                                     onClick={clearFile}
                                     disabled={isUploading}
                                 >
@@ -270,6 +271,7 @@ export default function ItemMasterUploadView({ state }) {
 
 
                                 <Button
+                                    className="bg-[var(--brand-success)] text-white hover:opacity-90"
                                     onClick={handleUpload}
                                     disabled={isUploading}
                                 >
@@ -300,21 +302,21 @@ export default function ItemMasterUploadView({ state }) {
                         <div className="flex flex-col items-center">
 
 
-                            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-[var(--bg-main)] text-[var(--brand-accent)]">
 
                                 <Upload className="size-8" />
 
                             </div>
 
 
-                            <h3 className="font-semibold">
+                            <h3 className="font-semibold text-[var(--text-primary)]">
 
                                 Select a CSV file
 
                             </h3>
 
 
-                            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                            <p className="mt-2 max-w-sm text-sm text-[var(--text-muted)]">
 
                                 Upload a structured product master CSV.
                                 Maximum recommended file size: 5MB.
@@ -324,13 +326,13 @@ export default function ItemMasterUploadView({ state }) {
 
                             <Button
                                 variant="outline"
-                                className="mt-6"
+                                className="mt-6 border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
                                 onClick={() =>
                                     fileInputRef.current?.click()
                                 }
                             >
 
-                                <FileSpreadsheet className="mr-2 size-4 text-blue-500" />
+                                <FileSpreadsheet className="mr-2 size-4 text-[var(--brand-accent)]" />
 
                                 Browse Local Files
 
@@ -343,9 +345,9 @@ export default function ItemMasterUploadView({ state }) {
                 </div>
 
 
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
 
-                    <FileSpreadsheet className="size-3.5 text-emerald-600" />
+                    <FileSpreadsheet className="size-3.5 text-[var(--brand-success)]" />
 
                     CSV files only • Maximum 5MB recommended
 

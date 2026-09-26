@@ -32,17 +32,17 @@ function SectionHeader({
     return (
         <div className="space-y-1">
             <div className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-[var(--bg-muted)] text-[var(--brand-accent)]">
                     <Icon className="size-4" />
                 </div>
 
-                <h3 className="text-sm font-semibold">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                     {title}
                 </h3>
             </div>
 
             {description && (
-                <p className="pl-10 text-xs text-muted-foreground">
+                <p className="pl-10 text-xs text-[var(--text-muted)]">
                     {description}
                 </p>
             )}
@@ -65,24 +65,24 @@ export default function CompanyEntryFormView({ state }) {
     };
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-4">
+        <div className="mx-auto w-full max-w-5xl space-y-4 bg-[var(--bg-main)] text-[var(--text-primary)]">
             {/* PAGE HEADER */}
-            <Card className="overflow-hidden border-primary/20 shadow-sm">
-                <CardHeader className="bg-gradient-to-r from-primary/10 via-background to-blue-500/10">
+            <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
+                <CardHeader className="bg-[var(--bg-surface)]">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-start gap-3">
-                            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-accent)] text-white shadow-[var(--shadow-sm)]">
                                 <Building2 className="size-5" />
                             </div>
 
                             <div className="min-w-0">
-                                <CardTitle className="text-xl">
+                                <CardTitle className="text-xl text-[var(--text-primary)]">
                                     {state.isEditingCompany
                                         ? `Edit Profile: ${state.selectedCompanyId}`
                                         : "New Customer Profile"}
                                 </CardTitle>
 
-                                <CardDescription className="mt-1">
+                                <CardDescription className="mt-1 text-[var(--text-muted)]">
                                     {state.isEditingCompany
                                         ? "Update the existing enterprise master account."
                                         : "Provision a new enterprise master account."}
@@ -95,7 +95,7 @@ export default function CompanyEntryFormView({ state }) {
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className="border-red-500/30 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400"
+                                    className="border-[var(--brand-danger)]/40 bg-[var(--bg-main)] text-[var(--brand-danger)] hover:bg-[var(--warning-row)] hover:text-[var(--brand-danger)]"
                                     onClick={() =>
                                         state.deleteCompany(
                                             state.selectedCompanyId
@@ -110,6 +110,7 @@ export default function CompanyEntryFormView({ state }) {
                             <Button
                                 type="button"
                                 variant="outline"
+                                className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--combobox-hover)] hover:text-[var(--text-primary)]"
                                 onClick={() =>
                                     state.setActiveTab(
                                         "companies-list"
@@ -123,6 +124,7 @@ export default function CompanyEntryFormView({ state }) {
                             <Button
                                 type="submit"
                                 form="company-entry-form"
+                                className="bg-[var(--brand-accent)] text-white hover:bg-[var(--brand-accent)] hover:opacity-90"
                             >
                                 <Save className="mr-2 size-4" />
                                 {state.isEditingCompany
@@ -145,7 +147,7 @@ export default function CompanyEntryFormView({ state }) {
                 className="space-y-5"
             >
                 {/* BASIC INFORMATION */}
-                <Card className="border-border/70 shadow-sm">
+                <Card className="border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
                     <CardHeader>
                         <SectionHeader
                             icon={Building2}
@@ -156,9 +158,12 @@ export default function CompanyEntryFormView({ state }) {
 
                     <CardContent className="space-y-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="company-name">
+                            <Label
+                                htmlFor="company-name"
+                                className="text-[var(--text-primary)]"
+                            >
                                 Registered Legal Name
-                                <span className="ml-1 text-destructive">
+                                <span className="ml-1 text-[var(--brand-danger)]">
                                     *
                                 </span>
                             </Label>
@@ -175,13 +180,14 @@ export default function CompanyEntryFormView({ state }) {
                                     )
                                 }
                                 placeholder="e.g. Tempo Instruments Manufacturing Pvt Ltd"
+                                className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                             />
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* ADDRESS */}
-                <Card className="border-border/70 shadow-sm">
+                <Card className="border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
                     <CardHeader>
                         <SectionHeader
                             icon={MapPin}
@@ -192,9 +198,12 @@ export default function CompanyEntryFormView({ state }) {
 
                     <CardContent className="space-y-5">
                         <div className="grid gap-2">
-                            <Label htmlFor="address-line-1">
+                            <Label
+                                htmlFor="address-line-1"
+                                className="text-[var(--text-primary)]"
+                            >
                                 Address Line 1
-                                <span className="ml-1 text-destructive">
+                                <span className="ml-1 text-[var(--brand-danger)]">
                                     *
                                 </span>
                             </Label>
@@ -203,9 +212,7 @@ export default function CompanyEntryFormView({ state }) {
                                 id="address-line-1"
                                 type="text"
                                 required
-                                value={
-                                    form.address_line_1 || ""
-                                }
+                                value={form.address_line_1 || ""}
                                 onChange={(event) =>
                                     updateField(
                                         "address_line_1",
@@ -213,17 +220,21 @@ export default function CompanyEntryFormView({ state }) {
                                     )
                                 }
                                 placeholder="Plot No, Industrial Estate, Phase, Complex Area..."
+                                className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                             />
                         </div>
 
-                        <Separator />
+                        <Separator className="bg-[var(--border-light)]" />
 
                         <div className="grid gap-4 md:grid-cols-2">
                             {/* CITY */}
                             <div className="grid gap-2">
-                                <Label htmlFor="company-city">
+                                <Label
+                                    htmlFor="company-city"
+                                    className="text-[var(--text-primary)]"
+                                >
                                     City
-                                    <span className="ml-1 text-destructive">
+                                    <span className="ml-1 text-[var(--brand-danger)]">
                                         *
                                     </span>
                                 </Label>
@@ -240,24 +251,29 @@ export default function CompanyEntryFormView({ state }) {
                                         )
                                     }
                                     placeholder="Select or type city..."
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                                 />
 
                                 <datalist id="company-city-options">
-                                    {(state.industrialCities ||
-                                        []).map((city) => (
-                                        <option
-                                            key={city}
-                                            value={city}
-                                        />
-                                    ))}
+                                    {(state.industrialCities || []).map(
+                                        (city) => (
+                                            <option
+                                                key={city}
+                                                value={city}
+                                            />
+                                        )
+                                    )}
                                 </datalist>
                             </div>
 
                             {/* STATE */}
                             <div className="grid gap-2">
-                                <Label htmlFor="company-state">
+                                <Label
+                                    htmlFor="company-state"
+                                    className="text-[var(--text-primary)]"
+                                >
                                     State / Province
-                                    <span className="ml-1 text-destructive">
+                                    <span className="ml-1 text-[var(--brand-danger)]">
                                         *
                                     </span>
                                 </Label>
@@ -274,6 +290,7 @@ export default function CompanyEntryFormView({ state }) {
                                         )
                                     }
                                     placeholder="Select or type state..."
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                                 />
 
                                 <datalist id="company-state-options">
@@ -290,9 +307,12 @@ export default function CompanyEntryFormView({ state }) {
 
                             {/* PIN */}
                             <div className="grid gap-2">
-                                <Label htmlFor="company-pincode">
+                                <Label
+                                    htmlFor="company-pincode"
+                                    className="text-[var(--text-primary)]"
+                                >
                                     Postal PIN Code
-                                    <span className="ml-1 text-destructive">
+                                    <span className="ml-1 text-[var(--brand-danger)]">
                                         *
                                     </span>
                                 </Label>
@@ -312,6 +332,7 @@ export default function CompanyEntryFormView({ state }) {
                                         )
                                     }
                                     placeholder="e.g. 400001"
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                                 />
                             </div>
                         </div>
@@ -319,7 +340,7 @@ export default function CompanyEntryFormView({ state }) {
                 </Card>
 
                 {/* PRIMARY CONTACT */}
-                <Card className="border-border/70 shadow-sm">
+                <Card className="border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
                     <CardHeader>
                         <SectionHeader
                             icon={UserRound}
@@ -332,9 +353,12 @@ export default function CompanyEntryFormView({ state }) {
                         <div className="grid gap-4 md:grid-cols-2">
                             {/* NAME */}
                             <div className="grid gap-2">
-                                <Label htmlFor="contact-name">
+                                <Label
+                                    htmlFor="contact-name"
+                                    className="text-[var(--text-primary)]"
+                                >
                                     Full Name
-                                    <span className="ml-1 text-destructive">
+                                    <span className="ml-1 text-[var(--brand-danger)]">
                                         *
                                     </span>
                                 </Label>
@@ -343,9 +367,7 @@ export default function CompanyEntryFormView({ state }) {
                                     id="contact-name"
                                     type="text"
                                     required
-                                    value={
-                                        form.contact_name || ""
-                                    }
+                                    value={form.contact_name || ""}
                                     onChange={(event) =>
                                         updateField(
                                             "contact_name",
@@ -353,14 +375,18 @@ export default function CompanyEntryFormView({ state }) {
                                         )
                                     }
                                     placeholder="Enter handling executive's name"
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                                 />
                             </div>
 
                             {/* ROLE */}
                             <div className="grid gap-2">
-                                <Label htmlFor="contact-role">
+                                <Label
+                                    htmlFor="contact-role"
+                                    className="text-[var(--text-primary)]"
+                                >
                                     Corporate Designation
-                                    <span className="ml-1 text-destructive">
+                                    <span className="ml-1 text-[var(--brand-danger)]">
                                         *
                                     </span>
                                 </Label>
@@ -370,9 +396,7 @@ export default function CompanyEntryFormView({ state }) {
                                     list="company-role-options"
                                     type="text"
                                     required
-                                    value={
-                                        form.contact_role || ""
-                                    }
+                                    value={form.contact_role || ""}
                                     onChange={(event) =>
                                         updateField(
                                             "contact_role",
@@ -380,39 +404,42 @@ export default function CompanyEntryFormView({ state }) {
                                         )
                                     }
                                     placeholder="Select or type role..."
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                                 />
 
                                 <datalist id="company-role-options">
-                                    {(state.professionalRoles ||
-                                        []).map((role) => (
-                                        <option
-                                            key={role}
-                                            value={role}
-                                        />
-                                    ))}
+                                    {(state.professionalRoles || []).map(
+                                        (role) => (
+                                            <option
+                                                key={role}
+                                                value={role}
+                                            />
+                                        )
+                                    )}
                                 </datalist>
                             </div>
                         </div>
 
                         {/* PHONE */}
                         <div className="grid gap-2 md:max-w-md">
-                            <Label htmlFor="contact-phone">
+                            <Label
+                                htmlFor="contact-phone"
+                                className="text-[var(--text-primary)]"
+                            >
                                 Direct Phone Number
-                                <span className="ml-1 text-destructive">
+                                <span className="ml-1 text-[var(--brand-danger)]">
                                     *
                                 </span>
                             </Label>
 
                             <div className="relative">
-                                <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
 
                                 <Input
                                     id="contact-phone"
                                     type="tel"
                                     required
-                                    value={
-                                        form.contact_phone || ""
-                                    }
+                                    value={form.contact_phone || ""}
                                     onChange={(event) =>
                                         updateField(
                                             "contact_phone",
@@ -420,7 +447,7 @@ export default function CompanyEntryFormView({ state }) {
                                         )
                                     }
                                     placeholder="+91 9876543210"
-                                    className="pl-10"
+                                    className="border-[var(--border-light)] bg-[var(--bg-main)] pl-10 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                                 />
                             </div>
                         </div>

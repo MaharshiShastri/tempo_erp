@@ -1,11 +1,19 @@
 import GeoMapCanvas from "../components/geo/GeoMapCanvas";
 import SearchableMultiSelect from "../components/shared/SearchableMultiselect";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const themedInputClass =
+  "border-[var(--border-light)] bg-[var(--bg-main)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-[var(--brand-accent)]";
 
 export default function GeoAnalyticsView({ state }) {
   const stateList = Array.isArray(state?.indiaMap?.features)
@@ -34,31 +42,31 @@ export default function GeoAnalyticsView({ state }) {
 
   if (state.isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-7 w-72" />
+      <Card className="w-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+        <CardHeader className="border-b border-[var(--border-light)]">
+          <Skeleton className="h-7 w-72 bg-[var(--bg-muted)]" />
         </CardHeader>
 
         <CardContent className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full bg-[var(--bg-muted)]" />
+            <Skeleton className="h-10 w-full bg-[var(--bg-muted)]" />
+            <Skeleton className="h-10 w-full bg-[var(--bg-muted)]" />
+            <Skeleton className="h-10 w-full bg-[var(--bg-muted)]" />
           </div>
 
-          <Skeleton className="h-[500px] w-full" />
+          <Skeleton className="h-[500px] w-full bg-[var(--bg-muted)]" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>
+    <Card className="w-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]">
+      <CardHeader className="border-b border-[var(--border-light)] bg-[var(--bg-surface)]">
+        <CardTitle className="text-xl text-[var(--text-primary)]">
           Geographic Analytics{" "}
-          <span className="text-muted-foreground">
+          <span className="text-[var(--text-muted)]">
             {isDispatchAnalytics
               ? "- Dispatch Data"
               : "- Sales/Billing Data"}
@@ -69,9 +77,13 @@ export default function GeoAnalyticsView({ state }) {
       <CardContent className="space-y-6">
         {/* Filters */}
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+
           {/* From Date */}
           <div className="space-y-2">
-            <Label htmlFor="geo-from-date">
+            <Label
+              htmlFor="geo-from-date"
+              className="text-[var(--text-primary)]"
+            >
               From Date
             </Label>
 
@@ -84,12 +96,16 @@ export default function GeoAnalyticsView({ state }) {
               onChange={(e) =>
                 state.setFromGeoDate(e.target.value)
               }
+              className={themedInputClass}
             />
           </div>
 
           {/* To Date */}
           <div className="space-y-2">
-            <Label htmlFor="geo-to-date">
+            <Label
+              htmlFor="geo-to-date"
+              className="text-[var(--text-primary)]"
+            >
               To Date
             </Label>
 
@@ -102,6 +118,7 @@ export default function GeoAnalyticsView({ state }) {
               onChange={(e) =>
                 state.setToGeoDate(e.target.value)
               }
+              className={themedInputClass}
             />
           </div>
 
@@ -137,23 +154,33 @@ export default function GeoAnalyticsView({ state }) {
         </div>
 
         {/* Selection summary */}
-        <div className="flex flex-wrap gap-3 rounded-lg border bg-muted/40 p-4">
-          <Badge variant="secondary" className="px-3 py-1.5">
-            <span className="mr-1 font-semibold">
+        <div className="flex flex-wrap gap-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-muted)] p-4">
+
+          <Badge
+            variant="secondary"
+            className="border border-[var(--border-light)] bg-[var(--bg-main)] px-3 py-1.5 text-[var(--text-primary)]"
+          >
+            <span className="mr-1 font-semibold text-[var(--brand-accent)]">
               {state.selectedGroups.length}
             </span>
             Groups
           </Badge>
 
-          <Badge variant="secondary" className="px-3 py-1.5">
-            <span className="mr-1 font-semibold">
+          <Badge
+            variant="secondary"
+            className="border border-[var(--border-light)] bg-[var(--bg-main)] px-3 py-1.5 text-[var(--text-primary)]"
+          >
+            <span className="mr-1 font-semibold text-[var(--brand-accent)]">
               {state.selectedItems.length}
             </span>
             Items
           </Badge>
 
-          <Badge variant="secondary" className="px-3 py-1.5">
-            <span className="mr-1 font-semibold">
+          <Badge
+            variant="secondary"
+            className="border border-[var(--border-light)] bg-[var(--bg-main)] px-3 py-1.5 text-[var(--text-primary)]"
+          >
+            <span className="mr-1 font-semibold text-[var(--brand-accent)]">
               {state.selectedStates.length}
             </span>
             States
@@ -161,7 +188,7 @@ export default function GeoAnalyticsView({ state }) {
         </div>
 
         {/* Map */}
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-main)] shadow-[var(--shadow-sm)]">
           <GeoMapCanvas
             visibleMap={state.visibleMap}
             isDispatcher={isDispatchAnalytics}
